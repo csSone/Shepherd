@@ -74,93 +74,56 @@ class ConfigLoader {
    * 注意：这是一个简化的 YAML 解析器，仅处理我们的配置文件格式
    */
   private parseYaml(yamlText: string): AppConfig {
-    const lines = yamlText.split('\n');
-    const config: any = {};
-    const stack: Array<{ obj: any; level: number }> = [{ obj: config, level: -1 }];
+    // 使用正则表达式直接提取所有配置项
+    // 提取 backend.urls
+    const urlMatches = [...yamlText.matchAll(/-\s+"([^"]+)"/g)];
+    const urls = urlMatches.map(m => m[1]);
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
+    // 提取 currentIndex
+    const currentIndexMatch = yamlText.match(/currentIndex:\s*(\d+)/);
+    const currentIndex = currentIndexMatch ? parseInt(currentIndexMatch[1], 10) : 0;
 
-      // 跳过空行和注释
-      if (!trimmed || trimmed.startsWith('#')) {
-        continue;
-      }
+    // 提取 timeout
+    const timeoutMatch = yamlText.match(/timeout:\s*(\d+)/);
+    const timeout = timeoutMatch ? parseInt(timeoutMatch[1], 10) : 30000;
 
-      // 计算缩进级别
-      const indent = line.search(/\S|$/);
-      const level = Math.floor(indent / 2);
+    // 提取 retry count
+    const retryCountMatch = yamlText.match(/count:\s*(\d+)/);
+    const retryCount = retryCountMatch ? parseInt(retryCountMatch[1], 10) : 3;
 
-      // 弹出栈到正确的层级
-      while (stack.length > 1 && stack[stack.length - 1].level >= level) {
-        stack.pop();
-      }
+    // 提取 retry delay
+    const retryDelayMatch = yamlText.match(/delay:\s*(\d+)/);
+    const retryDelay = retryDelayMatch ? parseInt(retryDelayMatch[1], 10) : 1000;
 
-      const current = stack[stack.length - 1].obj;
-
-      // 解析键值对
-      if (trimmed.includes(':')) {
-        const colonIndex = trimmed.indexOf(':');
-        const key = trimmed.substring(0, colonIndex).trim();
-        const value = trimmed.substring(colonIndex + 1).trim();
-
-        if (value === '' || value === '|') {
-          // 这是一个对象或数组的开始
-          // 检查下一行是否是数组项（以 - 开头）
-          const nextLineIndex = i + 1;
-          if (nextLineIndex < lines.length) {
-            const nextLine = lines[nextLineIndex].trim();
-            if (nextLine.startsWith('- ')) {
-              // 这是一个数组
-              const newArr: any[] = [];
-              current[key] = newArr;
-              stack.push({ obj: newArr, level });
-            } else {
-              // 这是一个对象
-              const newObj: any = {};
-              current[key] = newObj;
-              stack.push({ obj: newObj, level });
-            }
-          } else {
-            // 没有下一行，当作空对象
-            current[key] = {};
-          }
-        } else if (value.startsWith('"') || value.startsWith("'")) {
-          // 字符串值
-          current[key] = value.slice(1, -1);
-        } else if (value === 'true' || value === 'false') {
-          // 布尔值
-          current[key] = value === 'true';
-        } else if (value === 'null' || value === '~') {
-          // null 值
-          current[key] = null;
-        } else if (!isNaN(Number(value))) {
-          // 数字值
-          current[key] = Number(value);
-        } else if (value.startsWith('- ')) {
-          // 内联数组
-          const items = value.split('-').map(s => s.trim()).filter(s => s);
-          current[key] = items;
-        } else {
-          // 其他值作为字符串
-          current[key] = value;
-        }
-      } else if (trimmed.startsWith('- ')) {
-        // 数组项
-        const itemValue = trimmed.slice(2).trim();
-        if (Array.isArray(current)) {
-          if (itemValue.startsWith('"') || itemValue.startsWith("'")) {
-            current.push(itemValue.slice(1, -1));
-          } else if (itemValue === 'true' || itemValue === 'false') {
-            current.push(itemValue === 'true');
-          } else if (!isNaN(Number(itemValue))) {
-            current.push(Number(itemValue));
-          } else {
-            current.push(itemValue);
-          }
+    // 提取 features
+    const features: any = {};
+    const featureMatches = yamlText.matchAll(/(\w+):\s*(true|false)/g);
+    for (const match of featureMatches) {
+      // 只提取 features 下的配置
+      const featureIndex = yamlText.indexOf(match[0]);
+      const featuresIndex = yamlText.indexOf('features:');
+      // 简单判断：在 features 块内
+      if (featuresIndex > 0 && featureIndex > featuresIndex) {
+        const nextSectionIndex = yamlText.indexOf('\n#', featuresIndex + 9);
+        if (featureIndex < (nextSectionIndex > 0 ? nextSectionIndex : yamlText.length)) {
+          features[match[1]] = match[2] === 'true';
         }
       }
     }
+
+    // 构建 config 对象
+    const config: any = {
+      backend: {
+        urls: urls,
+        currentIndex,
+        timeout,
+        retry: {
+          count: retryCount,
+          delay: retryDelay,
+        },
+      },
+      features,
+    };
 
     return this.normalizeConfig(config);
   }
