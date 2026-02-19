@@ -84,16 +84,16 @@ export function DialogContent({ className, children }: DialogContentProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* 背景遮罩 */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in"
         onClick={() => onOpenChange(false)}
       />
 
       {/* 对话框内容 */}
       <div
         className={cn(
-          'relative bg-card text-card-foreground rounded-xl shadow-2xl border border-border/50',
-          'max-w-lg w-full mx-4',
-          'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2',
+          'relative bg-white dark:bg-gray-900 text-card-foreground rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800',
+          'max-w-lg w-full',
+          'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200',
           className
         )}
       >
@@ -113,7 +113,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn('flex flex-col space-y-1.5 p-6 border-b', className)}>
+    <div className={cn('flex flex-col space-y-1.5 p-6 border-b border-gray-200 dark:border-gray-800', className)}>
       {children}
     </div>
   );
@@ -168,7 +168,7 @@ export function DialogFooter({ className, children }: DialogFooterProps) {
   return (
     <div
       className={cn(
-        'flex items-center p-6 pt-4 gap-3 justify-end border-t bg-muted/20',
+        'flex items-center p-6 pt-4 gap-3 justify-end border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50',
         className
       )}
     >
