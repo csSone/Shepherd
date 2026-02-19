@@ -48,6 +48,12 @@
 - 断点续传，并发下载（最多 4 任务）
 - 实时进度监控
 
+### 🎨 Web 前端
+- **React + TypeScript** - 现代化前端技术栈
+- **YAML 配置驱动** - 单一配置文件生成所有前端配置
+- **实时 UI 更新** - SSE 实时事件推送
+- **响应式设计** - 支持桌面和移动端
+
 ---
 
 ## 📦 快速开始
@@ -247,9 +253,15 @@ Shepherd/
 │   ├── server/            # HTTP 服务器
 │   └── websocket/         # SSE 实时通信
 ├── config/                # 配置文件目录
-├── docs/                  # 项目文档
+│   ├── config.yaml        # 后端服务器配置
+│   └── web/               # Web 前端配置
+│       └── config.yaml    # 前端 YAML 配置（单一数据源）
 ├── scripts/               # 编译和部署脚本
-└── web/                   # Web UI
+│   └── generate-web-configs.ts  # 前端配置生成器
+├── web/                   # Web 前端
+│   ├── src/               # React + TypeScript 源码
+│   └── [配置文件自动生成] # 由 config.yaml 生成
+└── docs/                  # 项目文档
 ```
 
 ---
@@ -270,10 +282,69 @@ Shepherd/
 
 ### 环境要求
 
+**后端开发:**
 - Go 1.25+
 - Git
 
-### 开发命令
+**前端开发:**
+- Node.js 18+
+- npm 或 yarn
+
+### Web 前端开发
+
+Shepherd Web 前端采用 **YAML 配置驱动** 的方式管理所有配置文件：
+
+```bash
+cd web
+
+# 1. 安装依赖
+npm install
+
+# 2. 修改配置文件
+# 编辑 config/web/config.yaml
+
+# 3. 生成前端配置（自动运行）
+npm run gen:config
+
+# 4. 启动开发服务器
+npm run dev
+
+# 5. 构建生产版本
+npm run build
+
+# 6. 类型检查
+npm run type-check
+
+# 7. 代码检查
+npm run lint
+```
+
+**配置生成流程：**
+
+```
+config/web/config.yaml (单一数据源)
+         ↓
+scripts/generate-web-configs.ts
+         ↓
+web/ (自动生成的配置文件)
+├── tsconfig.json
+├── tsconfig.app.json
+├── tsconfig.node.json
+├── vite.config.ts
+├── tailwind.config.js
+├── postcss.config.js
+└── eslint.config.js
+```
+
+**技术栈:**
+- **构建工具:** Vite 7.x
+- **框架:** React 19 + TypeScript 5.x
+- **路由:** React Router v7
+- **状态管理:** Zustand + React Query
+- **UI 组件:** Tailwind CSS 4.x + shadcn/ui
+- **Markdown:** react-markdown + remark-gfm + rehype-highlight
+
+### 后端开发命令
 
 ```bash
 # 运行测试
@@ -319,8 +390,8 @@ make clean
 
 - [x] v0.1.0-alpha - 核心功能 (M1-M9)
 - [x] Master-Client 分布式管理
+- [x] Web UI - React + TypeScript 前端
 - [ ] MCP (Model Context Protocol) 支持
-- [ ] Web UI
 - [ ] 系统托盘
 - [ ] v1.0.0 - 生产就绪
 
