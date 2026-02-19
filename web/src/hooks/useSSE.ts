@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SSEEvent } from '@/types';
+import { apiClient } from '@/lib/api/client';
 
 /**
  * useSSE Hook 配置选项
@@ -130,7 +131,13 @@ export function useSSE(options: UseSSEOptions = {}) {
     }
 
     try {
-      const es = new EventSource('/api/events');
+      // 从 API 客户端获取后端 URL
+      const baseUrl = apiClient.getBaseUrl();
+      const sseUrl = `${baseUrl}/events`;
+
+      console.log('Connecting to SSE endpoint:', sseUrl);
+
+      const es = new EventSource(sseUrl);
       es.addEventListener('message', handleMessage);
       es.addEventListener('error', handleError);
       es.addEventListener('open', handleOpen);
