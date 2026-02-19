@@ -1,0 +1,14 @@
+// Write to all outputs
+	for _, w := range l.outputs {
+		w.Write([]byte(logLine))
+		// Flush if the writer supports it (e.g., *os.File)
+		if f, ok := w.(*os.File); ok {
+			// Only sync actual files, not stdout/stderr
+			if f.Name() != "" && f.Name() != "/dev/stdout" && f.Name() != "/dev/stderr" {
+				f.Sync()
+			}
+			info, _ := f.Stat()
+			l.currentSize = info.Size()
+		}
+	}
+}

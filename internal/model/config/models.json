@@ -1,0 +1,200 @@
+[
+  {
+    "modelId": "/tmp/TestManagerSetAlias4034239488/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite2185442648/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias635033643/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3079673631/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias1202187510/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite389262401/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias4183636768/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite4166178642/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias892957855/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3624531329/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias2096866698/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite1114430495/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias3036512018/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite1336452156/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias980611553/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite999859069/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias4260249467/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3450660907/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias4134870658/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3504780542/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias3141199458/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite592890991/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias571152681/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite2841666916/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias3695968661/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite2814196917/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias3166397368/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite817986041/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias181636606/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3934111062/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias871509676/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3046914708/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias1666237200/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite1882071321/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias1595658323/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite2504045764/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias1570942025/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite3438979729/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias2913058623/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite2498651010/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias2440412957/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite1752267962/001/test-model.gguf",
+    "favourite": true
+  },
+  {
+    "modelId": "/tmp/TestManagerSetAlias3947460534/001/test-model.gguf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "/tmp/TestManagerSetFavourite2126832917/001/test-model.gguf",
+    "favourite": true
+  }
+]

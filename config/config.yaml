@@ -1,0 +1,46 @@
+server:
+    web_port: 9190
+    anthropic_port: 9170
+    ollama_port: 11434
+    lmstudio_port: 1234
+    host: 0.0.0.0
+    read_timeout: 60
+    write_timeout: 60
+log:
+    level: info
+    format: json
+    output: both
+    directory: ./logs
+    max_size: 100
+    max_backups: 3
+    max_age: 7
+    compress: true
+model:
+    paths:
+        - /home/user/workspace/Shepherd/models
+        - /home/user/.cache/huggingface/hub
+    auto_scan: true
+    scan_interval: 0
+llamacpp:
+    paths:
+        - path: /home/user/workspace/Shepherd/llama.cpp
+          name: Default
+download:
+    directory: /home/user/workspace/Shepherd/downloads
+    max_concurrent: 4
+    chunk_size: 1048576
+    retry_count: 3
+    timeout: 300
+security:
+    api_key_enabled: false
+    api_key: ""
+    cors_enabled: true
+    allowed_origins:
+        - '*'
+compatibility:
+    ollama:
+        enabled: true
+        port: 11434
+    lmstudio:
+        enabled: false
+        port: 1234

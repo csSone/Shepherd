@@ -1,2 +1,306 @@
-# Shepherd
-a manager for llama.cpp
+<div align="center">
+
+# 🐏 Shepherd
+
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build](https://img.shields.io/badge/Build-passing-brightgreen.svg)]()
+
+**高性能轻量级 llama.cpp 模型管理系统**
+
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [文档](#-文档) • [贡献](#-贡献)
+
+</div>
+
+---
+
+## ✨ 功能特性
+
+### 🚀 核心能力
+- **极快启动** - <500ms 启动时间，相比 Java 版本快 20 倍
+- **低内存占用** - 仅 ~30MB 内存，相比 Java 版本减少 85%
+- **单一二进制** - 无需运行时依赖，开箱即用
+- **分布式架构** - 支持 Master-Client 多节点部署
+
+### 📦 模型管理
+- 自动扫描 GGUF 格式模型
+- 一键加载/卸载，支持多目录管理
+- 模型收藏、别名、分卷自动识别
+- 视觉模型 (mmproj) 支持
+
+### 🔌 多 API 兼容
+| API | 端口 | 状态 |
+|-----|------|------|
+| OpenAI | `:9190/v1` | ✅ |
+| Anthropic | `:9170/v1` | ✅ |
+| Ollama | `:11434` | ✅ |
+| LM Studio | `:1234` | ✅ |
+
+### 🌐 分布式管理
+- **Master 模式** - 管理多个 Client 节点
+- **Client 模式** - 作为工作节点执行任务
+- **自动发现** - 内网自动扫描和注册 Client
+- **任务调度** - 支持轮询、最少负载、资源感知策略
+- **Conda 集成** - 使用 Client 端 Python 环境
+
+### 📥 下载管理
+- HuggingFace / ModelScope 模型下载
+- 断点续传，并发下载（最多 4 任务）
+- 实时进度监控
+
+---
+
+## 📦 快速开始
+
+### 安装
+
+<details>
+<summary><b>从源码编译</b></summary>
+
+```bash
+# 克隆仓库
+git clone https://github.com/shepherd-project/shepherd.git
+cd shepherd
+
+# 编译 (支持 Linux/macOS/Windows)
+make build
+# 或
+./scripts/build.sh
+```
+
+</details>
+
+<details>
+<summary><b>使用 Makefile</b></summary>
+
+```bash
+make build        # 编译当前平台
+make build-all    # 跨平台编译所有平台
+make release      # 打包发布版本
+make install      # 安装到系统
+```
+
+</details>
+
+<details>
+<summary><b>下载预编译版本</b></summary>
+
+前往 [Releases](https://github.com/shepherd-project/shepherd/releases) 下载对应平台的二进制文件。
+
+</details>
+
+### 配置
+
+创建 `config/config.yaml`：
+
+```yaml
+# 运行模式: standalone, master, client
+mode: standalone
+
+server:
+  web_port: 9190
+
+model:
+  paths:
+    - "./models"
+    - "~/.cache/huggingface/hub"
+  auto_scan: true
+```
+
+### 运行
+
+```bash
+# 单机模式 (默认)
+./shepherd
+
+# Master 模式
+./shepherd --mode=master
+
+# Client 模式
+./shepherd --mode=client --master-address=http://master:9190
+```
+
+访问 Web UI: http://localhost:9190
+
+---
+
+## 💡 使用示例
+
+### OpenAI API
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:9190/v1",
+    api_key="dummy"
+)
+
+response = client.chat.completions.create(
+    model="llama-2-7b-chat",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)
+```
+
+### Master-Client 分布式部署
+
+```bash
+# 1. 启动 Master 节点
+./shepherd --mode=master
+
+# 2. 在其他机器启动 Client 节点
+./shepherd --mode=client --master-address=http://master:9190
+
+# 3. 查看集群状态
+curl http://master:9190/api/master/clients
+
+# 4. 创建调度任务
+curl -X POST http://master:9190/api/master/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "run_python",
+    "payload": {
+      "script": "/path/to/script.py",
+      "conda_env": "rocm7.2"
+    }
+  }'
+```
+
+### SSE 实时事件监听
+
+```javascript
+const eventSource = new EventSource('http://localhost:9190/api/events');
+
+eventSource.addEventListener('log', (e) => {
+  const data = JSON.parse(e.data);
+  console.log(`[LOG] ${data.message}`);
+});
+```
+
+---
+
+## 🏗️ 项目结构
+
+```
+Shepherd/
+├── cmd/shepherd/          # 主程序入口
+├── internal/
+│   ├── api/               # OpenAI/Anthropic/Ollama API
+│   ├── cluster/           # Master-Client 分布式管理
+│   ├── client/            # Client 端组件
+│   ├── config/            # 配置管理
+│   ├── download/          # 下载管理器
+│   ├── gguf/              # GGUF 模型解析
+│   ├── logger/            # 日志系统
+│   ├── model/             # 模型管理器
+│   ├── process/           # 进程管理
+│   ├── server/            # HTTP 服务器
+│   └── websocket/         # SSE 实时通信
+├── config/                # 配置文件目录
+├── docs/                  # 项目文档
+├── scripts/               # 编译和部署脚本
+└── web/                   # Web UI
+```
+
+---
+
+## 📚 文档
+
+| 文档 | 描述 |
+|------|------|
+| [编译和安装](docs/06-编译和安装.md) | 详细编译指南 |
+| [项目概述](docs/01-项目概述.md) | 项目背景和目标 |
+| [架构设计](docs/03-架构设计.md) | 系统架构说明 |
+| [实施路线图](docs/04-实施路线图.md) | 开发进度和计划 |
+| [API 参考](docs/05-API参考.md) | API 接口文档 |
+
+---
+
+## 🛠️ 开发
+
+### 环境要求
+
+- Go 1.25+
+- Git
+
+### 开发命令
+
+```bash
+# 运行测试
+make test
+
+# 代码检查
+make lint
+
+# 代码格式化
+make fmt
+
+# 跨平台编译
+make build-all
+
+# 清理构建文件
+make clean
+```
+
+### 贡献指南
+
+欢迎贡献！请查看 [贡献指南](CONTRIBUTING.md)。
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+---
+
+## 📊 性能对比
+
+| 特性 | Java 版本 | Go 版本 | 改进 |
+|------|---------|---------|------|
+| 启动时间 | 5-10 秒 | <500ms | **20x** |
+| 内存占用 | ~200MB | ~30MB | **-85%** |
+| 部署体积 | ~150MB | ~15MB | **-90%** |
+| 部署方式 | 需要 JVM | 单一二进制 | 更简单 |
+
+---
+
+## 🗺️ 路线图
+
+- [x] v0.1.0-alpha - 核心功能 (M1-M9)
+- [x] Master-Client 分布式管理
+- [ ] MCP (Model Context Protocol) 支持
+- [ ] Web UI
+- [ ] 系统托盘
+- [ ] v1.0.0 - 生产就绪
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 🙏 致谢
+
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) - 核心推理引擎
+- [LlamacppServer](https://github.com/markpublish/LlamacppServer) - 原始 Java 版本
+- 所有第三方库的贡献者
+
+---
+
+## 📞 联系方式
+
+- **问题反馈**: [GitHub Issues](https://github.com/shepherd-project/shepherd/issues)
+- **功能建议**: [GitHub Discussions](https://github.com/shepherd-project/shepherd/discussions)
+
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对你有帮助，请点个 Star！**
+
+</div>

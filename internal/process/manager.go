@@ -1,0 +1,326 @@
+package process
+
+import (
+	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+)
+
+// Manager manages multiple llama.cpp processes
+type Manager struct {
+	processes   map[string]*Process
+	loading     map[string]*Process
+	mu          sync.RWMutex
+}
+
+// NewManager creates a new process manager
+func NewManager() *Manager {
+	return &Manager{
+		processes: make(map[string]*Process),
+		loading:   make(map[string]*Process),
+	}
+}
+
+// Start starts a new llama.cpp process for a model
+func (m *Manager) Start(modelID, name, cmd, binPath string) (*Process, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check if already loaded
+	if _, exists := m.processes[modelID]; exists {
+		return nil, fmt.Errorf("model %s already loaded", modelID)
+	}
+
+	// Check if currently loading
+	if _, exists := m.loading[modelID]; exists {
+		return nil, fmt.Errorf("model %s is currently loading", modelID)
+	}
+
+	// Create process
+	process := NewProcess(modelID, name, cmd, binPath)
+
+	// Add to loading map
+	m.loading[modelID] = process
+
+	// Start the process (outside the lock)
+	m.mu.Unlock()
+	err := process.Start()
+	m.mu.Lock()
+
+	if err != nil {
+		// Remove from loading map on error
+		delete(m.loading, modelID)
+		return nil, fmt.Errorf("failed to start process: %w", err)
+	}
+
+	// Move from loading to loaded
+	delete(m.loading, modelID)
+	m.processes[modelID] = process
+
+	return process, nil
+}
+
+// Stop stops a running process
+func (m *Manager) Stop(modelID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check loaded processes
+	process, exists := m.processes[modelID]
+	if !exists {
+		// Also check loading processes
+		if process, exists = m.loading[modelID]; exists {
+			delete(m.loading, modelID)
+			return process.Stop()
+		}
+		return fmt.Errorf("model %s not found", modelID)
+	}
+
+	// Stop the process
+	if err := process.Stop(); err != nil {
+		return err
+	}
+
+	// Remove from map
+	delete(m.processes, modelID)
+
+	return nil
+}
+
+// Get returns a process by model ID
+func (m *Manager) Get(modelID string) (*Process, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Check loaded first
+	if process, exists := m.processes[modelID]; exists {
+		return process, true
+	}
+
+	// Check loading
+	process, exists := m.loading[modelID]
+	return process, exists
+}
+
+// List returns all running processes
+func (m *Manager) List() map[string]*Process {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Return a copy to prevent concurrent modification
+	result := make(map[string]*Process, len(m.processes))
+	for k, v := range m.processes {
+		result[k] = v
+	}
+
+	return result
+}
+
+// ListAll returns both running and loading processes
+func (m *Manager) ListAll() (running, loading map[string]*Process) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	running = make(map[string]*Process, len(m.processes))
+	loading = make(map[string]*Process, len(m.loading))
+
+	for k, v := range m.processes {
+		running[k] = v
+	}
+	for k, v := range m.loading {
+		loading[k] = v
+	}
+
+	return running, loading
+}
+
+// GetRunningCount returns the number of running processes
+func (m *Manager) GetRunningCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.processes)
+}
+
+// GetLoadingCount returns the number of loading processes
+func (m *Manager) GetLoadingCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.loading)
+}
+
+// IsRunning returns true if a model is currently running
+func (m *Manager) IsRunning(modelID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if process, exists := m.processes[modelID]; exists {
+		return process.IsRunning()
+	}
+	return false
+}
+
+// IsLoading returns true if a model is currently loading
+func (m *Manager) IsLoading(modelID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if process, exists := m.loading[modelID]; exists {
+		return process.IsRunning()
+	}
+	return false
+}
+
+// GetProcessByPort finds a process by its port number
+func (m *Manager) GetProcessByPort(port int) (*Process, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, process := range m.processes {
+		if process.GetPort() == port {
+			return process, true
+		}
+	}
+
+	return nil, false
+}
+
+// Cleanup removes stopped processes from the manager
+func (m *Manager) Cleanup() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var removed []string
+
+	for modelID, process := range m.processes {
+		if !process.IsRunning() {
+			delete(m.processes, modelID)
+			removed = append(removed, modelID)
+		}
+	}
+
+	return removed
+}
+
+// StopAll stops all running processes
+func (m *Manager) StopAll() []error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var errs []error
+
+	// Stop all loaded processes
+	for modelID, process := range m.processes {
+		if err := process.Stop(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to stop %s: %w", modelID, err))
+		}
+		delete(m.processes, modelID)
+	}
+
+	// Stop all loading processes
+	for modelID, process := range m.loading {
+		if err := process.Stop(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to stop loading %s: %w", modelID, err))
+		}
+		delete(m.loading, modelID)
+	}
+
+	return errs
+}
+
+// BuildCommand builds the llama-server command line
+// This is a helper to construct the command string
+func BuildCommand(binPath, modelPath string, port int, opts map[string]interface{}) (string, error) {
+	if binPath == "" {
+		return "", fmt.Errorf("binary path cannot be empty")
+	}
+	if modelPath == "" {
+		return "", fmt.Errorf("model path cannot be empty")
+	}
+
+	// Find the llama-server executable
+	serverBin := filepath.Join(binPath, "llama-server")
+
+	// Build command arguments
+	args := []string{
+		serverBin,
+		"-m", modelPath,
+		"--port", strconv.Itoa(port),
+	}
+
+	// Add optional parameters
+	if ctxSize, ok := opts["ctx_size"].(int); ok && ctxSize > 0 {
+		args = append(args, "-c", strconv.Itoa(ctxSize))
+	}
+	if batchSize, ok := opts["batch_size"].(int); ok && batchSize > 0 {
+		args = append(args, "-b", strconv.Itoa(batchSize))
+	}
+	if threads, ok := opts["threads"].(int); ok && threads > 0 {
+		args = append(args, "-t", strconv.Itoa(threads))
+	}
+	if gpuLayers, ok := opts["gpu_layers"].(int); ok && gpuLayers > 0 {
+		args = append(args, "-ngl", strconv.Itoa(gpuLayers))
+	}
+	if temperature, ok := opts["temperature"].(float64); ok {
+		args = append(args, "--temp", fmt.Sprintf("%.2f", temperature))
+	}
+	if topP, ok := opts["top_p"].(float64); ok {
+		args = append(args, "--top-p", fmt.Sprintf("%.2f", topP))
+	}
+	if topK, ok := opts["top_k"].(int); ok && topK > 0 {
+		args = append(args, "--top-k", strconv.Itoa(topK))
+	}
+	if repeatPenalty, ok := opts["repeat_penalty"].(float64); ok {
+		args = append(args, "--repeat-penalty", fmt.Sprintf("%.2f", repeatPenalty))
+	}
+	if nPredict, ok := opts["n_predict"].(int); ok && nPredict > 0 {
+		args = append(args, "-n", strconv.Itoa(nPredict))
+	}
+
+	// Add host parameter
+	args = append(args, "--host", "0.0.0.0")
+
+	// Join arguments into command string
+	return quoteAndJoin(args), nil
+}
+
+// quoteAndJoin joins arguments into a command string with proper quoting
+func quoteAndJoin(args []string) string {
+	var result string
+	for i, arg := range args {
+		if i > 0 {
+			result += " "
+		}
+
+		// Quote arguments that contain spaces or special characters
+		if needsQuoting(arg) {
+			result += `"` + escapeQuotes(arg) + `"`
+		} else {
+			result += arg
+		}
+	}
+	return result
+}
+
+// needsQuoting returns true if an argument needs to be quoted
+func needsQuoting(arg string) bool {
+	for _, c := range arg {
+		if c == ' ' || c == '\t' || c == '"' || c == '\'' || c == '\\' {
+			return true
+		}
+	}
+	return false
+}
+
+// escapeQuotes escapes quotes in a string
+func escapeQuotes(s string) string {
+	result := strings.Builder{}
+	for _, c := range s {
+		if c == '"' || c == '\\' {
+			result.WriteRune('\\')
+		}
+		result.WriteRune(c)
+	}
+	return result.String()
+}
