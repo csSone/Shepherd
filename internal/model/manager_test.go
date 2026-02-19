@@ -36,7 +36,7 @@ func TestLoadStateString(t *testing.T) {
 
 func TestNewManager(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -49,7 +49,7 @@ func TestNewManager(t *testing.T) {
 
 func TestManagerIsGGUFFile(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -76,7 +76,7 @@ func TestManagerIsGGUFFile(t *testing.T) {
 
 func TestManagerGetSetModel(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -94,7 +94,7 @@ func TestManagerGetSetModel(t *testing.T) {
 
 func TestManagerSetAlias(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -126,7 +126,7 @@ func TestManagerSetAlias(t *testing.T) {
 
 func TestManagerSetFavourite(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -158,7 +158,7 @@ func TestManagerSetFavourite(t *testing.T) {
 
 func TestManagerGetStatus(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -176,7 +176,7 @@ func TestManagerGetStatus(t *testing.T) {
 
 func TestManagerGetScanStatus(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -188,7 +188,7 @@ func TestManagerGetScanStatus(t *testing.T) {
 
 func TestFindAvailablePort(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -200,7 +200,7 @@ func TestFindAvailablePort(t *testing.T) {
 
 func TestFindMmproj(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -213,7 +213,7 @@ func TestFindMmproj(t *testing.T) {
 
 func TestGenerateModelID(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -228,7 +228,7 @@ func TestGenerateModelID(t *testing.T) {
 
 func TestScanStatus(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -262,7 +262,7 @@ func createMinimalGGUF(path string) error {
 
 func TestLoadModel(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -291,7 +291,7 @@ func TestLoadModel(t *testing.T) {
 
 func TestScanPath(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -324,7 +324,7 @@ func TestScanPath(t *testing.T) {
 
 func TestLoadUnload(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)
@@ -414,7 +414,7 @@ func TestScanErrorDefaults(t *testing.T) {
 
 func BenchmarkListModels(b *testing.B) {
 	cfg := config.DefaultConfig()
-	cfgMgr := config.NewManager()
+	cfgMgr := config.NewManager("standalone")
 	procMgr := process.NewManager()
 
 	manager := NewManager(cfg, cfgMgr, procMgr)

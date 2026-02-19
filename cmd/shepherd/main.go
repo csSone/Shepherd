@@ -53,8 +53,15 @@ func main() {
 	fmt.Printf("版本: %s\n", Version)
 	fmt.Printf("Commit: %s\n\n", GitCommit)
 
-	// 创建配置管理器
-	configMgr := config.NewManager()
+	// 确定运行模式
+	// 优先使用命令行参数，否则默认为 standalone
+	runMode := "standalone"
+	if *mode != "" {
+		runMode = *mode
+	}
+
+	// 创建配置管理器（根据运行模式）
+	configMgr := config.NewManager(runMode)
 
 	// 加载配置
 	cfg, err := configMgr.Load()
@@ -63,11 +70,11 @@ func main() {
 		cfg = config.DefaultConfig()
 	}
 
+	// 确保配置中的 mode 与运行时一致
+	cfg.Mode = runMode
+
 	// 命令行参数覆盖配置
-	if *mode != "" {
-		cfg.Mode = *mode
-	}
-	if *masterAddr != "" && cfg.Mode == "client" {
+	if *masterAddr != "" && runMode == "client" {
 		cfg.Client.MasterAddress = *masterAddr
 	}
 
