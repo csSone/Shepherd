@@ -62,3 +62,7 @@ coverage/
 *.out
 *.coverprofile
 profile.cov
+
+# Node.js
+node_modules/
+package-lock.json

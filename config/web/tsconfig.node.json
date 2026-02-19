@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "tsBuildInfoFile": "../../web/node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "types": ["node"]
-  },
-  "include": ["../../web/vite.config.ts", "../../web/eslint.config.js"]
-}
