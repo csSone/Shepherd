@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:start": "cd ../.. && ./scripts/start-dev.sh",
     "dev:watch": "cd ../.. && ./scripts/watch-sync-config.sh",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
