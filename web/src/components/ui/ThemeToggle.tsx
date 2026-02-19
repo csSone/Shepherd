@@ -43,12 +43,12 @@ export function ThemeToggle() {
 
   return (
     <div ref={containerRef} className="relative">
-      {/* 触发按钮 - 简化为图标按钮 */}
+      {/* 触发按钮 - 紧凑的下拉样式 */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex items-center justify-center rounded-lg p-2',
+          'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5',
           'transition-all duration-200',
           'border border-border/40 hover:border-border/60',
           'bg-background/50 hover:bg-background/80',
@@ -60,21 +60,28 @@ export function ThemeToggle() {
         aria-expanded={isOpen}
         title={currentTheme?.label}
       >
-        <CurrentIcon size={18} />
+        <CurrentIcon size={16} />
+        <ChevronDown
+          size={12}
+          className={cn(
+            'transition-transform duration-200 text-muted-foreground',
+            isOpen && 'rotate-180'
+          )}
+        />
       </button>
 
       {/* 下拉菜单 */}
       {isOpen && (
         <div
           className={cn(
-            'absolute right-0 top-full z-50 mt-2 w-36',
+            'absolute right-0 top-full z-50 mt-1 w-32',
             'rounded-lg border bg-popover shadow-md overflow-hidden',
             'animate-in fade-in-0 zoom-in-95'
           )}
           role="listbox"
           aria-label="主题选项"
         >
-          <div className="py-1">
+          <div className="py-0.5">
             {themeOptions.map((option) => {
               const Icon = option.icon;
               const isSelected = option.value === theme;
@@ -88,7 +95,7 @@ export function ThemeToggle() {
                     setIsOpen(false);
                   }}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-xs',
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-xs',
                     'transition-colors duration-150',
                     'hover:bg-accent hover:text-accent-foreground',
                     isSelected && 'bg-accent',
@@ -97,7 +104,7 @@ export function ThemeToggle() {
                   role="option"
                   aria-selected={isSelected}
                 >
-                  <Icon size={14} className={cn(
+                  <Icon size={12} className={cn(
                     'shrink-0',
                     isSelected ? 'text-primary' : 'text-foreground'
                   )} />
@@ -107,9 +114,6 @@ export function ThemeToggle() {
                   )}>
                     {option.label}
                   </span>
-                  {isSelected && (
-                    <span className="ml-auto text-[10px] text-primary">✓</span>
-                  )}
                 </button>
               );
             })}
