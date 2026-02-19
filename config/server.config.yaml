@@ -21,6 +21,9 @@ llamacpp:
         - path: ./llama.cpp
           name: Default
           description: ""
+        - path: /home/user/workspace/llama.cpp/build-rocm/bin
+          name: Rocm后端
+          description: ""
 download:
     directory: ./downloads
     max_concurrent: 4

@@ -53,33 +53,13 @@
   }
 
   html {
-    font-size: 16px;
+    font-size: 22px; /* 整体放大约 37.5% */
   }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
-    /* 150% 缩放: 使用 zoom 或 transform */
-    zoom: 1.5; /* Chrome/Edge 非 标准,但效果最好 */
-  }
-
-  /* Firefox 替代方案 */
-  @supports not (zoom: 1.5) {
-    body {
-      zoom: unset;
-      transform: scale(1.5);
-      transform-origin: top left;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    #root {
-      width: 66.67vw; /* 100 / 1.5 */
-      height: 66.67vh;
-      overflow: auto;
-    }
   }
 }
 
