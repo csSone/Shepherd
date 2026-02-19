@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useUIStore } from '@/stores/uiStore';
+import { useConfig } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -14,16 +15,16 @@ import {
 } from 'lucide-react';
 
 /**
- * 侧边栏导航项配置
+ * 完整的导航项配置
  */
-const navItems = [
-  { path: '/', icon: LayoutDashboard, label: '仪表盘' },
-  { path: '/models', icon: Package, label: '模型管理' },
-  { path: '/downloads', icon: Download, label: '下载管理' },
-  { path: '/chat', icon: MessageSquare, label: '聊天' },
-  { path: '/cluster', icon: Network, label: '集群管理' },
-  { path: '/logs', icon: ScrollText, label: '日志' },
-  { path: '/settings', icon: Settings, label: '设置' },
+const allNavItems = [
+  { path: '/', icon: LayoutDashboard, label: '仪表盘', feature: 'dashboard' },
+  { path: '/models', icon: Package, label: '模型管理', feature: 'models' },
+  { path: '/downloads', icon: Download, label: '下载管理', feature: 'downloads' },
+  {path: '/chat', icon: MessageSquare, label: '聊天', feature: 'chat' },
+  { path: '/cluster', icon: Network, label: '集群管理', feature: 'cluster' },
+  { path: '/logs', icon: ScrollText, label: '日志', feature: 'logs' },
+  { path: '/settings', icon: Settings, label: '设置', feature: 'settings' },
 ];
 
 /**
@@ -32,6 +33,12 @@ const navItems = [
 export function Sidebar() {
   const location = useLocation();
   const { sidebarOpen, toggleSidebar } = useUIStore();
+  const config = useConfig();
+
+  // 根据配置过滤导航项
+  const navItems = allNavItems.filter(
+    (item) => config.features[item.feature as keyof typeof config.features] !== false
+  );
 
   return (
     <aside
@@ -90,7 +97,7 @@ export function Sidebar() {
       <div className="border-t p-4">
         {sidebarOpen && (
           <div className="text-xs text-muted-foreground">
-            <div>Shepherd v0.1.0-alpha</div>
+            <div>Shepherd v0.1.1</div>
             <div className="mt-1">© 2026 Shepherd Project</div>
           </div>
         )}
