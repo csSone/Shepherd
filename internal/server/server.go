@@ -153,6 +153,13 @@ func (s *Server) setupRoutes() {
 			processes.GET("/:id", s.handleGetProcess)
 			processes.POST("/:id/stop", s.handleStopProcess)
 		}
+
+		// Log routes
+		logs := api.Group("/logs")
+		{
+			logs.GET("/stream", s.handleLogStream)
+			logs.GET("/entries", s.handleLogEntries)
+		}
 	}
 
 	// OpenAI compatible API
@@ -449,6 +456,88 @@ func (s *Server) handleGetProcess(c *gin.Context) {
 
 func (s *Server) handleStopProcess(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+}
+
+// handleLogStream streams log entries using Server-Sent Events
+func (s *Server) handleLogStream(c *gin.Context) {
+	// Set SSE headers
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Get parameters
+	fromBeginning := c.DefaultQuery("fromBeginning", "false") == "true"
+	limit := 100
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+
+	// Get log stream
+	logStream := logger.GetLogStream()
+
+	// Flush headers
+	c.Writer.Flush()
+
+	// Create channel for log entries
+	logCh := logStream.Subscribe()
+	defer logStream.Unsubscribe(logCh)
+
+	// Send existing entries if requested
+	if fromBeginning {
+		entries := logStream.GetEntries(limit)
+		for _, entry := range entries {
+			s.sendSSE(c, &entry)
+		}
+	}
+
+	// Keep connection alive and send new entries
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	ctx := c.Request.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry, ok := <-logCh:
+			if !ok {
+				return
+			}
+			s.sendSSE(c, &entry)
+			c.Writer.Flush()
+		case <-ticker.C:
+			// Send keepalive comment
+			c.SSEvent("keepalive", "")
+			c.Writer.Flush()
+		}
+	}
+}
+
+// sendSSE sends a log entry as Server-Sent Event
+func (s *Server) sendSSE(c *gin.Context, entry *logger.StreamLogEntry) {
+	data := fmt.Sprintf("data: {\"timestamp\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n\n",
+		entry.Timestamp.Format(time.RFC3339),
+		entry.Level,
+		entry.Message)
+	c.Writer.WriteString(data)
+}
+
+// handleLogEntries returns recent log entries
+func (s *Server) handleLogEntries(c *gin.Context) {
+	limit := 100
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+
+	logStream := logger.GetLogStream()
+	entries := logStream.GetEntries(limit)
+
+	c.JSON(http.StatusOK, gin.H{
+		"entries": entries,
+		"count":   len(entries),
+	})
 }
 
 func (s *Server) handleEvents(c *gin.Context) {
