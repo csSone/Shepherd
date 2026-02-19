@@ -1,24 +1,27 @@
 /**
+ * Shepherd Web 前端运行时配置
+ * 配置文件位置: config/web.config.yaml
+ */
+
+/**
  * 运行时配置类型定义
  */
 export interface AppConfig {
-  app: {
-    name: string;
-    version: string;
-    description: string;
-  };
+  // API 配置
   api: {
     baseUrl: string;
     timeout: number;
     retryCount: number;
     retryDelay: number;
   };
+  // SSE 实时事件配置
   sse: {
     endpoint: string;
     reconnect: boolean;
     reconnectDelay: number;
     maxReconnectAttempts: number;
   };
+  // 功能开关
   features: {
     models: boolean;
     downloads: boolean;
@@ -26,17 +29,20 @@ export interface AppConfig {
     logs: boolean;
     chat: boolean;
   };
+  // UI 配置
   ui: {
     theme: 'light' | 'dark' | 'auto';
     language: string;
     pageSize: number;
     virtualScrollThreshold: number;
   };
+  // 日志配置
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
     console: boolean;
     remote: boolean;
   };
+  // 缓存配置
   cache: {
     modelsTTL: number;
     clientsTTL: number;
@@ -48,11 +54,6 @@ export interface AppConfig {
  * 默认配置
  */
 const defaultConfig: AppConfig = {
-  app: {
-    name: 'Shepherd',
-    version: '1.0.0',
-    description: '分布式 AI 模型管理系统',
-  },
   api: {
     baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:9190',
     timeout: 30000,
@@ -105,18 +106,21 @@ class ConfigManager {
    */
   async init(): Promise<void> {
     try {
-      // 尝试从服务器加载配置
-      const response = await fetch('/api/config', {
-        timeout: 5000,
+      // 从后端 API 加载配置
+      const response = await fetch('/api/config/web', {
+        headers: {
+          'Accept': 'application/json',
+        },
       });
 
       if (response.ok) {
         const serverConfig = await response.json();
         this.config = this.mergeConfig(defaultConfig, serverConfig);
+      } else {
+        console.warn('Failed to load config from server, using defaults');
       }
     } catch (error) {
       console.warn('Failed to load server config, using defaults:', error);
-      // 使用默认配置
     }
   }
 

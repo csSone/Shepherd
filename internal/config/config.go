@@ -13,12 +13,19 @@ const (
 	// DefaultConfigDir is the default configuration directory
 	DefaultConfigDir = "config"
 	// DefaultConfigFile is the default configuration file name
-	DefaultConfigFile = "config.yaml"
+	DefaultConfigFile = "server.config.yaml"
 	// DefaultModelsConfigFile is the default models configuration file
 	DefaultModelsConfigFile = "models.json"
 	// DefaultLaunchConfigFile is the default launch configuration file
 	DefaultLaunchConfigFile = "launch_config.json"
 )
+
+// ConfigFileNames maps mode to config file name
+var ConfigFileNames = map[string]string{
+	"standalone": "server.config.yaml",
+	"master":     "master.config.yaml",
+	"client":     "client.config.yaml",
+}
 
 // Config represents the complete application configuration
 type Config struct {
@@ -462,21 +469,32 @@ type Manager struct {
 	mu                sync.RWMutex
 	cachedModels      []ModelConfigEntry
 	cachedModelsTime  int64
+	mode              string // 运行模式
 }
 
 // NewManager creates a new configuration manager
-func NewManager() *Manager {
+func NewManager(mode string) *Manager {
 	configDir := GetConfigDir()
+	configFile := DefaultConfigFile
+	if f, ok := ConfigFileNames[mode]; ok {
+		configFile = f
+	}
 	return &Manager{
-		configPath:       filepath.Join(configDir, DefaultConfigFile),
+		configPath:       filepath.Join(configDir, configFile),
 		modelsConfigPath: filepath.Join(configDir, DefaultModelsConfigFile),
 		launchConfigPath: filepath.Join(configDir, DefaultLaunchConfigFile),
+		mode:             mode,
 	}
 }
 
 // GetConfigPath returns the main configuration file path
 func (m *Manager) GetConfigPath() string {
 	return m.configPath
+}
+
+// GetMode returns the current mode
+func (m *Manager) GetMode() string {
+	return m.mode
 }
 
 // GetModelsConfigPath returns the models configuration file path

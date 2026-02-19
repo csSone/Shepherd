@@ -253,9 +253,10 @@ Shepherd/
 │   ├── server/            # HTTP 服务器
 │   └── websocket/         # SSE 实时通信
 ├── config/                # 配置文件目录
-│   ├── config.yaml        # 后端服务器配置
-│   └── web/               # Web 前端运行时配置
-│       └── config.yaml    # 前端运行时配置
+│   ├── server.config.yaml    # 单机模式配置
+│   ├── master.config.yaml    # Master 模式配置
+│   ├── client.config.yaml    # Client 模式配置
+│   └── web.config.yaml       # Web 前端运行时配置
 ├── scripts/               # 编译和部署脚本
 ├── web/                   # Web 前端
 │   ├── src/               # React + TypeScript 源码
@@ -300,7 +301,7 @@ cd web
 npm install
 
 # 2. 配置运行时参数（可选）
-# 编辑 config/web/config.yaml
+# 编辑 config/web.config.yaml
 
 # 3. 启动开发服务器
 npm run dev
@@ -317,7 +318,7 @@ npm run lint
 
 **运行时配置：**
 
-前端应用支持通过 `config/web/config.yaml` 配置运行时参数：
+前端应用支持通过 `config/web.config.yaml` 配置运行时参数：
 
 ```yaml
 # API 配置
