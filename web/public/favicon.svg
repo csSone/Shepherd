@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- 背景 -->
+  <rect width="128" height="128" rx="24" fill="#1a1a1a"/>
+
+  <!-- 羊身体 -->
+  <ellipse cx="64" cy="78" rx="38" ry="32" fill="#2d2d2d"/>
+
+  <!-- 羊头 -->
+  <circle cx="64" cy="45" r="22" fill="#2d2d2d"/>
+
+  <!-- 羊耳朵 -->
+  <ellipse cx="40" cy="42" rx="8" ry="12" fill="#2d2d2d" transform="rotate(-20 40 42)"/>
+  <ellipse cx="88" cy="42" rx="8" ry="12" fill="#2d2d2d" transform="rotate(20 88 42)"/>
+
+  <!-- 羊角 -->
+  <path d="M48 32 Q42 20 38 25 Q44 30 48 35" fill="#3d3d3d" stroke="#3d3d3d" stroke-width="2"/>
+  <path d="M80 32 Q86 20 90 25 Q84 30 80 35" fill="#3d3d3d" stroke="#3d3d3d" stroke-width="2"/>
+
+  <!-- 羊腿 -->
+  <rect x="40" y="100" width="6" height="18" rx="3" fill="#2d2d2d"/>
+  <rect x="52" y="102" width="6" height="18" rx="3" fill="#2d2d2d"/>
+  <rect x="70" y="102" width="6" height="18" rx="3" fill="#2d2d2d"/>
+  <rect x="82" y="100" width="6" height="18" rx="3" fill="#2d2d2d"/>
+
+  <!-- 羊眼睛 -->
+  <circle cx="56" cy="42" r="3" fill="#4a4a4a"/>
+  <circle cx="72" cy="42" r="3" fill="#4a4a4a"/>
+
+  <!-- 羊鼻子 -->
+  <ellipse cx="64" cy="50" rx="5" ry="3" fill="#3d3d3d"/>
+
+  <!-- 羊蹄 -->
+  <ellipse cx="43" cy="118" rx="5" ry="3" fill="#1a1a1a"/>
+  <ellipse cx="55" cy="120" rx="5" ry="3" fill="#1a1a1a"/>
+  <ellipse cx="73" cy="120" rx="5" ry="3" fill="#1a1a1a"/>
+  <ellipse cx="85" cy="118" rx="5" ry="3" fill="#1a1a1a"/>
+
+  <!-- 羊毛纹理（点缀） -->
+  <circle cx="45" cy="65" r="3" fill="#3a3a3a" opacity="0.5"/>
+  <circle cx="55" cy="72" r="3" fill="#3a3a3a" opacity="0.5"/>
+  <circle cx="70" cy="68" r="3" fill="#3a3a3a" opacity="0.5"/>
+  <circle cx="80" cy="75" r="3" fill="#3a3a3a" opacity="0.5"/>
+  <circle cx="60" cy="85" r="3" fill="#3a3a3a" opacity="0.5"/>
+  <circle cx="75" cy="82" r="3" fill="#3a3a3a" opacity="0.5"/>
+</svg>
