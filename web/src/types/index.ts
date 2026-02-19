@@ -6,3 +6,4 @@ export * from './model';
 export * from './download';
 export * from './cluster';
 export * from './events';
+export * from './logs';

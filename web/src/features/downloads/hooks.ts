@@ -1,0 +1,209 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type {
+  DownloadTask,
+  DownloadListResponse,
+  CreateDownloadParams,
+  DownloadState,
+} from '@/types';
+
+/**
+ * 下载任务列表 Hook
+ */
+export function useDownloads() {
+  return useQuery({
+    queryKey: ['downloads'],
+    queryFn: async () => {
+      const response = await apiClient.get<DownloadListResponse>('/downloads');
+      return response.tasks;
+    },
+    staleTime: 5 * 1000, // 5 秒
+    refetchInterval: 2000, // 每 2 秒自动刷新（获取进度）
+  });
+}
+
+/**
+ * 单个下载任务 Hook
+ */
+export function useDownload(taskId: string) {
+  return useQuery({
+    queryKey: ['downloads', taskId],
+    queryFn: async () => {
+      const response = await apiClient.get<{ task: DownloadTask }>(`/downloads/${taskId}`);
+      return response.task;
+    },
+    enabled: !!taskId,
+    refetchInterval: (query) => {
+      // 如果任务进行中，每秒刷新；否则不刷新
+      const data = query.state.data;
+      const activeStates: DownloadState[] = ['preparing', 'downloading', 'merging', 'verifying'];
+      return data && activeStates.includes(data.state) ? 1000 : false;
+    },
+  });
+}
+
+/**
+ * 创建下载任务 Hook
+ */
+export function useCreateDownload() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: CreateDownloadParams) => {
+      const response = await apiClient.post<{ task: DownloadTask }>('/downloads', params);
+      return response.task;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+    },
+  });
+}
+
+/**
+ * 暂停下载 Hook
+ */
+export function usePauseDownload() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await apiClient.post<{ success: boolean }>(`/downloads/${taskId}/pause`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+    },
+  });
+}
+
+/**
+ * 恢复下载 Hook
+ */
+export function useResumeDownload() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await apiClient.post<{ success: boolean }>(`/downloads/${taskId}/resume`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+    },
+  });
+}
+
+/**
+ * 取消下载 Hook
+ */
+export function useCancelDownload() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await apiClient.delete<{ success: boolean }>(`/downloads/${taskId}`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+    },
+  });
+}
+
+/**
+ * 重试下载 Hook
+ */
+export function useRetryDownload() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await apiClient.post<{ success: boolean }>(`/downloads/${taskId}/retry`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+    },
+  });
+}
+
+/**
+ * 清理已完成下载 Hook
+ */
+export function useClearCompletedDownloads() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.delete<{ success: boolean }>('/downloads/completed');
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+    },
+  });
+}
+
+/**
+ * 过滤下载任务 Hook
+ */
+export function useFilteredDownloads(
+  downloads: DownloadTask[] | undefined,
+  filters: {
+    search?: string;
+    state?: DownloadState;
+    source?: 'huggingface' | 'modelscope';
+  }
+) {
+  if (!downloads) return [];
+
+  return downloads.filter((task) => {
+    // 搜索过滤
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      const matchRepo = task.repoId.toLowerCase().includes(search);
+      const matchFile = task.fileName.toLowerCase().includes(search);
+      if (!matchRepo && !matchFile) return false;
+    }
+
+    // 状态过滤
+    if (filters.state && task.state !== filters.state) return false;
+
+    // 来源过滤
+    if (filters.source && task.source !== filters.source) return false;
+
+    return true;
+  });
+}
+
+/**
+ * 下载统计 Hook
+ */
+export function useDownloadStats(downloads: DownloadTask[] | undefined) {
+  if (!downloads) {
+    return {
+      total: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+      totalBytes: 0,
+      downloadedBytes: 0,
+    };
+  }
+
+  const total = downloads.length;
+  const active = downloads.filter((d) => ['preparing', 'downloading', 'merging', 'verifying'].includes(d.state)).length;
+  const completed = downloads.filter((d) => d.state === 'completed').length;
+  const failed = downloads.filter((d) => d.state === 'failed').length;
+  const totalBytes = downloads.reduce((sum, d) => sum + d.totalBytes, 0);
+  const downloadedBytes = downloads.reduce((sum, d) => sum + d.downloadedBytes, 0);
+
+  return {
+    total,
+    active,
+    completed,
+    failed,
+    totalBytes,
+    downloadedBytes,
+  };
+}

@@ -1,0 +1,286 @@
+import { Server, Cpu, HardDrive, Wifi, WifiOff, AlertCircle, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { Client, ClientStatus } from '@/types';
+
+interface ClientCardProps {
+  client: Client;
+  onDisconnect?: () => void;
+  actions?: React.ReactNode;
+}
+
+/**
+ * 客户端状态颜色映射
+ */
+const STATUS_COLORS: Record<ClientStatus, string> = {
+  online: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+  offline: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+  busy: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+  error: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+  disabled: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+};
+
+/**
+ * 客户端状态标签
+ */
+const STATUS_LABELS: Record<ClientStatus, string> = {
+  online: '在线',
+  offline: '离线',
+  busy: '忙碌',
+  error: '错误',
+  disabled: '已禁用',
+};
+
+/**
+ * 格式化字节大小
+ */
+function formatSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${size.toFixed(2)} ${units[unitIndex]}`;
+}
+
+/**
+ * 格式化最后见到时间
+ */
+function formatLastSeen(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`;
+  return date.toLocaleDateString('zh-CN');
+}
+
+export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
+  const statusColor = STATUS_COLORS[client.status];
+  const statusLabel = STATUS_LABELS[client.status];
+  const isConnected = client.status === 'online' || client.status === 'busy';
+
+  // 资源使用百分比
+  const cpuPercent = client.resources?.cpuPercent ?? 0;
+  const memoryPercent = client.resources?.memoryUsed
+    ? (client.resources.memoryUsed / client.resources.memoryTotal) * 100
+    : 0;
+  const gpuPercent = client.resources?.gpuPercent ?? 0;
+  const gpuMemoryPercent = client.resources?.gpuMemoryUsed
+    ? (client.resources.gpuMemoryUsed / client.resources.gpuMemoryTotal) * 100
+    : 0;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-shadow">
+      {/* 标题栏 */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              'p-2 rounded-lg',
+              isConnected
+                ? 'bg-green-100 dark:bg-green-900/30'
+                : 'bg-gray-100 dark:bg-gray-700'
+            )}
+          >
+            {isConnected ? (
+              <Server className="w-5 h-5 text-green-600 dark:text-green-400" />
+            ) : (
+              <Server className="w-5 h-5 text-gray-400" />
+            )}
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">{client.name}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {client.address}:{client.port}
+            </p>
+          </div>
+        </div>
+
+        <span className={cn('px-2 py-1 rounded-md text-xs font-medium', statusColor)}>
+          {statusLabel}
+        </span>
+      </div>
+
+      {/* 能力信息 */}
+      <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+        <div className="flex items-center gap-2 text-sm">
+          <Cpu className="w-4 h-4 text-gray-500" />
+          <span className="text-gray-600 dark:text-gray-400">
+            {client.capabilities.cpuCount} 核心
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <HardDrive className="w-4 h-4 text-gray-500" />
+          <span className="text-gray-600 dark:text-gray-400">
+            {formatSize(client.capabilities.memory)}
+          </span>
+        </div>
+        {client.capabilities.gpuCount > 0 && (
+          <>
+            <div className="flex items-center gap-2 text-sm">
+              <Server className="w-4 h-4 text-purple-500" />
+              <span className="text-gray-600 dark:text-gray-400">
+                {client.capabilities.gpuCount} GPU
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <HardDrive className="w-4 h-4 text-purple-500" />
+              <span className="text-gray-600 dark:text-gray-400">
+                {formatSize(client.capabilities.gpuMemory)}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 标签 */}
+      {client.tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {client.tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded text-xs"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 资源使用 */}
+      {client.resources && isConnected && (
+        <div className="space-y-2 mb-4">
+          {/* CPU */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+              <span>CPU</span>
+              <span>{cpuPercent.toFixed(1)}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full transition-all',
+                  cpuPercent > 80
+                    ? 'bg-red-500'
+                    : cpuPercent > 50
+                      ? 'bg-yellow-500'
+                      : 'bg-green-500'
+                )}
+                style={{ width: `${cpuPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* 内存 */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+              <span>内存</span>
+              <span>
+                {formatSize(client.resources.memoryUsed)} / {formatSize(client.resources.memoryTotal)}
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full transition-all',
+                  memoryPercent > 80
+                    ? 'bg-red-500'
+                    : memoryPercent > 50
+                      ? 'bg-yellow-500'
+                      : 'bg-blue-500'
+                )}
+                style={{ width: `${memoryPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* GPU */}
+          {client.capabilities.gpuCount > 0 && (
+            <>
+              <div>
+                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                  <span>GPU</span>
+                  <span>{gpuPercent.toFixed(1)}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full transition-all',
+                      gpuPercent > 80 ? 'bg-red-500' : gpuPercent > 50 ? 'bg-yellow-500' : 'bg-purple-500'
+                    )}
+                    style={{ width: `${gpuPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                  <span>GPU 内存</span>
+                  <span>
+                    {formatSize(client.resources.gpuMemoryUsed)} / {formatSize(client.resources.gpuMemoryTotal)}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full transition-all',
+                      gpuMemoryPercent > 80
+                        ? 'bg-red-500'
+                        : gpuMemoryPercent > 50
+                          ? 'bg-yellow-500'
+                          : 'bg-purple-500'
+                    )}
+                    style={{ width: `${gpuMemoryPercent}%` }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 最后见到时间和操作 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+          <Clock className="w-3 h-3" />
+          <span>{formatLastSeen(client.lastSeen)}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {actions}
+          {onDisconnect && isConnected && (
+            <button
+              onClick={onDisconnect}
+              className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 rounded transition-colors"
+            >
+              断开
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 元数据 */}
+      {Object.keys(client.metadata).length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs text-gray-500 dark:text-gray-400">
+            元数据
+          </summary>
+          <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded text-xs">
+            {Object.entries(client.metadata).map(([key, value]) => (
+              <div key={key} className="flex justify-between gap-4">
+                <span className="text-gray-600 dark:text-gray-400">{key}:</span>
+                <span className="text-gray-900 dark:text-white font-mono">{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
