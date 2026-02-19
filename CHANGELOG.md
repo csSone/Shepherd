@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- 集群管理功能实现
+- 日志查看功能实现
+- 性能优化和测试改进
+
+## [0.1.1] - 2026-02-19
+
 ### Added
 - **Web 前端完全独立架构**
   - 前端现在拥有独立的配置文件 (`web/config.yaml`)
@@ -19,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 新增 `web/INDEPENDENT.md` 迁移指南
   - 新增 `scripts/sync-web-config.sh` 配置同步脚本
 
+- **Master-Client 分布式架构支持**
+  - Master 模式：管理多个 Client 节点
+  - Client 模式：作为工作节点执行任务
+  - 网络自动发现和节点注册
+  - 分布式任务调度（支持轮询、最少负载、资源感知策略）
+  - 跨节点日志聚合
+  - Conda 环境集成
+- 命令行参数支持 (`--mode`, `--version`, `--master-address`)
+- 跨平台编译脚本（Linux/macOS/Windows）
+- 版本信息注入
+
 ### Changed
 - 后端不再提供 `/api/config/web` 端点（前端独立配置）
 - API 客户端支持动态后端 URL 配置
@@ -26,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 后端 CORS 已配置允许所有源访问
 - SSE Hook 现在使用完整后端 URL 而非相对路径
 - 功能配置：禁用尚未实现的集群管理和日志查看功能
+- 优化日志系统，添加实例方法
+- 更新配置验证逻辑，优先检查模式参数
+- 完善 README 文档结构
 
 ### Removed
 - 删除 `config/web.config.yaml`（后端控制的前端配置）
@@ -38,39 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **QueryClient 错误** - 重构 App 组件，确保 useSSE Hook 在 QueryClientProvider 内部使用
 - **类型安全** - 修复 useConfig() 函数访问私有成员的问题
 - **语法错误** - 修复 configLoader.ts 中的正则表达式语法错误
+- **配置测试** - 修复配置测试中的模式验证问题
 - 禁用未实现的功能（集群管理、日志查看），避免 404 错误
-
-### Changed
-- 后端不再提供 `/api/config/web` 端点（前端独立配置）
-- API 客户端支持动态后端 URL 配置
-- Vite 配置移除代理设置，前端独立运行
-- 后端 CORS 已配置允许所有源访问
-
-### Removed
-- 删除 `config/web.config.yaml`（后端控制的前端配置）
-- 删除 `internal/server/server.go` 中的 `handleGetWebConfig` 方法
-- 删除后端 `/api/config/web` 路由
-
-### Added
-- Master-Client 分布式架构支持
-- Master-Client 分布式架构支持
-  - Master 模式：管理多个 Client 节点
-  - Client 模式：作为工作节点执行任务
-  - 网络自动发现和节点注册
-  - 分布式任务调度（支持轮询、最少负载、资源感知策略）
-  - 跨节点日志聚合
-  - Conda 环境集成
-- 命令行参数支持 (`--mode`, `--version`, `--master-address`)
-- 跨平台编译脚本（Linux/macOS/Windows）
-- 版本信息注入
-
-### Changed
-- 优化日志系统，添加实例方法
-- 更新配置验证逻辑，优先检查模式参数
-- 完善 README 文档结构
-
-### Fixed
-- 修复配置测试中的模式验证问题
 
 ## [0.1.0-alpha] - 2026-02-19
 
@@ -111,10 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### v0.2.0 (Planned)
 - [ ] MCP (Model Context Protocol) 支持
-- [ ] Web UI 界面
 - [ ] 系统托盘（Windows/Linux/macOS）
 - [ ] Docker 镜像支持
 - [ ] Kubernetes 部署支持
+- [ ] 集群管理和日志查看功能完善
 
 ### v0.3.0 (Planned)
 - [ ] 模型量化功能
