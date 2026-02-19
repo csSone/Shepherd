@@ -20,6 +20,9 @@ dist
 dist-ssr
 *.local
 
+# Config file (synced from config/web.config.yaml)
+config.yaml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

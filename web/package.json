@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "sync-config": "cd ../.. && ./scripts/sync-web-config.sh"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",

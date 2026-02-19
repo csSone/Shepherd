@@ -1,25 +1,32 @@
 #!/bin/bash
-# 同步配置文件到 public 目录
+#
+# sync-web-config.sh - 同步前端配置文件
+#
+# 将 config/web.config.yaml 同步到 web/public/config.yaml
+# 这样前端可以读取统一的配置文件
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-WEB_DIR="${PROJECT_DIR}/web"
-CONFIG_FILE="${WEB_DIR}/config.yaml"
-PUBLIC_DIR="${WEB_DIR}/public"
-TARGET_FILE="${PUBLIC_DIR}/config.yaml"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# 检查源配置文件是否存在
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "错误: 配置文件不存在: $CONFIG_FILE"
+SOURCE_CONFIG="$PROJECT_ROOT/config/web.config.yaml"
+TARGET_CONFIG="$PROJECT_ROOT/web/public/config.yaml"
+
+echo "📋 同步前端配置文件..."
+echo "   源: $SOURCE_CONFIG"
+echo "   目标: $TARGET_CONFIG"
+
+# 检查源文件是否存在
+if [ ! -f "$SOURCE_CONFIG" ]; then
+    echo "❌ 错误: 源配置文件不存在: $SOURCE_CONFIG"
     exit 1
 fi
 
-# 确保目标目录存在
-mkdir -p "$PUBLIC_DIR"
+# 创建目标目录（如果不存在）
+mkdir -p "$(dirname "$TARGET_CONFIG")"
 
 # 复制配置文件
-cp "$CONFIG_FILE" "$TARGET_FILE"
+cp "$SOURCE_CONFIG" "$TARGET_CONFIG"
 
-echo "配置文件已同步到: $TARGET_FILE"
+echo "✅ 配置文件同步完成"
