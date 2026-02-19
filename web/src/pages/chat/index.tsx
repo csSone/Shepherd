@@ -15,6 +15,8 @@ export function ChatPage() {
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const streamingChat = useStreamingChat();
 
@@ -23,10 +25,19 @@ export function ChatPage() {
     getLoadedModels().then(setModels).catch(console.error);
   }, []);
 
-  // 自动滚动到底部
+  // 自动滚动到底部 - 只在有消息变化时触发,初始化时不滚动
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentResponse]);
+    // 跳过初始化阶段
+    if (!isInitialized) {
+      setIsInitialized(true);
+      return;
+    }
+
+    // 只在有消息或正在流式传输时滚动
+    if (messages.length > 0 || currentResponse) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, currentResponse, isInitialized]);
 
   // 处理发送消息
   const handleSend = (content: string) => {
@@ -147,7 +158,10 @@ export function ChatPage() {
       </div>
 
       {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto"
+      >
         {messages.length === 0 && !currentResponse ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <MessageSquare className="w-16 h-16 mb-4 opacity-50" />
