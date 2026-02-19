@@ -84,15 +84,15 @@ EOF
                 chmod +x "../${RELEASE_DIR}/${PACKAGE_DIR}/start.sh"
             fi
 
-            # 复制配置文件示例
+            # 复制配置文件示例（提供所有模式）
             mkdir -p "../${RELEASE_DIR}/${PACKAGE_DIR}/config"
-            cat > "../${RELEASE_DIR}/${PACKAGE_DIR}/config/config.yaml" << 'EOF'
-# Shepherd 配置文件示例
 
-# 运行模式: standalone, master, client
+            # server.config.yaml (单机模式)
+            cat > "../${RELEASE_DIR}/${PACKAGE_DIR}/config/server.config.yaml" << 'EOF'
+# Shepherd 单机模式配置
+
 mode: standalone
 
-# 服务器配置
 server:
   web_port: 9190
   anthropic_port: 9170
@@ -102,7 +102,6 @@ server:
   read_timeout: 60
   write_timeout: 60
 
-# 模型配置
 model:
   paths:
     - "./models"
@@ -110,30 +109,125 @@ model:
   auto_scan: true
   scan_interval: 0
 
-# 下载配置
 download:
   directory: "./downloads"
   max_concurrent: 4
-  chunk_size: 1048576  # 1MB
+  chunk_size: 1048576
   retry_count: 3
-  timeout: 300  # 5 minutes
+  timeout: 300
 
-# 安全配置
 security:
   api_key_enabled: false
   api_key: ""
   cors_enabled: true
   allowed_origins: ["*"]
 
-# 日志配置
 log:
   level: "info"
   format: "json"
   output: "both"
   directory: "./logs"
-  max_size: 100  # 100MB
+  max_size: 100
   max_backups: 3
-  max_age: 7  # days
+  max_age: 7
+  compress: true
+EOF
+
+            # master.config.yaml (Master 模式)
+            cat > "../${RELEASE_DIR}/${PACKAGE_DIR}/config/master.config.yaml" << 'EOF'
+# Shepherd Master 模式配置
+
+mode: master
+
+server:
+  web_port: 9190
+  anthropic_port: 9170
+  ollama_port: 11434
+  lmstudio_port: 1234
+  host: "0.0.0.0"
+  read_timeout: 60
+  write_timeout: 60
+
+model:
+  paths:
+    - "./models"
+    - "~/.cache/huggingface/hub"
+  auto_scan: true
+  scan_interval: 0
+
+master:
+  auto_scan: true
+  scan_interval: 300
+  scan_networks:
+    - "192.168.1.0/24"
+    - "10.0.0.0/24"
+  scheduling_policy: "least-load"
+  heartbeat_timeout: 60
+
+download:
+  directory: "./downloads"
+  max_concurrent: 4
+  chunk_size: 1048576
+  retry_count: 3
+  timeout: 300
+
+security:
+  api_key_enabled: false
+  api_key: ""
+  cors_enabled: true
+  allowed_origins: ["*"]
+
+log:
+  level: "info"
+  format: "json"
+  output: "both"
+  directory: "./logs"
+  max_size: 100
+  max_backups: 3
+  max_age: 7
+  compress: true
+EOF
+
+            # client.config.yaml (Client 模式)
+            cat > "../${RELEASE_DIR}/${PACKAGE_DIR}/config/client.config.yaml" << 'EOF'
+# Shepherd Client 模式配置
+
+mode: client
+
+client:
+  name: "client-1"
+  tags:
+    - "gpu"
+    - "rocm"
+
+master:
+  address: "http://192.168.1.100:9190"
+  token: ""
+  heartbeat_interval: 30
+  reconnect_delay: 5
+
+model:
+  paths:
+    - "./models"
+    - "~/.cache/huggingface/hub"
+  auto_scan: false
+
+conda:
+  enabled: false
+  env_name: "shepherd"
+
+resource:
+  max_models: 1
+  max_memory_percent: 80
+
+log:
+  level: "info"
+  format: "json"
+  output: "both"
+  directory: "./logs"
+  max_size: 100
+  max_backups: 3
+  max_age: 7
   compress: true
 EOF
 
@@ -147,7 +241,10 @@ Shepherd 是一个轻量级的 llama.cpp 模型管理系统，支持多 API 兼�
 快速开始
 --------
 
-1. 配置编辑 config/config.yaml
+1. 编辑配置文件:
+   - 单机模式: config/server.config.yaml
+   - Master 模式: config/master.config.yaml
+   - Client 模式: config/client.config.yaml
 
 2. 运行 Shepherd:
 EOF

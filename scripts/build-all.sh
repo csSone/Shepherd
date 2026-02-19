@@ -57,7 +57,12 @@ LDFLAGS="${LDFLAGS} -s -w"
 
 # 设置 Go 代理
 export GOPROXY=${GOPROXY:-"https://goproxy.cn,direct"}
-export GOROOT=/home/user/sdk/go
+
+# 检查 Go 是否安装
+if ! command -v go &> /dev/null; then
+    echo -e "${RED}错误: Go 未安装或不在 PATH 中${NC}"
+    exit 1
+fi
 
 # 编译各个平台
 SUCCESS_COUNT=0
@@ -76,7 +81,7 @@ for platform in "${PLATFORMS[@]}"; do
     echo -e "${BLUE}编译 ${GOOS}/${GOARCH}...${NC}"
 
     # 编译
-    env GOOS=$GOOS GOARCH=$GOARCH /home/user/sdk/go/bin/go build \
+    env GOOS=$GOOS GOARCH=$GOARCH go build \
         -ldflags "${LDFLAGS}" \
         -o "${BUILD_DIR}/${OUTPUT_NAME}" \
         cmd/shepherd/main.go

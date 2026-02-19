@@ -15,12 +15,17 @@ import (
 func TestNewLogger(t *testing.T) {
 	t.Run("Initialize with stdout output", func(t *testing.T) {
 		cfg := &config.LogConfig{
-			Level:  "debug",
-			Format: "json",
-			Output: "stdout",
+			Level:      "debug",
+			Format:     "json",
+			Output:     "stdout",
+			Directory:  "",
+			MaxSize:    0,
+			MaxBackups: 0,
+			MaxAge:     0,
+			Compress:   false,
 		}
 
-		logger, err := NewLogger(cfg)
+		logger, err := NewLogger(cfg, "standalone")
 		require.NoError(t, err)
 		assert.NotNil(t, logger)
 		assert.Equal(t, DEBUG, logger.level)
@@ -39,7 +44,7 @@ func TestNewLogger(t *testing.T) {
 			Compress:   false,
 		}
 
-		logger, err := NewLogger(cfg)
+		logger, err := NewLogger(cfg, "standalone")
 		require.NoError(t, err)
 		assert.NotNil(t, logger)
 
@@ -68,7 +73,7 @@ func TestNewLogger(t *testing.T) {
 			Compress:   false,
 		}
 
-		logger, err := NewLogger(cfg)
+		logger, err := NewLogger(cfg, "standalone")
 		require.NoError(t, err)
 		assert.NotNil(t, logger)
 		assert.Equal(t, WARN, logger.level)
@@ -83,7 +88,7 @@ func TestNewLogger(t *testing.T) {
 			Output: "stdout",
 		}
 
-		logger, err := NewLogger(cfg)
+		logger, err := NewLogger(cfg, "standalone")
 		require.NoError(t, err)
 		assert.Equal(t, INFO, logger.level)
 	})
@@ -102,7 +107,7 @@ func TestLogLevels(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// Test all log levels using logger instance directly
@@ -139,7 +144,7 @@ func TestLogFormats(t *testing.T) {
 			Compress:   false,
 		}
 
-		logger, err := NewLogger(cfg)
+		logger, err := NewLogger(cfg, "standalone")
 		require.NoError(t, err)
 
 		logger.log(INFO, "test json message", nil)
@@ -166,7 +171,7 @@ func TestLogFormats(t *testing.T) {
 			Compress:   false,
 		}
 
-		logger, err := NewLogger(cfg)
+		logger, err := NewLogger(cfg, "standalone")
 		require.NoError(t, err)
 
 		logger.log(INFO, "test text message", nil)
@@ -194,7 +199,7 @@ func TestLogWithFields(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// Test WithField using logger instance directly
@@ -211,7 +216,7 @@ func TestLogWithFields(t *testing.T) {
 	assert.Contains(t, string(content), "value1")
 
 	// Test WithFields
-	logger2, _ := NewLogger(cfg)
+	logger2, _ := NewLogger(cfg, "standalone")
 	fields2 := []Field{
 		{Key: "key2", Value: "value2"},
 		{Key: "key3", Value: 123},
@@ -240,7 +245,7 @@ func TestLogWithError(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	testErr := assert.AnError
@@ -270,7 +275,7 @@ func TestFormattedLogging(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// Use logger.log directly instead of global functions
@@ -369,7 +374,7 @@ func TestLogLevelFiltering(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// These should be filtered out - use logger directly
@@ -407,7 +412,7 @@ func TestLogEntryChaining(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// Test field chaining - use logger directly with multiple fields
@@ -447,7 +452,7 @@ func TestLogRotationBySize(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// Write a large message to trigger rotation
@@ -475,7 +480,7 @@ func TestConcurrency(t *testing.T) {
 		Compress:   false,
 	}
 
-	logger, err := NewLogger(cfg)
+	logger, err := NewLogger(cfg, "standalone")
 	require.NoError(t, err)
 
 	// Test concurrent logging

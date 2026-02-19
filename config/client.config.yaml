@@ -39,27 +39,27 @@ log:
 # 模型配置
 model:
   paths:
-    - /home/user/workspace/Shepherd/models
-    - /home/user/.cache/huggingface/hub
+    - ./models
+    - ~/.cache/huggingface/hub
   auto_scan: true
   scan_interval: 0
 
 # llama.cpp 配置
 llamacpp:
   paths:
-    - path: /home/user/workspace/Shepherd/llama.cpp
+    - path: ./llama.cpp
       name: Default
 
 # Conda 环境配置（用于 Python 任务）
 conda:
   # 默认 Conda 环境
-  default_env: rocm7.2
+  default_env: shepherd
   # 可用的环境列表
   available_envs:
-    - rocm7.2
+    - shepherd
     - base
   # Conda 路径
-  conda_path: /home/user/miniconda3
+  conda_path: ""
 
 # 资源限制
 resources:

@@ -21,6 +21,8 @@
 - **低内存占用** - 仅 ~30MB 内存，相比 Java 版本减少 85%
 - **单一二进制** - 无需运行时依赖，开箱即用
 - **分布式架构** - 支持 Master-Client 多节点部署
+- **优雅启停** - 完善的信号处理和资源清理机制
+- **智能日志** - 按运行模式分类的日志系统 (shepherd-{mode}-{date}.log)
 
 ### 📦 模型管理
 - 自动扫描 GGUF 格式模型
@@ -42,6 +44,17 @@
 - **自动发现** - 内网自动扫描和注册 Client
 - **任务调度** - 支持轮询、最少负载、资源感知策略
 - **Conda 集成** - 使用 Client 端 Python 环境
+
+### 📝 日志系统
+- **按模式分类** - 日志文件名包含运行模式 (shepherd-{mode}-{date}.log)
+- **自动轮转** - 支持按日期和文件大小自动轮转
+- **备份管理** - 自动清理过期日志文件
+- **优雅关闭** - 确保日志在关闭前正确写入
+
+### 🎛️ 运行时配置
+- **动态配置** - Web 前端支持运行时配置 (`/api/config/web`)
+- **CORS 控制** - 可配置跨域访问策略
+- **SSE 支持** - 服务器推送事件实时更新
 
 ### 📥 下载管理
 - HuggingFace / ModelScope 模型下载
@@ -97,26 +110,87 @@ make install      # 安装到系统
 
 ### 配置
 
-创建 `config/config.yaml`：
+Shepherd 使用 YAML 配置文件，支持三种运行模式：
+
+| 配置文件 | 运行模式 | 说明 |
+|---------|---------|------|
+| `config/server.config.yaml` | standalone | 单机模式配置 |
+| `config/master.config.yaml` | master | Master 节点配置 |
+| `config/client.config.yaml` | client | Client 节点配置 |
+
+**示例配置 (server.config.yaml):**
 
 ```yaml
-# 运行模式: standalone, master, client
+# 运行模式
 mode: standalone
 
+# 服务器配置
 server:
+  host: "0.0.0.0"
   web_port: 9190
+  read_timeout: 30
+  write_timeout: 30
 
+# 模型扫描路径
 model:
   paths:
     - "./models"
     - "~/.cache/huggingface/hub"
   auto_scan: true
+
+# 日志配置
+log:
+  level: "info"         # debug, info, warn, error
+  format: "json"        # text, json
+  output: "both"        # stdout, file, both
+  directory: "logs"
+  max_size: 100         # MB
+  max_age: 7            # days
+```
+
+**Web 前端运行时配置 (config/web.config.yaml):**
+
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 3000
+  cors:
+    enabled: true
+    origin: "*"
+
+api:
+  baseUrl: "http://localhost:9190"
+  timeout: 30000
+
+features:
+  models: true
+  downloads: true
+  cluster: true    # 仅在 standalone/master 模式启用
 ```
 
 ### 运行
 
 <details>
-<summary><b>使用运行脚本 (推荐)</b></summary>
+<summary><b>位置参数方式 (推荐)</b></summary>
+
+```bash
+# 单机模式 (默认)
+./build/shepherd standalone
+
+# Master 模式
+./build/shepherd master
+
+# Client 模式
+./build/shepherd client --master-address=http://master:9190
+
+# 查看版本
+./build/shepherd --version
+```
+
+</details>
+
+<details>
+<summary><b>使用运行脚本</b></summary>
 
 **Linux/macOS:**
 
@@ -156,25 +230,56 @@ scripts\run.bat master -b
 </details>
 
 <details>
-<summary><b>直接使用二进制文件</b></summary>
+<summary><b>优雅关闭</b></summary>
+
+Shepherd 支持优雅关闭，按正确顺序清理资源：
 
 ```bash
-# 单机模式 (默认)
-./build/shepherd
+# 发送 SIGTERM (Ctrl+C)
+kill -TERM <pid>
 
-# Master 模式
-./build/shepherd --mode=master
+# 或发送 SIGINT
+kill -INT <pid>
 
-# Client 模式
-./build/shepherd --mode=client --master-address=http://master:9190
-
-# 查看版本
-./build/shepherd --version
+# 系统会按以下顺序关闭：
+# 1. 停止接受新连接 (HTTP 服务器)
+# 2. 停止所有模型加载和处理
+# 3. 停止所有子进程
+# 4. 关闭日志系统
+# 总超时时间: 10 秒
 ```
 
 </details>
 
+<details>
+<summary><b>前端开发服务器</b></summary>
+
+```bash
+# 启动开发服务器 (端口 3000)
+./scripts/web.sh dev
+
+# 指定端口
+./scripts/web.sh dev -p 4000
+
+# 查看依赖状态
+./scripts/web.sh check
+
+# 修复依赖问题
+./scripts/web.sh fix
+```
+
+前端服务器也支持优雅关闭（Ctrl+C）。
+
+</details>
+
 访问 Web UI: http://localhost:9190
+
+**日志文件位置：**
+```
+logs/shepherd-standalone-2026-02-19.log    # 单机模式
+logs/shepherd-master-2026-02-19.log       # Master 模式
+logs/shepherd-client-2026-02-19.log       # Client 模式
+```
 
 ---
 
@@ -247,10 +352,11 @@ Shepherd/
 │   ├── config/            # 配置管理
 │   ├── download/          # 下载管理器
 │   ├── gguf/              # GGUF 模型解析
-│   ├── logger/            # 日志系统
+│   ├── logger/            # 日志系统 (按模式分类)
 │   ├── model/             # 模型管理器
 │   ├── process/           # 进程管理
-│   ├── server/            # HTTP 服务器
+│   ├── server/            # HTTP 服务器 (优雅关闭)
+│   ├── shutdown/          # 优雅关闭管理器
 │   └── websocket/         # SSE 实时通信
 ├── config/                # 配置文件目录
 │   ├── server.config.yaml    # 单机模式配置
@@ -263,6 +369,10 @@ Shepherd/
 │   │   └── lib/
 │   │       └── config.ts  # 配置加载器
 │   └── [开发工具配置]     # TypeScript/Vite/ESLint 等
+├── logs/                  # 日志目录 (自动创建)
+│   ├── shepherd-standalone-*.log
+│   ├── shepherd-master-*.log
+│   └── shepherd-client-*.log
 └── docs/                  # 项目文档
 ```
 

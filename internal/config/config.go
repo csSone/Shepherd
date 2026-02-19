@@ -334,9 +334,9 @@ func DefaultConfig() *Config {
 			},
 			CondaEnv: CondaEnvConfig{
 				Enabled:   false,
-				CondaPath: "/home/user/miniconda3",
+				CondaPath: "",
 				Environments: map[string]string{
-					"rocm7.2": "/home/user/miniconda3/envs/rocm7.2",
+					"shepherd": "",
 				},
 			},
 		},

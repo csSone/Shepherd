@@ -62,6 +62,7 @@ type Logger struct {
 	maxAge        int    // days
 	currentSize   int64
 	currentDate   string
+	serverMode    string // standalone, master, client
 }
 
 var (
@@ -70,8 +71,8 @@ var (
 )
 
 // InitLogger initializes the global logger with the given configuration
-func InitLogger(cfg *config.LogConfig) error {
-	logger, err := NewLogger(cfg)
+func InitLogger(cfg *config.LogConfig, serverMode string) error {
+	logger, err := NewLogger(cfg, serverMode)
 	if err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ func InitLogger(cfg *config.LogConfig) error {
 }
 
 // NewLogger creates a new logger instance
-func NewLogger(cfg *config.LogConfig) (*Logger, error) {
+func NewLogger(cfg *config.LogConfig, serverMode string) (*Logger, error) {
 	l := &Logger{
 		level:       parseLevel(cfg.Level),
 		formatJSON:  cfg.Format == "json",
@@ -91,6 +92,7 @@ func NewLogger(cfg *config.LogConfig) (*Logger, error) {
 		maxAge:      cfg.MaxAge,
 		currentSize: 0,
 		currentDate: time.Now().Format("2006-01-02"),
+		serverMode:  serverMode,
 	}
 
 	// Setup outputs
@@ -119,7 +121,9 @@ func (l *Logger) setupFileWriter() error {
 		return fmt.Errorf("创建日志目录失败: %w", err)
 	}
 
-	logFile := filepath.Join(l.logDir, "shepherd.log")
+	// 使用新的日志文件命名格式: shepherd-{mode}-{date}.log
+	logFileName := fmt.Sprintf("shepherd-%s-%s.log", l.serverMode, l.currentDate)
+	logFile := filepath.Join(l.logDir, logFileName)
 
 	// Check if file exists and get current size
 	if info, err := os.Stat(logFile); err == nil {
@@ -179,10 +183,12 @@ func (l *Logger) rotateLog(reason string) {
 	// Close current file
 	l.fileWriter.Close()
 
-	// Rename current log file
-	logFile := filepath.Join(l.logDir, "shepherd.log")
+	// Rename current log file with timestamp
+	// 格式: shepherd-{mode}-{date}-{timestamp}-{reason}.log
+	logFileName := fmt.Sprintf("shepherd-%s-%s.log", l.serverMode, l.currentDate)
+	logFile := filepath.Join(l.logDir, logFileName)
 	timestamp := time.Now().Format("20060102-150405")
-	backupFile := filepath.Join(l.logDir, fmt.Sprintf("shepherd-%s-%s.log", timestamp, reason))
+	backupFile := filepath.Join(l.logDir, fmt.Sprintf("shepherd-%s-%s-%s-%s.log", l.serverMode, l.currentDate, timestamp, reason))
 
 	os.Rename(logFile, backupFile)
 
@@ -219,15 +225,24 @@ func (l *Logger) cleanOldBackups() {
 		return
 	}
 
-	// Group backup files by date
+	// Group backup files by date and mode
+	// 新格式: shepherd-{mode}-{date}-{timestamp}-{reason}.log
 	backupsByDate := make(map[string][]string)
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), "shepherd-") && strings.HasSuffix(file.Name(), ".log") {
-			// Extract date from filename (format: shepherd-20060102-150405-reason.log)
-			parts := strings.Split(file.Name(), "-")
-			if len(parts) >= 2 {
-				datePart := parts[1]
-				backupsByDate[datePart] = append(backupsByDate[datePart], file.Name())
+		name := file.Name()
+		// 匹配新的日志文件格式
+		if strings.HasPrefix(name, "shepherd-") && strings.HasSuffix(name, ".log") {
+			// 提取日期部分 (格式: shepherd-mode-date-timestamp-reason.log)
+			parts := strings.Split(name, "-")
+			if len(parts) >= 3 {
+				// parts[0] = "shepherd"
+				// parts[1] = mode
+				// parts[2] = date (YYYYMMDD)
+				datePart := parts[2]
+				// 只清理当前模式的备份日志
+				if parts[1] == l.serverMode {
+					backupsByDate[datePart] = append(backupsByDate[datePart], name)
+				}
 			}
 		}
 	}
@@ -274,7 +289,7 @@ func GetLogger() *Logger {
 				Level:  "info",
 				Format: "text",
 				Output: "stdout",
-			})
+			}, "standalone")
 		})
 	}
 	return defaultLogger

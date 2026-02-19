@@ -85,8 +85,15 @@ echo -e "${GREEN}开始编译...${NC}"
 if [ "${GOPROXY}" = "" ]; then
     GOPROXY="https://goproxy.cn,direct"
 fi
+export GOPROXY
 
-GOROOT=/home/user/sdk/go /home/user/sdk/go/bin/go build \
+# 检查 Go 是否安装
+if ! command -v go &> /dev/null; then
+    echo -e "${RED}错误: Go 未安装或不在 PATH 中${NC}"
+    exit 1
+fi
+
+go build \
     -ldflags "${LDFLAGS}" \
     -o "${BUILD_DIR}/${BINARY_NAME}" \
     "${CMD_DIR}/main.go"
@@ -118,7 +125,7 @@ fi
 # 运行测试（可选）
 if [ "${RUN_TESTS}" = "true" ]; then
     echo -e "${YELLOW}运行测试...${NC}"
-    /home/user/sdk/go/bin/go test ./... -v
+    go test ./... -v
 fi
 
 # 使用提示

@@ -3,11 +3,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
@@ -15,6 +14,7 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/process"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/server"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/shutdown"
 )
 
 // 版本信息（编译时注入）
@@ -54,10 +54,21 @@ func main() {
 	fmt.Printf("Commit: %s\n\n", GitCommit)
 
 	// 确定运行模式
-	// 优先使用命令行参数，否则默认为 standalone
+	// 优先使用位置参数，然后是命令行参数，否则默认为 standalone
 	runMode := "standalone"
-	if *mode != "" {
+
+	// 检查位置参数 (shepherd standalone, shepherd master, shepherd client)
+	args := flag.Args()
+	if len(args) > 0 {
+		runMode = args[0]
+	} else if *mode != "" {
 		runMode = *mode
+	}
+
+	// 验证运行模式
+	if runMode != "standalone" && runMode != "master" && runMode != "client" {
+		fmt.Fprintf(os.Stderr, "错误: 无效的运行模式 '%s'，必须是 standalone、master 或 client\n", runMode)
+		os.Exit(1)
 	}
 
 	// 创建配置管理器（根据运行模式）
@@ -78,8 +89,8 @@ func main() {
 		cfg.Client.MasterAddress = *masterAddr
 	}
 
-	// 初始化日志系统
-	if err := logger.InitLogger(&cfg.Log); err != nil {
+	// 初始化日志系统（传递运行模式）
+	if err := logger.InitLogger(&cfg.Log, runMode); err != nil {
 		fmt.Printf("警告: 无法初始化日志系统: %v\n", err)
 	}
 
@@ -119,18 +130,50 @@ func main() {
 		AnthropicPort: cfg.Server.AnthropicPort,
 		OllamaPort:    cfg.Server.OllamaPort,
 		LMStudioPort:  cfg.Server.LMStudioPort,
-		Host:         cfg.Server.Host,
-		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
-		WebUIPath:    "./web",
+		Host:          cfg.Server.Host,
+		ReadTimeout:   time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout:  time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		WebUIPath:     "./web",
+		Mode:          cfg.Mode,
+		ServerCfg:     cfg,
 	}
 
 	srv := server.NewServer(serverCfg, modelMgr)
+
+	// 创建优雅关闭管理器
+	shutdownMgr := shutdown.NewManager(10 * time.Second)
+
+	// 注册关闭钩子（按优先级顺序执行）
+	// 1. 优先级最高：停止接受新连接（HTTP服务器）
+	shutdownMgr.Register("http-server", func(ctx context.Context) error {
+		return srv.Shutdown(ctx)
+	}, shutdown.PriorityCritical)
+
+	// 2. 优先级高：停止所有模型加载和处理
+	shutdownMgr.Register("models", func(ctx context.Context) error {
+		modelMgr.Close()
+		return nil
+	}, shutdown.PriorityHigh)
+
+	// 3. 优先级中：停止所有进程
+	shutdownMgr.Register("processes", func(ctx context.Context) error {
+		procMgr.StopAll()
+		return nil
+	}, shutdown.PriorityNormal)
+
+	// 4. 优先级低：关闭日志系统
+	shutdownMgr.Register("logger", func(ctx context.Context) error {
+		logger.Info("日志系统已关闭")
+		return nil
+	}, shutdown.PriorityLow)
 
 	// 启动服务器
 	if err := srv.Start(); err != nil {
 		logger.Fatalf("无法启动服务器: %v", err)
 	}
+
+	// 启动优雅关闭管理器
+	shutdownMgr.Start()
 
 	logger.Infof("HTTP 服务器已启动，监听 %s:%d", cfg.Server.Host, cfg.Server.WebPort)
 	fmt.Printf("✓ 运行模式: %s\n", cfg.Mode)
@@ -141,20 +184,18 @@ func main() {
 		fmt.Printf("✓ Ollama API: http://localhost:%d\n", cfg.Server.OllamaPort)
 	}
 
-	// 等待中断信号
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
 	fmt.Println("\n按 Ctrl+C 停止服务器...")
 
-	<-sigChan
-	logger.Info("收到关闭信号，正在关闭服务器...")
-	fmt.Println("\n正在关闭服务器...")
+	// 等待关闭信号或上下文取消
+	select {
+	case <-shutdownMgr.Context().Done():
+		// Shutdown initiated
+	case <-shutdownMgr.Done():
+		// Shutdown complete
+	}
 
-	// 清理资源
-	modelMgr.Close()
-	procMgr.StopAll()
-	srv.Stop()
+	// 等待所有关闭钩子完成
+	shutdownMgr.Wait()
 
 	logger.Info("服务器已关闭")
 	fmt.Println("✓ 服务器已关闭")

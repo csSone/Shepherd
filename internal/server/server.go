@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -13,9 +15,11 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
+	"gopkg.in/yaml.v3"
 )
 
 // Server represents the HTTP server
@@ -43,6 +47,9 @@ type Config struct {
 	ReadTimeout   time.Duration
 	WriteTimeout  time.Duration
 	WebUIPath     string
+	// Mode and ServerMode for runtime configuration
+	Mode      string // standalone|master|client
+	ServerCfg *config.Config
 }
 
 // Handlers contains handler instances
@@ -111,6 +118,7 @@ func (s *Server) setupRoutes() {
 		{
 			config.GET("", s.handleGetConfig)
 			config.PUT("", s.handleUpdateConfig)
+			config.GET("/web", s.handleGetWebConfig)
 		}
 
 		// Model routes
@@ -182,6 +190,11 @@ func (s *Server) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Check if already started
+	if s.httpServer != nil {
+		return fmt.Errorf("server already started")
+	}
+
 	// Start WebSocket manager
 	s.wsMgr.Start()
 
@@ -203,36 +216,88 @@ func (s *Server) Start() error {
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Errorf("HTTP 服务器错误: %v", err)
 		}
+		logger.Info("HTTP 服务器已停止")
 	}()
 
 	return nil
 }
 
-// Stop stops the HTTP server
+// Stop stops the HTTP server gracefully
 func (s *Server) Stop() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	if s.httpServer == nil {
+		s.mu.Unlock()
+		return fmt.Errorf("server not started")
+	}
+	s.mu.Unlock()
 
-	// Cancel context
+	logger.Info("开始停止 HTTP 服务器...")
+
+	// Step 1: Cancel context to signal all goroutines
 	s.cancel()
 
-	// Stop WebSocket manager
-	s.wsMgr.Stop()
+	// Step 2: Stop accepting new connections (but don't close existing ones)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Shutdown HTTP server
+	// Step 3: Shutdown HTTP server gracefully
+	s.mu.Lock()
 	if s.httpServer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := s.httpServer.Shutdown(ctx); err != nil {
-			return fmt.Errorf("failed to shutdown server: %w", err)
+		logger.Info("关闭 HTTP 服务器...")
+		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
+			logger.Errorf("HTTP 服务器关闭失败: %v", err)
+			// Force close if graceful shutdown fails
+			s.httpServer.Close()
+		} else {
+			logger.Info("HTTP 服务器已优雅关闭")
 		}
+		s.httpServer = nil
 	}
+	s.mu.Unlock()
 
-	// Wait for all goroutines
+	// Step 4: Stop WebSocket manager
+	logger.Info("停止 WebSocket 管理器...")
+	s.wsMgr.Stop()
+	logger.Info("WebSocket 管理器已停止")
+
+	// Step 5: Wait for all goroutines to finish
+	logger.Info("等待所有协程完成...")
 	s.wg.Wait()
+	logger.Info("所有协程已完成")
 
 	return nil
+}
+
+// Shutdown performs graceful shutdown with context
+func (s *Server) Shutdown(ctx context.Context) error {
+	logger.Info("开始优雅关闭...")
+
+	// Create a channel for shutdown completion
+	done := make(chan error, 1)
+
+	go func() {
+		done <- s.Stop()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			logger.Errorf("优雅关闭失败: %v", err)
+			return err
+		}
+		logger.Info("优雅关闭完成")
+		return nil
+	case <-ctx.Done():
+		logger.Warn("优雅关闭超时，强制退出")
+		// Force stop
+		s.mu.Lock()
+		if s.httpServer != nil {
+			s.httpServer.Close()
+			s.httpServer = nil
+		}
+		s.mu.Unlock()
+		return ctx.Err()
+	}
 }
 
 // GetEngine returns the Gin engine (for testing)
@@ -319,6 +384,93 @@ func (s *Server) handleGetConfig(c *gin.Context) {
 
 func (s *Server) handleUpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+}
+
+// handleGetWebConfig returns the web frontend configuration
+func (s *Server) handleGetWebConfig(c *gin.Context) {
+	webConfigPath := filepath.Join(config.GetConfigDir(), "web.config.yaml")
+
+	// Check if web config exists
+	if _, err := os.Stat(webConfigPath); os.IsNotExist(err) {
+		// Return default config if file doesn't exist
+		c.JSON(http.StatusOK, gin.H{
+			"app": gin.H{
+				"name":        "Shepherd",
+				"version":     "1.0.0",
+				"description": "分布式 AI 模型管理系统",
+				"environment": "production",
+			},
+			"server": gin.H{
+				"host":   "0.0.0.0",
+				"port":   3000,
+				"https":  false,
+				"cors": gin.H{
+					"enabled":     true,
+					"origin":      "*",
+					"methods":     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+					"headers":     "Content-Type, Authorization, X-Requested-With",
+					"credentials": false,
+				},
+			},
+			"api": gin.H{
+				"baseUrl":         fmt.Sprintf("http://%s:%d", s.config.Host, s.config.WebPort),
+				"basePath":       "/api",
+				"timeout":        30000,
+				"connectTimeout": 10000,
+				"retryCount":      3,
+				"retryDelay":      1000,
+				"retryStatusCodes": []int{408, 429, 500, 502, 503, 504},
+			},
+			"features": gin.H{
+				"models":    true,
+				"downloads": true,
+				"cluster":   s.config.Mode == "master" || s.config.Mode == "standalone",
+				"logs":      true,
+				"chat":      true,
+				"settings":  true,
+				"dashboard": true,
+			},
+			"ui": gin.H{
+				"theme":               "auto",
+				"language":            "zh-CN",
+				"supportedLanguages":  []string{"zh-CN", "en-US"},
+				"pageSize":            20,
+				"pageSizeOptions":     []int{10, 20, 50, 100},
+				"virtualScrollThreshold": 100,
+				"animations":          true,
+				"skeleton":            true,
+				"breadcrumb":          true,
+				"sidebarExpanded":     true,
+			},
+		})
+		return
+	}
+
+	// Read and parse web.config.yaml
+	data, err := os.ReadFile(webConfigPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read web config"})
+		return
+	}
+
+	// Parse YAML
+	var webConfig map[string]interface{}
+	if err := yaml.Unmarshal(data, &webConfig); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse web config"})
+		return
+	}
+
+	// Override baseUrl with actual server address
+	if apiConfig, ok := webConfig["api"].(map[string]interface{}); ok {
+		apiConfig["baseUrl"] = fmt.Sprintf("http://%s:%d", s.config.Host, s.config.WebPort)
+	}
+
+	// Update features based on mode
+	if features, ok := webConfig["features"].(map[string]interface{}); ok {
+		features["cluster"] = s.config.Mode == "master" || s.config.Mode == "standalone"
+	}
+
+	c.JSON(http.StatusOK, webConfig)
 }
 
 func (s *Server) handleListModels(c *gin.Context) {

@@ -17,16 +17,16 @@ log:
     compress: true
 model:
     paths:
-        - /home/user/workspace/Shepherd/models
-        - /home/user/.cache/huggingface/hub
+        - ./models
+        - ~/.cache/huggingface/hub
     auto_scan: true
     scan_interval: 0
 llamacpp:
     paths:
-        - path: /home/user/workspace/Shepherd/llama.cpp
+        - path: ./llama.cpp
           name: Default
 download:
-    directory: /home/user/workspace/Shepherd/downloads
+    directory: ./downloads
     max_concurrent: 4
     chunk_size: 1048576
     retry_count: 3

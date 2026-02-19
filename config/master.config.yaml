@@ -39,20 +39,20 @@ log:
 # 模型配置
 model:
   paths:
-    - /home/user/workspace/Shepherd/models
-    - /home/user/.cache/huggingface/hub
+    - ./models
+    - ~/.cache/huggingface/hub
   auto_scan: true
   scan_interval: 0
 
 # llama.cpp 配置
 llamacpp:
   paths:
-    - path: /home/user/workspace/Shepherd/llama.cpp
+    - path: ./llama.cpp
       name: Default
 
 # 下载配置
 download:
-  directory: /home/user/workspace/Shepherd/downloads
+  directory: ./downloads
   max_concurrent: 4
   chunk_size: 1048576
   retry_count: 3
