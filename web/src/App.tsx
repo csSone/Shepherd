@@ -14,9 +14,10 @@ import { useSSE } from './hooks/useSSE';
 import 'highlight.js/styles/github-dark.css';
 
 /**
- * 应用根组件
+ * 应用内容组件
+ * 在 QueryClientProvider 内部使用 SSE
  */
-function App() {
+function AppContent() {
   // 启用 SSE 实时事件
   useSSE({
     onMessage: (event) => {
@@ -25,20 +26,29 @@ function App() {
   });
 
   return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="models" element={<ModelsPage />} />
+          <Route path="downloads" element={<DownloadsPage />} />
+          <Route path="chat" element={<ChatPage />} />
+          <Route path="cluster" element={<ClusterPage />} />
+          <Route path="logs" element={<LogsPage />} />
+          <Route path="settings" element={<div>设置页面 - 开发中</div>} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+/**
+ * 应用根组件
+ */
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="models" element={<ModelsPage />} />
-            <Route path="downloads" element={<DownloadsPage />} />
-            <Route path="chat" element={<ChatPage />} />
-            <Route path="cluster" element={<ClusterPage />} />
-            <Route path="logs" element={<LogsPage />} />
-            <Route path="settings" element={<div>设置页面 - 开发中</div>} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <AppContent />
     </QueryClientProvider>
   );
 }
