@@ -109,16 +109,64 @@ model:
 
 ### 运行
 
+<details>
+<summary><b>使用运行脚本 (推荐)</b></summary>
+
+**Linux/macOS:**
+
 ```bash
-# 单机模式 (默认)
-./shepherd
+# 单机模式
+./scripts/run.sh standalone
 
 # Master 模式
-./shepherd --mode=master
+./scripts/run.sh master --port 9190 --scan
 
 # Client 模式
-./shepherd --mode=client --master-address=http://master:9190
+./scripts/run.sh client --master http://192.168.1.100:9190 --name client-1
+
+# 运行前先编译
+./scripts/run.sh master -b
+
+# 查看帮助
+./scripts/run.sh --help
 ```
+
+**Windows:**
+
+```batch
+REM 单机模式
+scripts\run.bat standalone
+
+REM Master 模式
+scripts\run.bat master --port 9190 --scan
+
+REM Client 模式
+scripts\run.bat client --master http://192.168.1.100:9190 --name client-1
+
+REM 运行前先编译
+scripts\run.bat master -b
+```
+
+</details>
+
+<details>
+<summary><b>直接使用二进制文件</b></summary>
+
+```bash
+# 单机模式 (默认)
+./build/shepherd
+
+# Master 模式
+./build/shepherd --mode=master
+
+# Client 模式
+./build/shepherd --mode=client --master-address=http://master:9190
+
+# 查看版本
+./build/shepherd --version
+```
+
+</details>
 
 访问 Web UI: http://localhost:9190
 

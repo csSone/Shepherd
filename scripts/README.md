@@ -1,8 +1,10 @@
-# Shepherd 编译脚本
+# Shepherd 脚本说明
 
-本目录包含 Shepherd 项目的编译和发布脚本。
+本目录包含 Shepherd 项目的编译和运行脚本。
 
-## 脚本说明
+## 📁 脚本列表
+
+### 编译脚本
 
 ### 单平台编译
 
@@ -186,6 +188,94 @@ RUN_TESTS=false ./scripts/build.sh
 
 ```batch
 chcp 65001
+```
+
+## 🚀 运行脚本
+
+### Linux/macOS (run.sh)
+
+```bash
+# 查看帮助
+./scripts/run.sh --help
+
+# 单机模式
+./scripts/run.sh standalone
+
+# Master 模式
+./scripts/run.sh master --port 9190 --scan
+
+# Client 模式
+./scripts/run.sh client --master http://192.168.1.100:9190 --name client-1
+
+# 运行前先编译
+./scripts/run.sh master -b
+```
+
+### Windows (run.bat)
+
+```batch
+REM 查看帮助
+scripts\run.bat --help
+
+REM 单机模式
+scripts\run.bat standalone
+
+REM Master 模式
+scripts\run.bat master --port 9190 --scan
+
+REM Client 模式
+scripts\run.bat client --master http://192.168.1.100:9190 --name client-1
+```
+
+### 运行脚本选项
+
+| 选项 | 说明 |
+|------|------|
+| `-h, --help` | 显示帮助信息 |
+| `-b, --build` | 运行前先编译 |
+| `-v, --version` | 显示版本信息 |
+| `--mode MODE` | 运行模式：standalone, master, client |
+| `--master URL` | Master 地址（Client 模式必需） |
+| `--name NAME` | Client 名称 |
+| `--tags TAGS` | Client 标签（逗号分隔） |
+| `--port PORT` | Web 服务器端口（Master 模式） |
+| `--scan` | 启动时自动扫描网络（Master 模式） |
+
+## 📖 使用场景
+
+### 开发环境
+
+每次运行前自动编译：
+
+```bash
+./scripts/run.sh standalone -b
+```
+
+### 生产部署
+
+**Master 节点：**
+
+```bash
+./scripts/run.sh master --scan
+```
+
+**Client 节点：**
+
+```bash
+./scripts/run.sh client \
+  --master http://master.example.com:9190 \
+  --name gpu-server-1 \
+  --tags "gpu,rocm,high-memory"
+```
+
+### 本地测试
+
+```bash
+# 终端 1: 启动 Master
+./scripts/run.sh master --port 9190
+
+# 终端 2: 启动 Client
+./scripts/run.sh client --master http://localhost:9190 --name test-client
 ```
 
 ## 贡献
