@@ -8,13 +8,22 @@
  * 前端完全独立运行，可以连接任意后端服务器
  */
 
-// 重新导出配置加载器和接口
-export { configLoader, AppConfig, ServerConfig } from './configLoader';
-export type { AppConfig } from './configLoader';
+// 导出配置类型（避免循环依赖）
+export type {
+  AppConfig,
+  ServerConfig,
+  ApiConfig,
+  SseConfig,
+  FeaturesConfig,
+  UiConfig,
+  LoggingConfig,
+  CacheConfig,
+  OpenAIConfig,
+  PerformanceConfig
+} from './configTypes';
 
-// 保留旧的 ConfigManager 作为备用（向后兼容）
-// 但推荐使用 configLoader
-export { useConfig } from './configLoader';
+// 导出配置加载器
+export { configLoader, useConfig } from './configLoader';
 
-// 重新导出 API 客户端的更新函数
+// 导出 API 客户端的更新函数
 export { updateApiClientUrl } from './api/client';

@@ -3,7 +3,7 @@
  * 从 web/config.yaml 加载配置，不依赖后端
  */
 
-import { AppConfig } from './config';
+import type { AppConfig } from './configTypes';
 
 /**
  * 配置文件路径
@@ -88,7 +88,7 @@ class ConfigLoader {
       }
 
       // 计算缩进级别
-      const indent = line.search(/\S|$//);
+      const indent = line.search(/\S|$/);
       const level = Math.floor(indent / 2);
 
       // 弹出栈到正确的层级
@@ -335,10 +335,68 @@ export const configLoader = new ConfigLoader();
 /**
  * 导出便捷 Hook
  */
-export function useConfig() {
-  if (!configLoader.config) {
+export function useConfig(): AppConfig {
+  try {
+    return configLoader.getConfig();
+  } catch (error) {
     console.warn('Config not loaded yet. Using default values.');
-    return configLoader['getDefaultConfig']();
+    // 返回一个基本的默认配置
+    return {
+      api: {
+        baseUrl: 'http://localhost:9190',
+        basePath: '/api',
+        timeout: 30000,
+        connectTimeout: 10000,
+        retryCount: 3,
+        retryDelay: 1000,
+      },
+      sse: {
+        endpoint: '/api/events',
+        reconnect: true,
+        reconnectDelay: 2000,
+        maxReconnectAttempts: -1,
+        connectionTimeout: 60000,
+        heartbeatEnabled: true,
+        heartbeatInterval: 30000,
+      },
+      features: {
+        models: true,
+        downloads: true,
+        cluster: true,
+        logs: true,
+        chat: true,
+        settings: true,
+        dashboard: true,
+      },
+      ui: {
+        theme: 'auto',
+        language: 'zh-CN',
+        pageSize: 20,
+        pageSizeOptions: [10, 20, 50, 100],
+        virtualScrollThreshold: 100,
+        animations: true,
+        skeleton: true,
+        breadcrumb: true,
+        sidebarExpanded: true,
+        compactMode: false,
+      },
+      logging: {
+        level: 'info',
+        console: true,
+        remote: false,
+        remoteEndpoint: '/api/logs',
+        batchSize: 50,
+        flushInterval: 5000,
+      },
+      cache: {
+        modelsTTL: 60000,
+        clientsTTL: 30000,
+        downloadsTTL: 5000,
+        configTTL: 300000,
+        persistent: true,
+        prefix: 'shepherd_web_',
+        versioning: true,
+      },
+    };
   }
-  return configLoader.getConfig();
 }
