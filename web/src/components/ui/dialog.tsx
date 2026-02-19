@@ -68,21 +68,32 @@ export function DialogContent({ className, children }: DialogContentProps) {
     }
   }, [open, onOpenChange]);
 
+  // 阻止滚动
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* 背景遮罩 */}
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
         onClick={() => onOpenChange(false)}
       />
 
       {/* 对话框内容 */}
       <div
         className={cn(
-          'relative bg-background rounded-lg shadow-lg border max-w-lg w-full mx-4',
-          'animate-in fade-in-0 zoom-in-95',
+          'relative bg-card text-card-foreground rounded-xl shadow-2xl border border-border/50',
+          'max-w-lg w-full mx-4',
+          'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2',
           className
         )}
       >
@@ -102,7 +113,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn('flex flex-col space-y-1.5 p-6', className)}>
+    <div className={cn('flex flex-col space-y-1.5 p-6 border-b', className)}>
       {children}
     </div>
   );
@@ -157,7 +168,7 @@ export function DialogFooter({ className, children }: DialogFooterProps) {
   return (
     <div
       className={cn(
-        'flex items-center p-6 pt-0 gap-2 justify-end',
+        'flex items-center p-6 pt-4 gap-3 justify-end border-t bg-muted/20',
         className
       )}
     >

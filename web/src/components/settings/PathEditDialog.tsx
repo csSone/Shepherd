@@ -79,47 +79,42 @@ export function PathEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[480px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>
-              {isEdit ? '编辑' : '添加'}{typeLabel}路径
+            <DialogTitle className="text-base">
+              {isEdit ? '编辑' : '添加'} {typeLabel} 路径
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 p-6 pt-0">
+          <div className="space-y-4 p-6">
             {/* 路径输入（必填） */}
             <div className="space-y-2">
-              <label htmlFor="path" className="text-sm font-medium">
+              <label htmlFor="path" className="text-xs font-medium flex items-center gap-1.5">
+                <FolderOpen size={12} className="text-muted-foreground" />
                 路径 <span className="text-destructive">*</span>
               </label>
-              <div className="relative">
-                <FolderOpen
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  id="path"
-                  type="text"
-                  value={formData.path}
-                  onChange={(e) =>
-                    setFormData({ ...formData, path: e.target.value })
-                  }
-                  placeholder="/path/to/directory"
-                  className="w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
-                  required
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
+              <input
+                id="path"
+                type="text"
+                value={formData.path}
+                onChange={(e) =>
+                  setFormData({ ...formData, path: e.target.value })
+                }
+                placeholder={type === 'llamacpp' ? '/usr/local/bin/llama.cpp' : '~/.cache/huggingface/hub'}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                required
+              />
+              <p className="text-[11px] text-muted-foreground">
                 {type === 'llamacpp'
-                  ? 'llama.cpp 可执行文件所在目录'
-                  : '包含模型文件的目录'}
+                  ? 'llama.cpp 可执行文件所在目录的绝对路径'
+                  : '包含 GGUF 模型文件的目录绝对路径'}
               </p>
             </div>
 
             {/* 名称输入（可选） */}
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
+              <label htmlFor="name" className="text-xs font-medium">
                 名称 <span className="text-muted-foreground">（可选）</span>
               </label>
               <input
@@ -132,18 +127,15 @@ export function PathEditDialog({
                 placeholder={
                   type === 'llamacpp'
                     ? '例如：主构建目录'
-                    : '例如：我的模型'
+                    : '例如：HuggingFace 缓存'
                 }
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
               />
-              <p className="text-xs text-muted-foreground">
-                为这个路径设置一个易记的名称
-              </p>
             </div>
 
             {/* 描述输入（可选） */}
             <div className="space-y-2">
-              <label htmlFor="description" className="text-sm font-medium">
+              <label htmlFor="description" className="text-xs font-medium">
                 描述 <span className="text-muted-foreground">（可选）</span>
               </label>
               <textarea
@@ -153,8 +145,8 @@ export function PathEditDialog({
                   setFormData({ ...formData, description: e.target.value })
                 }
                 placeholder="添加备注信息..."
-                rows={3}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:border-transparent resize-none"
+                rows={2}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none transition-all"
               />
             </div>
           </div>
@@ -162,13 +154,18 @@ export function PathEditDialog({
           <DialogFooter>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={onClose}
               disabled={isSaving}
+              className="h-8 px-3 text-xs"
             >
               取消
             </Button>
-            <Button type="submit" disabled={isSaving || !formData.path.trim()}>
+            <Button
+              type="submit"
+              disabled={isSaving || !formData.path.trim()}
+              className="h-8 px-3 text-xs"
+            >
               {isSaving ? '保存中...' : '保存'}
             </Button>
           </DialogFooter>
