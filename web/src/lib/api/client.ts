@@ -19,6 +19,7 @@ export class ApiError extends Error {
 
 /**
  * API 客户端类
+ * 支持动态配置后端 URL，前端完全独立运行
  */
 class ApiClient {
   private baseUrl: string;
@@ -28,17 +29,37 @@ class ApiClient {
   }
 
   /**
+   * 设置后端 URL
+   */
+  setBaseUrl(url: string): void {
+    this.baseUrl = url;
+  }
+
+  /**
+   * 获取当前后端 URL
+   */
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /**
    * 构建完整 URL
    */
   private buildUrl(endpoint: string, params?: Record<string, string>): string {
-    const url = new URL(endpoint, window.location.origin);
-    if (this.baseUrl !== '/api' && !endpoint.startsWith(this.baseUrl)) {
-      url.pathname = `${this.baseUrl}${endpoint}`;
+    // 如果 endpoint 是相对路径，添加 baseUrl
+    let url = endpoint;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = this.baseUrl + endpoint;
     }
+
+    // 添加查询参数
     if (params) {
-      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+      const urlObj = new URL(url);
+      Object.entries(params).forEach(([k, v]) => urlObj.searchParams.set(k, v));
+      url = urlObj.toString();
     }
-    return url.toString();
+
+    return url;
   }
 
   /**
@@ -125,6 +146,14 @@ class ApiClient {
 }
 
 /**
- * 导出单例实例
+ * 导出单例实例（默认值，会在配置加载后更新）
  */
 export const apiClient = new ApiClient();
+
+/**
+ * 更新 API 客户端的后端 URL
+ * 此函数在配置加载后调用
+ */
+export function updateApiClientUrl(baseUrl: string): void {
+  apiClient.setBaseUrl(baseUrl);
+}

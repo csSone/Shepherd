@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Web 前端完全独立架构**
+  - 前端现在拥有独立的配置文件 (`web/config.yaml`)
+  - 不再依赖后端提供配置，前端可连接任意后端服务器
+  - 支持多后端配置和运行时切换
+  - 移除 Vite 代理依赖，前端直接连接后端 API
+  - 新增 `configLoader.ts` 配置加载器
+  - 新增 `web/DEPLOYMENT.md` 部署指南
+  - 新增 `web/INDEPENDENT.md` 迁移指南
+  - 新增 `scripts/sync-web-config.sh` 配置同步脚本
+
+### Changed
+- 后端不再提供 `/api/config/web` 端点（前端独立配置）
+- API 客户端支持动态后端 URL 配置
+- Vite 配置移除代理设置，前端独立运行
+- 后端 CORS 已配置允许所有源访问
+
+### Removed
+- 删除 `config/web.config.yaml`（后端控制的前端配置）
+- 删除 `internal/server/server.go` 中的 `handleGetWebConfig` 方法
+- 删除后端 `/api/config/web` 路由
+
+### Added
+- Master-Client 分布式架构支持
 - Master-Client 分布式架构支持
   - Master 模式：管理多个 Client 节点
   - Client 模式：作为工作节点执行任务

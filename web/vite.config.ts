@@ -10,39 +10,37 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // 公共目录，用于存放 config.yaml
+  publicDir: 'public',
   server: {
-  "port": 3000,
-  "proxy": {
-    "/api": {
-      "target": "http://localhost:9190",
-      "changeOrigin": true
-    },
-    "/v1": {
-      "target": "http://localhost:9190",
-      "changeOrigin": true
-    }
-  }
-},
+    port: 3000,
+    // 前端独立运行，直接连接后端，不需要代理
+    // 如需跨域，在后端配置 CORS
+    host: true, // 监听所有地址，方便局域网访问
+  },
   build: {
-  "outDir": "dist",
-  "sourcemap": true,
-  "rollupOptions": {
-    "output": {
-      "manualChunks": {
-        "react-vendor": [
-          "react",
-          "react-dom",
-          "react-router-dom"
-        ],
-        "query-vendor": [
-          "@tanstack/react-query",
-          "@tanstack/react-virtual"
-        ],
-        "ui-vendor": [
-          "zustand"
-        ]
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom'
+          ],
+          'query-vendor': [
+            '@tanstack/react-query',
+            '@tanstack/react-virtual'
+          ],
+          'ui-vendor': [
+            'zustand'
+          ]
+        }
       }
     }
-  }
-},
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
 });

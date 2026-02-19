@@ -52,7 +52,8 @@
 - **优雅关闭** - 确保日志在关闭前正确写入
 
 ### 🎛️ 运行时配置
-- **动态配置** - Web 前端支持运行时配置 (`/api/config/web`)
+- **前端独立配置** - Web 前端拥有独立配置文件 (`web/config.yaml`)
+- **多后端支持** - 前端可连接任意后端服务器，支持运行时切换
 - **CORS 控制** - 可配置跨域访问策略
 - **SSE 支持** - 服务器推送事件实时更新
 
@@ -63,7 +64,8 @@
 
 ### 🎨 Web 前端
 - **React + TypeScript** - 现代化前端技术栈
-- **运行时配置** - 支持 YAML 配置文件动态调整
+- **独立配置** - 前端拥有独立配置文件，可连接任意后端
+- **多后端支持** - 支持配置多个后端地址，运行时切换
 - **实时 UI 更新** - SSE 实时事件推送
 - **响应式设计** - 支持桌面和移动端
 
@@ -148,25 +150,32 @@ log:
   max_age: 7            # days
 ```
 
-**Web 前端运行时配置 (config/web.config.yaml):**
+**Web 前端独立配置 (web/config.yaml):**
 
 ```yaml
-server:
-  host: "0.0.0.0"
-  port: 3000
-  cors:
-    enabled: true
-    origin: "*"
+# 后端服务器配置（可配置多个）
+backend:
+  urls:
+    - "http://localhost:9190"       # 主后端
+    - "http://backup:9190"          # 备用后端
+  currentIndex: 0                   # 当前使用的后端索引
 
-api:
-  baseUrl: "http://localhost:9190"
-  timeout: 30000
-
+# 功能开关
 features:
   models: true
   downloads: true
-  cluster: true    # 仅在 standalone/master 模式启用
+  cluster: true
+  logs: true
+  chat: true
+
+# UI 配置
+ui:
+  theme: "auto"
+  language: "zh-CN"
+  pageSize: 20
 ```
+
+前端现在完全独立运行，不依赖后端配置。详见 [web/INDEPENDENT.md](web/INDEPENDENT.md) 和 [web/DEPLOYMENT.md](web/DEPLOYMENT.md)。
 
 ### 运行
 
@@ -252,27 +261,29 @@ kill -INT <pid>
 </details>
 
 <details>
-<summary><b>前端开发服务器</b></summary>
+<summary><b>前端开发服务器（独立模式）</b></summary>
 
 ```bash
-# 启动开发服务器 (端口 3000)
+# 启动前端开发服务器 (端口 3000)
+cd web
+npm run dev
+
+# 或使用脚本
 ./scripts/web.sh dev
 
-# 指定端口
-./scripts/web.sh dev -p 4000
-
-# 查看依赖状态
-./scripts/web.sh check
-
-# 修复依赖问题
-./scripts/web.sh fix
+# 前端会从 web/config.yaml 读取后端配置
+# 可连接到任意后端服务器
 ```
 
-前端服务器也支持优雅关闭（Ctrl+C）。
+**前端独立运行的优势：**
+- 前端完全独立，可部署到任意服务器
+- 支持连接任意后端服务器（无需代理）
+- 多后端配置，运行时切换
+- 开发模式更简单，无需等待后端启动
 
 </details>
 
-访问 Web UI: http://localhost:9190
+访问 Web UI: http://localhost:3000 (开发模式) 或 http://localhost:9190 (后端托管)
 
 **日志文件位置：**
 ```
@@ -361,14 +372,19 @@ Shepherd/
 ├── config/                # 配置文件目录
 │   ├── server.config.yaml    # 单机模式配置
 │   ├── master.config.yaml    # Master 模式配置
-│   ├── client.config.yaml    # Client 模式配置
-│   └── web.config.yaml       # Web 前端运行时配置
+│   └── client.config.yaml    # Client 模式配置
 ├── scripts/               # 编译和部署脚本
-├── web/                   # Web 前端
+├── web/                   # Web 前端（独立配置）
+│   ├── config.yaml          # 前端独立配置文件
+│   ├── public/
+│   │   └── config.yaml      # 配置副本（自动同步）
 │   ├── src/               # React + TypeScript 源码
 │   │   └── lib/
-│   │       └── config.ts  # 配置加载器
-│   └── [开发工具配置]     # TypeScript/Vite/ESLint 等
+│   │       ├── configLoader.ts  # 配置加载器
+│   │       └── api/client.ts    # API 客户端
+│   ├── DEPLOYMENT.md          # 部署指南
+│   ├── INDEPENDENT.md         # 架构迁移说明
+│   └── [开发工具配置]         # TypeScript/Vite/ESLint 等
 ├── logs/                  # 日志目录 (自动创建)
 │   ├── shepherd-standalone-*.log
 │   ├── shepherd-master-*.log
@@ -387,6 +403,8 @@ Shepherd/
 | [架构设计](docs/03-架构设计.md) | 系统架构说明 |
 | [实施路线图](docs/04-实施路线图.md) | 开发进度和计划 |
 | [API 参考](docs/05-API参考.md) | API 接口文档 |
+| [Web 前端部署](web/DEPLOYMENT.md) | 前端部署指南 |
+| [Web 前端独立配置](web/INDEPENDENT.md) | 前端架构迁移说明 |
 
 ---
 
@@ -410,45 +428,54 @@ cd web
 # 1. 安装依赖
 npm install
 
-# 2. 配置运行时参数（可选）
-# 编辑 config/web.config.yaml
+# 2. 配置前端（可选）
+# 编辑 web/config.yaml 指定后端地址
 
 # 3. 启动开发服务器
 npm run dev
 
-# 4. 构建生产版本
+# 4. 同步配置（修改 config.yaml 后）
+./scripts/sync-web-config.sh
+
+# 5. 构建生产版本
 npm run build
 
-# 5. 类型检查
+# 6. 类型检查
 npm run type-check
 
-# 6. 代码检查
+# 7. 代码检查
 npm run lint
 ```
 
-**运行时配置：**
+**前端独立配置：**
 
-前端应用支持通过 `config/web.config.yaml` 配置运行时参数：
+前端现在使用独立的配置文件 `web/config.yaml`，不依赖后端：
 
 ```yaml
-# API 配置
-api:
-  baseUrl: "http://localhost:9190"
-  timeout: 30000
+# 后端服务器配置（支持多个）
+backend:
+  urls:
+    - "http://localhost:9190"
+    - "http://backup:9190"
+  currentIndex: 0
 
 # 功能开关
 features:
   models: true
   downloads: true
   cluster: true
-  chat: true
 
 # UI 配置
 ui:
   theme: "auto"
   language: "zh-CN"
-  pageSize: 20
 ```
+
+**架构优势：**
+- ✅ 前端完全独立，可连接任意后端
+- ✅ 无需 Vite 代理，开发更简单
+- ✅ 支持多后端配置和运行时切换
+- ✅ 后端仅提供数据 API
 
 **开发工具配置：**
 ├── postcss.config.js

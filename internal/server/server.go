@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,7 +17,6 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
-	"gopkg.in/yaml.v3"
 )
 
 // Server represents the HTTP server
@@ -118,7 +115,6 @@ func (s *Server) setupRoutes() {
 		{
 			config.GET("", s.handleGetConfig)
 			config.PUT("", s.handleUpdateConfig)
-			config.GET("/web", s.handleGetWebConfig)
 		}
 
 		// Model routes
@@ -384,93 +380,6 @@ func (s *Server) handleGetConfig(c *gin.Context) {
 
 func (s *Server) handleUpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
-}
-
-// handleGetWebConfig returns the web frontend configuration
-func (s *Server) handleGetWebConfig(c *gin.Context) {
-	webConfigPath := filepath.Join(config.GetConfigDir(), "web.config.yaml")
-
-	// Check if web config exists
-	if _, err := os.Stat(webConfigPath); os.IsNotExist(err) {
-		// Return default config if file doesn't exist
-		c.JSON(http.StatusOK, gin.H{
-			"app": gin.H{
-				"name":        "Shepherd",
-				"version":     "1.0.0",
-				"description": "分布式 AI 模型管理系统",
-				"environment": "production",
-			},
-			"server": gin.H{
-				"host":   "0.0.0.0",
-				"port":   3000,
-				"https":  false,
-				"cors": gin.H{
-					"enabled":     true,
-					"origin":      "*",
-					"methods":     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-					"headers":     "Content-Type, Authorization, X-Requested-With",
-					"credentials": false,
-				},
-			},
-			"api": gin.H{
-				"baseUrl":         fmt.Sprintf("http://%s:%d", s.config.Host, s.config.WebPort),
-				"basePath":       "/api",
-				"timeout":        30000,
-				"connectTimeout": 10000,
-				"retryCount":      3,
-				"retryDelay":      1000,
-				"retryStatusCodes": []int{408, 429, 500, 502, 503, 504},
-			},
-			"features": gin.H{
-				"models":    true,
-				"downloads": true,
-				"cluster":   s.config.Mode == "master" || s.config.Mode == "standalone",
-				"logs":      true,
-				"chat":      true,
-				"settings":  true,
-				"dashboard": true,
-			},
-			"ui": gin.H{
-				"theme":               "auto",
-				"language":            "zh-CN",
-				"supportedLanguages":  []string{"zh-CN", "en-US"},
-				"pageSize":            20,
-				"pageSizeOptions":     []int{10, 20, 50, 100},
-				"virtualScrollThreshold": 100,
-				"animations":          true,
-				"skeleton":            true,
-				"breadcrumb":          true,
-				"sidebarExpanded":     true,
-			},
-		})
-		return
-	}
-
-	// Read and parse web.config.yaml
-	data, err := os.ReadFile(webConfigPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read web config"})
-		return
-	}
-
-	// Parse YAML
-	var webConfig map[string]interface{}
-	if err := yaml.Unmarshal(data, &webConfig); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse web config"})
-		return
-	}
-
-	// Override baseUrl with actual server address
-	if apiConfig, ok := webConfig["api"].(map[string]interface{}); ok {
-		apiConfig["baseUrl"] = fmt.Sprintf("http://%s:%d", s.config.Host, s.config.WebPort)
-	}
-
-	// Update features based on mode
-	if features, ok := webConfig["features"].(map[string]interface{}); ok {
-		features["cluster"] = s.config.Mode == "master" || s.config.Mode == "standalone"
-	}
-
-	c.JSON(http.StatusOK, webConfig)
 }
 
 func (s *Server) handleListModels(c *gin.Context) {

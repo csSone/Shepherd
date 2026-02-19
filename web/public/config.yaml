@@ -1,0 +1,278 @@
+# Shepherd Web 前端独立配置
+# 此文件由前端直接读取，不依赖后端
+
+# 目标后端服务器配置
+backend:
+  # 后端 API 地址（可配置多个，按优先级使用）
+  urls:
+    - "http://localhost:9190"
+    - "http://192.168.1.100:9190"
+  # 当前使用的后端索引（0 表示第一个）
+  currentIndex: 0
+  # 连接超时时间（毫秒）
+  timeout: 30000
+  # 连接重试配置
+  retry:
+    count: 3
+    delay: 1000
+
+# 前端服务器配置
+server:
+  # 开发服务器端口
+  port: 3000
+  # 是否启用 HTTPS
+  https: false
+  # SSL 证书路径
+  sslCert: ""
+  sslKey: ""
+
+# CORS 配置（独立前端可能需要）
+cors:
+  # 允许的后端源
+  allowedOrigins:
+    - "http://localhost:9190"
+    - "http://192.168.1.100:9190"
+  # 是否发送凭据
+  credentials: false
+
+# 功能开关
+features:
+  models: true
+  downloads: true
+  cluster: true
+  logs: true
+  chat: true
+  settings: true
+  dashboard: true
+
+# UI 配置
+ui:
+  # 主题：light, dark, auto
+  theme: "auto"
+  # 语言：zh-CN, en-US
+  language: "zh-CN"
+  # 分页大小
+  pageSize: 20
+  # 分页选项
+  pageSizeOptions:
+    - 10
+    - 20
+    - 50
+    - 100
+  # 虚拟滚动阈值
+  virtualScrollThreshold: 100
+  # 动画效果
+  animations: true
+  # 骨架屏
+  skeleton: true
+  # 面包屑导航
+  breadcrumb: true
+  # 侧边栏默认展开
+  sidebarExpanded: true
+
+# SSE 实时事件配置
+sse:
+  # SSE 端点（相对路径，会追加到 backend URL）
+  endpoint: "/api/events"
+  # 是否自动重连
+  reconnect: true
+  # 重连延迟（毫秒）
+  reconnectDelay: 2000
+  # 最大重连次数（-1 表示无限）
+  maxReconnectAttempts: -1
+  # 连接超时（毫秒）
+  connectionTimeout: 60000
+  # 心跳间隔（毫秒）
+  heartbeatInterval: 30000
+  heartbeatEnabled: true
+
+# 缓存配置
+cache:
+  # 模型缓存时间（毫秒）
+  modelsTTL: 60000
+  # 客户端缓存时间
+  clientsTTL: 30000
+  # 下载缓存时间
+  downloadsTTL: 5000
+  # 配置缓存时间
+  configTTL: 300000
+  # 是否启用持久化缓存
+  persistent: true
+  # 缓存键前缀
+  prefix: "shepherd_web_"
+  # 是否启用版本控制
+  versioning: true
+
+# 日志配置
+logging:
+  # 日志级别：debug, info, warn, error
+  level: "info"
+  # 是否输出到控制台
+  console: true
+  # 是否发送到远程服务器
+  remote: false
+  # 远程日志端点
+  remoteEndpoint: "/api/logs"
+  # 批量发送大小
+  batchSize: 50
+  # 刷新间隔（毫秒）
+  flushInterval: 5000
+
+# OpenAI API 配置
+openai:
+  # API 端点（相对路径，会追加到 backend URL）
+  endpoint: "/v1/chat/completions"
+  # 默认模型
+  defaultModel: ""
+  # 温度参数
+  temperature: 0.7
+  # 最大 tokens
+  maxTokens: 4096
+  # Top-p 采样
+  topP: 0.9
+  # 频率惩罚
+  frequencyPenalty: 0
+  # 存在惩罚
+  presencePenalty: 0
+  # 流式超时（毫秒）
+  streamTimeout: 120000
+
+# 性能配置
+performance:
+  # 是否启用性能监控
+  monitoring: false
+  # 采样率（0-1）
+  sampleRate: 0.1
+  # 是否预加载资源
+  preloading: true
+  # 预加载的资源列表
+  preloadResources:
+    - "/api/config"
+    - "/api/models"
+  # 是否启用虚拟滚动
+  virtualScroll: true
+  # 是否启用代码分割
+  codeSplitting: true
+  # 懒加载图片阈值（字节）
+  lazyImageThreshold: 1024
+
+# 安全配置
+security:
+  # API 密钥（如果后端需要）
+  apiKey: ""
+  # 是否启用 CSP
+  cspEnabled: false
+  # XSS 保护
+  xssProtection: true
+  # 点击劫持保护
+  clickjackingProtection: true
+  # HSTS
+  strictTransportSecurity: false
+  # 是否签名请求
+  requestSigning: false
+
+# 错误处理配置
+errors:
+  # 是否显示错误对话框
+  showDialog: true
+  # 是否显示详细信息
+  showDetails: true
+  # 是否上报错误
+  reporting: false
+  # 错误上报端点
+  reportingEndpoint: "/api/errors"
+  # 技术支持邮箱
+  supportEmail: ""
+
+# 通知配置
+notifications:
+  # 是否启用通知
+  enabled: true
+  # 是否启用桌面通知
+  desktop: true
+  # 是否启用声音
+  sound: false
+  # 通知持续时间（毫秒）
+  duration: 5000
+  # 默认通知类型
+  defaultTypes:
+    - "model"
+    - "download"
+    - "system"
+    - "error"
+  # 是否请求通知权限
+  requestPermission: true
+
+# WebSocket 配置
+websocket:
+  # 是否启用 WebSocket（备用 SSE）
+  enabled: false
+  # WebSocket 端点（相对路径）
+  endpoint: "/api/ws"
+  # 心跳间隔（毫秒）
+  heartbeatInterval: 30000
+  # 重连间隔（毫秒）
+  reconnectInterval: 5000
+
+# 开发工具配置
+devtools:
+  # 是否启用调试模式
+  debug: false
+  # 是否启用 React DevTools
+  reactDevTools: true
+  # 是否启用 Redux DevTools
+  reduxDevTools: false
+  # 是否显示性能信息
+  showPerformance: false
+  # 是否记录网络请求
+  logNetworkRequests: false
+
+# 布局配置
+layout:
+  # 头部高度（像素）
+  headerHeight: 60
+  # 侧边栏宽度（像素）
+  sidebarWidth: 260
+  # 侧边栏折叠宽度（像素）
+  sidebarCollapsedWidth: 70
+  # 内容区域最大宽度（像素）
+  contentMaxWidth: 1400
+  # 是否固定头部
+  stickyHeader: true
+  # 是否固定侧边栏
+  stickySidebar: true
+
+# 导入导出配置
+importExport:
+  # 是否启用导入
+  importEnabled: true
+  # 是否启用导出
+  exportEnabled: true
+  # 支持的导入格式
+  importFormats:
+    - "json"
+    - "csv"
+  # 支持的导出格式
+  exportFormats:
+    - "json"
+    - "csv"
+  # 最大导出行数
+  maxExportRows: 10000
+
+# 上传配置
+upload:
+  # 最大文件大小（字节）
+  maxFileSize: 524288000
+  # 分块大小（字节）
+  chunkSize: 5242880
+  # 是否启用分块上传
+  chunked: true
+  # 上传超时（毫秒）
+  timeout: 300000
+  # 允许的文件类型
+  allowedTypes:
+    - ".gguf"
+    - ".bin"
+    - ".json"
+    - ".txt"
+    - ".md"
