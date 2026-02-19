@@ -8,6 +8,7 @@ import { DownloadsPage } from './pages/downloads';
 import { ChatPage } from './pages/chat';
 import { ClusterPage } from './pages/cluster';
 import { LogsPage } from './pages/logs';
+import { SettingsPage } from './pages/settings';
 import { useSSE } from './hooks/useSSE';
 
 // 导入代码高亮样式
@@ -35,7 +36,7 @@ function AppContent() {
           <Route path="chat" element={<ChatPage />} />
           <Route path="cluster" element={<ClusterPage />} />
           <Route path="logs" element={<LogsPage />} />
-          <Route path="settings" element={<div>设置页面 - 开发中</div>} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

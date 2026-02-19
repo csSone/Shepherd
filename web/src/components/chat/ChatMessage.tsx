@@ -26,7 +26,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     <div
       className={cn(
         'flex gap-3 p-4',
-        isUser ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900/50'
+        isUser ? 'bg-muted/30' : 'bg-muted/10'
       )}
     >
       {/* 头像 */}
@@ -34,7 +34,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         className={cn(
           'flex shrink-0 w-8 h-8 rounded-full items-center justify-center',
           isUser
-            ? 'bg-blue-600 text-white'
+            ? 'bg-primary text-primary-foreground'
             : 'bg-gradient-to-br from-purple-500 to-pink-500 text-white'
         )}
       >
@@ -44,11 +44,11 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
       {/* 内容 */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="font-medium text-gray-900 dark:text-white">
+          <span className="font-medium">
             {isUser ? '你' : 'AI 助手'}
           </span>
           {message.timestamp && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-muted-foreground">
               {new Date(message.timestamp).toLocaleTimeString('zh-CN')}
             </span>
           )}
@@ -77,7 +77,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
                       </div>
                     ) : (
                       <code
-                        className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-sm font-mono"
+                        className="px-1.5 py-0.5 bg-muted rounded text-sm font-mono"
                         {...props}
                       >
                         {children}
@@ -85,7 +85,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
                     );
                   },
                   pre: ({ children }) => (
-                    <pre className="overflow-x-auto p-4 bg-gray-900 dark:bg-gray-950 rounded-lg">
+                    <pre className="overflow-x-auto p-4 bg-muted rounded-lg">
                       {children}
                     </pre>
                   ),
@@ -100,13 +100,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           {!isUser && message.content && (
             <button
               onClick={handleCopy}
-              className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+              className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity rounded bg-muted hover:bg-accent"
               title="复制"
             >
               {copied ? (
                 <Check className="w-4 h-4 text-green-600" />
               ) : (
-                <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <Copy className="w-4 h-4" />
               )}
             </button>
           )}

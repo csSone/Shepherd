@@ -1,5 +1,6 @@
 import { Bell, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUIStore } from '@/stores/uiStore';
 
 /**
@@ -26,6 +27,9 @@ export function Header() {
 
       {/* 右侧操作 */}
       <div className="flex items-center gap-2">
+        {/* 主题切换 */}
+        <ThemeToggle />
+
         {/* 通知按钮 */}
         <Button variant="ghost" size="icon" aria-label="通知">
           <Bell size={20} />

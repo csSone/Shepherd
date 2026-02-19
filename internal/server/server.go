@@ -13,6 +13,7 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/api/paths"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
@@ -45,8 +46,9 @@ type Config struct {
 	WriteTimeout  time.Duration
 	WebUIPath     string
 	// Mode and ServerMode for runtime configuration
-	Mode      string // standalone|master|client
-	ServerCfg *config.Config
+	Mode        string // standalone|master|client
+	ServerCfg   *config.Config
+	ConfigMgr   *config.Manager // 配置管理器
 }
 
 // Handlers contains handler instances
@@ -54,6 +56,7 @@ type Handlers struct {
 	OpenAI    *openai.Handler
 	Ollama    *ollama.Handler
 	Anthropic *anthropic.Handler
+	Paths     *paths.Handler
 }
 
 // NewServer creates a new HTTP server
@@ -75,6 +78,7 @@ func NewServer(config *Config, modelMgr *model.Manager) *Server {
 	s.handlers.OpenAI = openai.NewHandler(modelMgr)
 	s.handlers.Ollama = ollama.NewHandler(modelMgr)
 	s.handlers.Anthropic = anthropic.NewHandler(modelMgr)
+	s.handlers.Paths = paths.NewHandler(config.ConfigMgr)
 
 	// Setup Gin engine
 	if config.WebUIPath == "" {
@@ -115,6 +119,24 @@ func (s *Server) setupRoutes() {
 		{
 			config.GET("", s.handleGetConfig)
 			config.PUT("", s.handleUpdateConfig)
+
+			// Llama.cpp paths
+			llamacpp := config.Group("/llamacpp/paths")
+			{
+				llamacpp.GET("", s.handlers.Paths.GetLlamaCppPaths)
+				llamacpp.POST("", s.handlers.Paths.AddLlamaCppPath)
+				llamacpp.DELETE("", s.handlers.Paths.RemoveLlamaCppPath)
+				llamacpp.POST("/test", s.handlers.Paths.TestLlamaCppPath)
+			}
+
+			// Model paths
+			models := config.Group("/models/paths")
+			{
+				models.GET("", s.handlers.Paths.GetModelPaths)
+				models.POST("", s.handlers.Paths.AddModelPath)
+				models.PUT("", s.handlers.Paths.UpdateModelPath)
+				models.DELETE("", s.handlers.Paths.RemoveModelPath)
+			}
 		}
 
 		// Model routes
@@ -184,8 +206,9 @@ func (s *Server) setupRoutes() {
 	}
 
 	// Static files for Web UI
-	s.engine.Static("/web", "./web")
-	s.engine.StaticFile("/", "./web/index.html")
+	s.engine.Static("/assets", s.config.WebUIPath+"/assets")
+	s.engine.Static("/favicon.svg", s.config.WebUIPath+"/favicon.svg")
+	s.engine.StaticFile("/", s.config.WebUIPath+"/index.html")
 }
 
 // Start starts the HTTP server

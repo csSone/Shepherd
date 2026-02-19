@@ -133,9 +133,10 @@ func main() {
 		Host:          cfg.Server.Host,
 		ReadTimeout:   time.Duration(cfg.Server.ReadTimeout) * time.Second,
 		WriteTimeout:  time.Duration(cfg.Server.WriteTimeout) * time.Second,
-		WebUIPath:     "./web",
+		WebUIPath:     "./web/dist",
 		Mode:          cfg.Mode,
 		ServerCfg:     cfg,
+		ConfigMgr:     configMgr,
 	}
 
 	srv := server.NewServer(serverCfg, modelMgr)

@@ -138,3 +138,33 @@ export interface ServerConfig {
     credentials: boolean;
   };
 }
+
+/**
+ * Llama.cpp 路径配置
+ */
+export interface LlamaCppPathConfig {
+  name: string;
+  path: string;
+  description: string;
+}
+
+/**
+ * 模型路径配置
+ */
+export interface ModelPathConfig {
+  path: string;
+  name?: string;
+  description?: string;
+}
+
+/**
+ * 路径列表响应
+ */
+export interface PathListResponse<T> {
+  success: boolean;
+  data: {
+    items: T[];
+    count: number;
+  };
+}
+

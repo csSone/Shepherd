@@ -3,7 +3,7 @@
 # 🐏 Shepherd
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Build](https://img.shields.io/badge/Build-passing-brightgreen.svg)]()
 
 **高性能轻量级 llama.cpp 模型管理系统**
@@ -29,6 +29,8 @@
 - 一键加载/卸载，支持多目录管理
 - 模型收藏、别名、分卷自动识别
 - 视觉模型 (mmproj) 支持
+- **Llama.cpp 路径配置** - Web UI 配置多个 llama.cpp 路径
+- **模型路径配置** - 灵活管理模型扫描路径
 
 ### 🔌 多 API 兼容
 | API | 端口 | 状态 |
@@ -180,8 +182,39 @@ ui:
 前端现在完全独立运行，不依赖后端配置。详见 [web/DEPLOYMENT.md](web/DEPLOYMENT.md) 和 [web/DEVELOPMENT.md](web/DEVELOPMENT.md)。
 
 **功能状态说明：**
-- ✅ 已实现：模型管理、下载管理、聊天、设置、仪表盘
+- ✅ 已实现：模型管理、下载管理、聊天、设置、仪表盘、路径配置
 - 🔜 开发中：集群管理、日志查看（将在后续版本实现）
+
+### 路径配置功能
+
+Shepherd 支持通过 Web UI 灵活配置 Llama.cpp 和模型路径：
+
+**Llama.cpp 路径配置:**
+- 在设置页面配置多个 Llama.cpp 安装路径
+- 支持自定义名称和描述
+- 路径有效性自动验证
+- 适用于多 Llama.cpp 环境管理
+
+**模型路径配置:**
+- 配置多个模型扫描目录
+- 支持自定义名称和描述
+- 自动扫描和发现 GGUF 模型
+- 便于组织和管理分散的模型文件
+
+**API 端点:**
+```bash
+# Llama.cpp 路径管理
+GET    /api/config/llamacpp/paths          # 获取所有路径
+POST   /api/config/llamacpp/paths          # 添加路径
+DELETE /api/config/llamacpp/paths          # 删除路径
+POST   /api/config/llamacpp/test           # 测试路径有效性
+
+# 模型路径管理
+GET    /api/config/models/paths            # 获取所有路径
+POST   /api/config/models/paths            # 添加路径
+PUT    /api/config/models/paths            # 更新路径
+DELETE /api/config/models/paths            # 删除路径
+```
 
 ### 运行
 
@@ -569,7 +602,7 @@ make clean
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+本项目采用 Apache License 2.0 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 

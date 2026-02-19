@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 /**
+ * 主题类型
+ */
+export type Theme = 'light' | 'dark' | 'system';
+
+/**
  * UI 状态接口
  */
 interface UIState {
@@ -11,8 +16,9 @@ interface UIState {
   setSidebarOpen: (open: boolean) => void;
 
   // 主题
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
 
   // 当前视图
   currentView: string;
@@ -35,19 +41,47 @@ interface UIState {
 }
 
 /**
+ * 获取系统主题
+ */
+function getSystemTheme(): 'light' | 'dark' {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+/**
+ * 应用主题到 DOM
+ */
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  const effectiveTheme = theme === 'system' ? getSystemTheme() : theme;
+
+  root.classList.remove('light', 'dark');
+  root.classList.add(effectiveTheme);
+}
+
+/**
  * UI 状态 Store
  */
 export const useUIStore = create<UIState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // 侧边栏
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
       // 主题
-      theme: 'light',
-      setTheme: (theme) => set({ theme }),
+      theme: 'system',
+      setTheme: (theme) => {
+        set({ theme });
+        applyTheme(theme);
+      },
+      toggleTheme: () => {
+        const currentTheme = get().theme;
+        const themes: Theme[] = ['light', 'dark', 'system'];
+        const currentIndex = themes.indexOf(currentTheme);
+        const nextTheme = themes[(currentIndex + 1) % themes.length];
+        get().setTheme(nextTheme);
+      },
 
       // 当前视图
       currentView: 'dashboard',
@@ -77,3 +111,13 @@ export const useUIStore = create<UIState>()(
     }
   )
 );
+
+// 初始化主题
+applyTheme(useUIStore.getState().theme);
+
+// 监听系统主题变化
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (useUIStore.getState().theme === 'system') {
+    applyTheme('system');
+  }
+});

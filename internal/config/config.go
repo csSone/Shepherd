@@ -55,9 +55,10 @@ type ServerConfig struct {
 
 // ModelConfig contains model scanning and management configuration
 type ModelConfig struct {
-	Paths    []string `mapstructure:"paths" yaml:"paths" json:"paths"`
-	AutoScan bool     `mapstructure:"auto_scan" yaml:"auto_scan" json:"autoScan"`
-	ScanInterval int  `mapstructure:"scan_interval" yaml:"scan_interval" json:"scanInterval"` // seconds, 0 = disable
+	Paths        []string    `mapstructure:"paths" yaml:"paths" json:"paths"`                   // 简单路径数组（向后兼容）
+	PathConfigs  []ModelPath `mapstructure:"path_configs" yaml:"path_configs" json:"pathConfigs"` // 详细路径配置
+	AutoScan     bool        `mapstructure:"auto_scan" yaml:"auto_scan" json:"autoScan"`
+	ScanInterval int         `mapstructure:"scan_interval" yaml:"scan_interval" json:"scanInterval"` // seconds, 0 = disable
 }
 
 // LlamacppConfig contains llama.cpp binary paths configuration
@@ -67,8 +68,16 @@ type LlamacppConfig struct {
 
 // LlamacppPath represents a llama.cpp binary path with metadata
 type LlamacppPath struct {
-	Path string `mapstructure:"path" yaml:"path" json:"path"`
-	Name string `mapstructure:"name" yaml:"name" json:"name"`
+	Path        string `mapstructure:"path" yaml:"path" json:"path"`
+	Name        string `mapstructure:"name" yaml:"name" json:"name"`
+	Description string `mapstructure:"description" yaml:"description" json:"description,omitempty"`
+}
+
+// ModelPath represents a model directory path with metadata
+type ModelPath struct {
+	Path        string `mapstructure:"path" yaml:"path" json:"path"`
+	Name        string `mapstructure:"name" yaml:"name" json:"name,omitempty"`
+	Description string `mapstructure:"description" yaml:"description" json:"description,omitempty"`
 }
 
 // DownloadConfig contains download manager configuration

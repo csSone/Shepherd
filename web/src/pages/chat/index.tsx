@@ -103,12 +103,12 @@ export function ChatPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
+    <div className="h-full flex flex-col bg-background">
       {/* 标题栏 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-3">
-          <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">AI 聊天</h1>
+          <MessageSquare className="w-5 h-5 text-primary" />
+          <h1 className="text-lg font-semibold">AI 聊天</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -116,9 +116,9 @@ export function ChatPage() {
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+            className="px-3 py-1.5 border rounded-md bg-background text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
           >
-            <option value="">选择模型...</option>
+            <option value="">选择模型</option>
             {models.map((model) => (
               <option key={model} value={model}>
                 {model}
@@ -128,7 +128,7 @@ export function ChatPage() {
 
           <button
             onClick={handleNewChat}
-            className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            className="p-2 text-muted-foreground hover:bg-accent rounded transition-colors"
             title="新建对话"
           >
             <Plus className="w-5 h-5" />
@@ -137,7 +137,7 @@ export function ChatPage() {
           {messages.length > 0 && (
             <button
               onClick={handleClearHistory}
-              className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+              className="p-2 text-muted-foreground hover:bg-accent rounded transition-colors"
               title="清空对话"
             >
               <Trash2 className="w-5 h-5" />
@@ -149,13 +149,13 @@ export function ChatPage() {
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 && !currentResponse ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <MessageSquare className="w-16 h-16 mb-4 opacity-50" />
             <p className="text-lg mb-2">开始对话</p>
             <p className="text-sm">选择一个模型，然后输入消息开始聊天</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="divide-y divide-border">
             {messages.map((message, index) => (
               <ChatMessage key={index} message={message} />
             ))}

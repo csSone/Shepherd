@@ -50,7 +50,7 @@ export function ChatInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-gray-700 p-4">
+    <form onSubmit={handleSubmit} className="border-t p-4 bg-background">
       <div className="flex items-end gap-3">
         <div className="flex-1 relative">
           <textarea
@@ -61,7 +61,7 @@ export function ChatInput({
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              'w-full px-4 py-3 pr-12 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400',
+              'w-full px-4 py-3 pr-12 bg-background border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent',
               disabled && 'opacity-50 cursor-not-allowed'
             )}
             rows={1}
@@ -70,7 +70,7 @@ export function ChatInput({
 
           {/* 字符计数 */}
           {content.length > 0 && (
-            <div className="absolute bottom-2 right-2 text-xs text-gray-400 dark:text-gray-500">
+            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
               {content.length.toLocaleString()}
             </div>
           )}
@@ -83,7 +83,7 @@ export function ChatInput({
             onClick={onStop}
             className={cn(
               'flex items-center justify-center w-12 h-12 rounded-lg transition-colors',
-              'bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600'
+              'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
             )}
             title="停止生成"
           >
@@ -96,8 +96,8 @@ export function ChatInput({
             className={cn(
               'flex items-center justify-center w-12 h-12 rounded-lg transition-colors',
               !content.trim() || disabled
-                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600'
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
             )}
             title="发送 (Enter)"
           >
@@ -107,7 +107,7 @@ export function ChatInput({
       </div>
 
       {/* 提示信息 */}
-      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+      <div className="mt-2 text-xs text-muted-foreground">
         按 Enter 发送，Shift + Enter 换行
       </div>
     </form>
