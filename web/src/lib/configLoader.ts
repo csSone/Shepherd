@@ -100,14 +100,31 @@ class ConfigLoader {
 
       // 解析键值对
       if (trimmed.includes(':')) {
-        const [key, ...valueParts] = trimmed.split(':');
-        const value = valueParts.join(':').trim();
+        const colonIndex = trimmed.indexOf(':');
+        const key = trimmed.substring(0, colonIndex).trim();
+        const value = trimmed.substring(colonIndex + 1).trim();
 
         if (value === '' || value === '|') {
           // 这是一个对象或数组的开始
-          const newObj: any = Array.isArray(current[key]) ? [] : {};
-          current[key] = newObj;
-          stack.push({ obj: newObj, level });
+          // 检查下一行是否是数组项（以 - 开头）
+          const nextLineIndex = i + 1;
+          if (nextLineIndex < lines.length) {
+            const nextLine = lines[nextLineIndex].trim();
+            if (nextLine.startsWith('- ')) {
+              // 这是一个数组
+              const newArr: any[] = [];
+              current[key] = newArr;
+              stack.push({ obj: newArr, level });
+            } else {
+              // 这是一个对象
+              const newObj: any = {};
+              current[key] = newObj;
+              stack.push({ obj: newObj, level });
+            }
+          } else {
+            // 没有下一行，当作空对象
+            current[key] = {};
+          }
         } else if (value.startsWith('"') || value.startsWith("'")) {
           // 字符串值
           current[key] = value.slice(1, -1);
@@ -121,9 +138,9 @@ class ConfigLoader {
           // 数字值
           current[key] = Number(value);
         } else if (value.startsWith('- ')) {
-          // 数组
-          current[key] = [];
-          stack.push({ obj: current[key], level });
+          // 内联数组
+          const items = value.split('-').map(s => s.trim()).filter(s => s);
+          current[key] = items;
         } else {
           // 其他值作为字符串
           current[key] = value;
