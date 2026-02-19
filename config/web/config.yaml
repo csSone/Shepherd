@@ -1,0 +1,159 @@
+# Shepherd Web 前端配置文件
+# 这是所有前端配置的单一数据源
+# 修改此文件后，运行 npm run gen:config 重新生成配置文件
+
+project:
+  name: "@shepherd/web"
+  version: "0.0.0"
+  description: "Shepherd 分布式 AI 模型管理系统 - Web 前端"
+
+# TypeScript 配置
+typescript:
+  # 基础配置（共享）
+  baseCompilerOptions:
+    target: "ES2022"
+    useDefineForClassFields: true
+    lib:
+      - "ES2022"
+      - "DOM"
+      - "DOM.Iterable"
+    module: "ESNext"
+    skipLibCheck: true
+    moduleResolution: "bundler"
+    allowImportingTsExtensions: true
+    noEmit: true
+    jsx: "react-jsx"
+    strict: true
+    noUnusedLocals: false
+    noUnusedParameters: false
+    noFallthroughCasesInSwitch: true
+
+  # 应用代码配置
+  app:
+    # compilerOptions 会与 baseCompilerOptions 合并
+    compilerOptions:
+      tsBuildInfoFile: "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
+      types:
+        - "vite/client"
+      baseUrl: "."
+      paths:
+        "@/*":
+          - "./src/*"
+    include:
+      - "src"
+
+  # Node.js 配置（构建工具）
+  node:
+    # compilerOptions 会与 baseCompilerOptions 合并
+    compilerOptions:
+      tsBuildInfoFile: "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+      target: "ES2023"
+      lib:
+        - "ES2023"
+      module: "ESNext"
+      types:
+        - "node"
+      verbatimModuleSyntax: true
+      moduleDetection: "force"
+      noUnusedLocals: true
+      noUnusedParameters: true
+      erasableSyntaxOnly: true
+      noUncheckedSideEffectImports: true
+    include:
+      - "vite.config.ts"
+
+# Vite 配置
+vite:
+  plugins:
+    - "react"
+  resolve:
+    alias:
+      "@": "./src"
+  server:
+    port: 3000
+    proxy:
+      /api:
+        target: "http://localhost:9190"
+        changeOrigin: true
+      /v1:
+        target: "http://localhost:9190"
+        changeOrigin: true
+  build:
+    outDir: "dist"
+    sourcemap: true
+    rollupOptions:
+      output:
+        manualChunks:
+          react-vendor:
+            - "react"
+            - "react-dom"
+            - "react-router-dom"
+          query-vendor:
+            - "@tanstack/react-query"
+            - "@tanstack/react-virtual"
+          ui-vendor:
+            - "zustand"
+
+# Tailwind CSS 配置
+tailwind:
+  darkMode:
+    - "class"
+  content:
+    - "./index.html"
+    - "./src/**/*.{js,ts,jsx,tsx}"
+  theme:
+    extend:
+      colors:
+        border: "hsl(var(--border))"
+        input: "hsl(var(--input))"
+        ring: "hsl(var(--ring))"
+        background: "hsl(var(--background))"
+        foreground: "hsl(var(--foreground))"
+        primary:
+          DEFAULT: "hsl(var(--primary))"
+          foreground: "hsl(var(--primary-foreground))"
+        secondary:
+          DEFAULT: "hsl(var(--secondary))"
+          foreground: "hsl(var(--secondary-foreground))"
+        destructive:
+          DEFAULT: "hsl(var(--destructive))"
+          foreground: "hsl(var(--destructive-foreground))"
+        muted:
+          DEFAULT: "hsl(var(--muted))"
+          foreground: "hsl(var(--muted-foreground))"
+        accent:
+          DEFAULT: "hsl(var(--accent))"
+          foreground: "hsl(var(--accent-foreground))"
+        popover:
+          DEFAULT: "hsl(var(--popover))"
+          foreground: "hsl(var(--popover-foreground))"
+        card:
+          DEFAULT: "hsl(var(--card))"
+          foreground: "hsl(var(--card-foreground))"
+      borderRadius:
+        lg: "var(--radius)"
+        md: "calc(var(--radius) - 2px)"
+        sm: "calc(var(--radius) - 4px)"
+  plugins: []
+
+# PostCSS 配置
+postcss:
+  plugins:
+    "@tailwindcss/postcss": {}
+    autoprefixer: {}
+
+# ESLint 配置
+eslint:
+  ignores:
+    - "dist"
+  files:
+    - "**/*.{ts,tsx}"
+  extends:
+    - "@eslint/js/recommended"
+    - "typescript-eslint/recommended"
+    - "eslint-plugin-react-hooks/recommended"
+    - "eslint-plugin-react-refresh/vite"
+  languageOptions:
+    ecmaVersion: 2020
+    globals:
+      browser: true
