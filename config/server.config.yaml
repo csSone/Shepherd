@@ -11,8 +11,11 @@ model:
         - ./models
         - ~/.cache/huggingface/hub
     path_configs:
-        - path: /tmp/test_models
+        - path: /home/user/.cache/huggingface/hub
           name: 测试目录
+          description: ""
+        - path: /home/user/workspace/LlamacppServer/build/models
+          name: ""
           description: ""
     auto_scan: true
     scan_interval: 0
@@ -23,6 +26,9 @@ llamacpp:
           description: ""
         - path: /home/user/workspace/llama.cpp/build-rocm/bin
           name: Rocm后端
+          description: ""
+        - path: /home/user/workspace/llama.cpp/build-vulkan/bin
+          name: VulKan后端
           description: ""
 download:
     directory: ./downloads
