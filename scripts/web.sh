@@ -37,7 +37,7 @@ show_help() {
     cat << EOF
 🐏 Shepherd Web 前端
 
-用法: $0 [命令] [选项]
+用法: $0 [命令]
 
 命令:
     dev         启动开发服务器 (默认)
@@ -50,15 +50,16 @@ show_help() {
 
 选项:
     -h, --help     显示此帮助信息
-    -p, --port PORT    指定端口 (开发模式默认: 3000)
 
 示例:
     $0 dev                 # 启动开发服务器
-    $0 dev -p 4000         # 在端口 4000 启动
     $0 build              # 构建生产版本
     $0 preview            # 预览构建结果
     $0 install            # 安装依赖
     $0 fix                # 修复依赖问题
+
+说明:
+    端口配置请修改 config/web.config.yaml 中的 server.port
 
 EOF
 }
@@ -212,77 +213,55 @@ check_dependencies_status() {
 
 # 启动开发服务器
 run_dev() {
-    local port=${1:-3000}
-    print_info "启动 Web 开发服务器 (端口: $port)..."
-    cd "$WEB_DIR"
+    print_info "启动 Web 开发服务器..."
 
-    # 创建临时文件来存储进程ID
-    local pid_file="/tmp/shepherd-web-dev.pid"
-    local log_file="/tmp/shepherd-web-dev.log"
-
-    # 清理函数
-    cleanup() {
-        local exit_code=$?
-        print_info "正在关闭 Web 开发服务器..."
-
-        # 读取PID并终止进程
-        if [ -f "$pid_file" ]; then
-            local pid=$(cat "$pid_file")
-            if kill -0 "$pid" 2>/dev/null; then
-                print_info "发送 SIGTERM 到进程 $pid..."
-                kill -TERM "$pid" 2>/dev/null || true
-
-                # 等待进程优雅退出（最多5秒）
-                local count=0
-                while kill -0 "$pid" 2>/dev/null && [ $count -lt 50 ]; do
-                    sleep 0.1
-                    count=$((count + 1))
-                done
-
-                # 如果进程仍在运行，强制终止
-                if kill -0 "$pid" 2>/dev/null; then
-                    print_warning "进程未响应，强制终止..."
-                    kill -KILL "$pid" 2>/dev/null || true
-                fi
-            fi
-            rm -f "$pid_file"
-        fi
-
-        # 清理临时文件
-        rm -f "$log_file"
-
-        if [ $exit_code -eq 0 ]; then
-            print_success "Web 开发服务器已优雅关闭"
-        else
-            print_warning "Web 开发服务器已关闭 (退出码: $exit_code)"
-        fi
-        exit $exit_code
-    }
-
-    # 捕获退出信号
-    trap cleanup EXIT INT TERM HUP QUIT
-
-    # 启动开发服务器到后台
-    npm run dev -- --port "$port" > "$log_file" 2>&1 &
-    local npm_pid=$!
-    echo $npm_pid > "$pid_file"
-
-    print_info "Web 开发服务器已启动 (PID: $npm_pid)"
-    print_info "日志文件: $log_file"
-    print_success "按 Ctrl+C 停止服务器"
-
-    # 等待进程或信号
-    wait $npm_pid 2>/dev/null
-    local exit_code=$?
-
-    # 如果进程异常退出，显示日志
-    if [ $exit_code -ne 0 ] && [ $exit_code -ne 143 ]; then
-        print_error "开发服务器异常退出，查看日志:"
-        tail -20 "$log_file" >&2
+    # 1. 同步配置文件
+    print_info "同步配置文件..."
+    local sync_script="$SCRIPT_DIR/sync-web-config.sh"
+    if [ -f "$sync_script" ]; then
+        "$sync_script"
+    else
+        print_warning "配置同步脚本不存在，跳过"
     fi
 
-    # 清理会由 trap 自动处理
-    exit $exit_code
+    # 2. 读取配置的端口
+    local config_file="$WEB_DIR/public/config.yaml"
+    local port=$(grep -oP 'port:\s*\K\d+' "$config_file" 2>/dev/null || echo "3000")
+    print_info "配置端口: $port"
+
+    # 3. 检查端口占用
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        print_warning "端口 $port 已被占用"
+        print_info "正在尝试停止占用进程..."
+
+        local killed_pids=$(lsof -ti :$port -sTCP:LISTEN 2>/dev/null)
+        if [ -n "$killed_pids" ]; then
+            echo "$killed_pids" | xargs -r kill -9 2>/dev/null || true
+            sleep 1
+
+            # 检查是否成功停止
+            if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                print_error "无法停止占用端口的进程，请手动停止"
+                print_info "运行以下命令查看占用进程:"
+                echo "  lsof -i :$port"
+                exit 1
+            else
+                print_success "已停止占用端口的进程"
+            fi
+        fi
+    fi
+
+    # 4. 进入 web 目录
+    cd "$WEB_DIR"
+
+    # 5. 显示访问地址
+    print_info "启动开发服务器 (端口: $port)..."
+    print_info "访问地址:"
+    print_info "  - http://localhost:$port"
+    print_info "  - http://10.0.0.193:$port"
+
+    # 6. 启动 Vite（不带 --port 参数，从配置文件读取）
+    npm run dev
 }
 
 # 构建生产版本
@@ -370,7 +349,6 @@ run_preview() {
 # 主函数
 main() {
     local command=""
-    local port=""
 
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -382,10 +360,6 @@ main() {
             -h|--help)
                 show_help
                 exit 0
-                ;;
-            -p|--port)
-                port="$2"
-                shift 2
                 ;;
             *)
                 print_error "未知参数: $1"
@@ -408,7 +382,7 @@ main() {
     # 执行命令
     case "$command" in
         dev)
-            run_dev "$port"
+            run_dev
             ;;
         build)
             run_build

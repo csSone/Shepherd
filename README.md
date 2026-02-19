@@ -177,7 +177,7 @@ ui:
   pageSize: 20
 ```
 
-前端现在完全独立运行，不依赖后端配置。详见 [web/INDEPENDENT.md](web/INDEPENDENT.md) 和 [web/DEPLOYMENT.md](web/DEPLOYMENT.md)。
+前端现在完全独立运行，不依赖后端配置。详见 [web/DEPLOYMENT.md](web/DEPLOYMENT.md) 和 [web/DEVELOPMENT.md](web/DEVELOPMENT.md)。
 
 **功能状态说明：**
 - ✅ 已实现：模型管理、下载管理、聊天、设置、仪表盘
@@ -389,7 +389,7 @@ Shepherd/
 │   │       ├── configLoader.ts  # 配置加载器
 │   │       └── api/client.ts    # API 客户端
 │   ├── DEPLOYMENT.md          # 部署指南
-│   ├── INDEPENDENT.md         # 架构迁移说明
+│   ├── DEVELOPMENT.md         # 开发文档
 │   └── [开发工具配置]         # TypeScript/Vite/ESLint 等
 ├── logs/                  # 日志目录 (自动创建)
 │   ├── shepherd-standalone-*.log
@@ -410,7 +410,7 @@ Shepherd/
 | [实施路线图](docs/04-实施路线图.md) | 开发进度和计划 |
 | [API 参考](docs/05-API参考.md) | API 接口文档 |
 | [Web 前端部署](web/DEPLOYMENT.md) | 前端部署指南 |
-| [Web 前端独立配置](web/INDEPENDENT.md) | 前端架构迁移说明 |
+| [Web 前端开发](web/DEVELOPMENT.md) | 前端开发文档 |
 
 ---
 

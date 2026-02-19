@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 日志查看功能实现
 - 性能优化和测试改进
 
+## [0.1.2] - 2026-02-19
+
+### Fixed
+- **Web 启动脚本** - 修复 `./scripts/web.sh dev` 不起作用的问题
+  - 集成配置同步功能（自动调用 sync-web-config.sh）
+  - 添加端口冲突检测和自动停止旧进程
+  - 移除命令行端口参数（改为从配置文件读取）
+
+### Changed
+- **开发服务器启动** - 现在统一使用 `./scripts/web.sh dev`
+  - 删除临时启动脚本 `scripts/start-dev.sh`
+  - 删除过时文档：`INDEPENDENT.md`, `CONFIG.md`, `START_DEV.md`
+  - 更新 `web/README.md`，添加配置说明和快速开始指南
+
+### Removed
+- 删除 `web/INDEPENDENT.md` - 迁移指南，迁移已完成
+- 删除 `web/CONFIG.md` - 配置热重载说明，内容整合到 README
+- 删除 `web/START_DEV.md` - 临时故障排查文档，问题已解决
+- 删除 `scripts/start-dev.sh` - 临时启动脚本，功能已整合到 web.sh
+
 ## [0.1.1] - 2026-02-19
 
 ### Added
