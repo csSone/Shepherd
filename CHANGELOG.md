@@ -14,9 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 支持多后端配置和运行时切换
   - 移除 Vite 代理依赖，前端直接连接后端 API
   - 新增 `configLoader.ts` 配置加载器
+  - 新增 `web/configTypes.ts` 独立类型定义文件
   - 新增 `web/DEPLOYMENT.md` 部署指南
   - 新增 `web/INDEPENDENT.md` 迁移指南
   - 新增 `scripts/sync-web-config.sh` 配置同步脚本
+
+### Changed
+- 后端不再提供 `/api/config/web` 端点（前端独立配置）
+- API 客户端支持动态后端 URL 配置
+- Vite 配置移除代理设置，前端独立运行
+- 后端 CORS 已配置允许所有源访问
+- SSE Hook 现在使用完整后端 URL 而非相对路径
+- 功能配置：禁用尚未实现的集群管理和日志查看功能
+
+### Removed
+- 删除 `config/web.config.yaml`（后端控制的前端配置）
+- 删除 `internal/server/server.go` 中的 `handleGetWebConfig` 方法
+- 删除后端 `/api/config/web` 路由
+
+### Fixed
+- **前端循环依赖** - 创建独立的 `configTypes.ts` 避免循环导入
+- **SSE 连接 404 错误** - 修复 SSE Hook 使用相对路径导致连接到前端服务器的问题
+- **QueryClient 错误** - 重构 App 组件，确保 useSSE Hook 在 QueryClientProvider 内部使用
+- **类型安全** - 修复 useConfig() 函数访问私有成员的问题
+- **语法错误** - 修复 configLoader.ts 中的正则表达式语法错误
+- 禁用未实现的功能（集群管理、日志查看），避免 404 错误
 
 ### Changed
 - 后端不再提供 `/api/config/web` 端点（前端独立配置）
