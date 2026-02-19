@@ -28,7 +28,37 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.write.go
 
+# Build output
 build/
+dist/
+bin/
+
+# Logs
+logs/
+*.log
+
+# Config (runtime)
+config/config.yaml
+config/clients.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+
+# Test coverage
+coverage/
+*.out
+*.coverprofile
+profile.cov
