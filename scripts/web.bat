@@ -1,10 +1,13 @@
 @echo off
 REM Shepherd Web 前端运行脚本 (Windows)
+REM 此脚本应从 scripts/ 目录运行，操作 web/ 目录
 
 setlocal enabledelayedexpansion
 
-REM 获取脚本所在目录
+REM 获取项目根目录
 set "SCRIPT_DIR=%~dp0"
+set "PROJECT_DIR=%SCRIPT_DIR%.."
+set "WEB_DIR=%PROJECT_DIR%\web"
 
 REM 显示帮助信息
 :show_help
@@ -45,7 +48,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-if not exist "node_modules\" (
+if not exist "%WEB_DIR%\node_modules\" (
     echo [WARNING] 依赖未安装，正在安装...
     call :install_dependencies
 )
@@ -53,16 +56,16 @@ goto :eof
 
 REM 安装依赖
 :install_dependencies
-echo [INFO] 安装依赖...
-cd /d "%SCRIPT_DIR%"
+echo [INFO] 安装 Web 前端依赖...
+cd /d "%WEB_DIR%"
 call npm install
 echo [SUCCESS] 依赖安装完成
 goto :eof
 
 REM 清理构建文件
 :clean_build
-echo [INFO] 清理构建文件...
-cd /d "%SCRIPT_DIR%"
+echo [INFO] 清理 Web 构建文件...
+cd /d "%WEB_DIR%"
 if exist "dist\" rmdir /s /q dist
 if exist "node_modules\.vite" rmdir /s /q node_modules\.vite
 echo [SUCCESS] 清理完成
@@ -73,22 +76,22 @@ REM 启动开发服务器
 set "PORT=%~1"
 if "%PORT%"=="" set "PORT=3000"
 echo [INFO] 启动开发服务器 (端口: %PORT%)...
-cd /d "%SCRIPT_DIR%"
+cd /d "%WEB_DIR%"
 call npm run dev -- --port %PORT%
 goto :eof
 
 REM 构建生产版本
 :run_build
-echo [INFO] 构建生产版本...
-cd /d "%SCRIPT_DIR%"
+echo [INFO] 构建 Web 生产版本...
+cd /d "%WEB_DIR%"
 call npm run build
-echo [SUCCESS] 构建完成，输出目录: dist\
+echo [SUCCESS] 构建完成，输出目录: web\dist\
 goto :eof
 
 REM 预览生产构建
 :run_preview
-echo [INFO] 预览生产构建...
-cd /d "%SCRIPT_DIR%"
+echo [INFO] 预览 Web 生产构建...
+cd /d "%WEB_DIR%"
 call npm run preview
 goto :eof
 

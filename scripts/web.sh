@@ -10,8 +10,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 获取脚本所在目录
+# 获取项目根目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+WEB_DIR="${PROJECT_DIR}/web"
 
 # 打印带颜色的消息
 print_info() {
@@ -69,7 +71,7 @@ check_dependencies() {
         exit 1
     fi
 
-    if [ ! -d "node_modules" ]; then
+    if [ ! -d "${WEB_DIR}/node_modules" ]; then
         print_warning "依赖未安装，正在安装..."
         install_dependencies
     fi
@@ -77,16 +79,16 @@ check_dependencies() {
 
 # 安装依赖
 install_dependencies() {
-    print_info "安装依赖..."
-    cd "$SCRIPT_DIR"
+    print_info "安装 Web 前端依赖..."
+    cd "$WEB_DIR"
     npm install
     print_success "依赖安装完成"
 }
 
 # 清理构建文件
 clean_build() {
-    print_info "清理构建文件..."
-    cd "$SCRIPT_DIR"
+    print_info "清理 Web 构建文件..."
+    cd "$WEB_DIR"
     rm -rf dist node_modules/.vite
     print_success "清理完成"
 }
@@ -94,23 +96,23 @@ clean_build() {
 # 启动开发服务器
 run_dev() {
     local port=${1:-3000}
-    print_info "启动开发服务器 (端口: $port)..."
-    cd "$SCRIPT_DIR"
+    print_info "启动 Web 开发服务器 (端口: $port)..."
+    cd "$WEB_DIR"
     exec npm run dev -- --port "$port"
 }
 
 # 构建生产版本
 run_build() {
-    print_info "构建生产版本..."
-    cd "$SCRIPT_DIR"
+    print_info "构建 Web 生产版本..."
+    cd "$WEB_DIR"
     npm run build
-    print_success "构建完成，输出目录: dist/"
+    print_success "构建完成，输出目录: web/dist/"
 }
 
 # 预览生产构建
 run_preview() {
-    print_info "预览生产构建..."
-    cd "$SCRIPT_DIR"
+    print_info "预览 Web 生产构建..."
+    cd "$WEB_DIR"
     exec npm run preview
 }
 
