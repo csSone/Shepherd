@@ -4,9 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "gen:config": "tsx ../scripts/generate-web-configs.ts",
-    "predev": "npm run gen:config",
-    "prebuild": "npm run gen:config",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
