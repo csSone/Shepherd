@@ -42,14 +42,14 @@ export function SettingsPage() {
   return (
     <div className="h-full">
       {/* 顶部标题栏 */}
-      <div className="border-b px-6 py-4">
-        <h1 className="text-2xl font-semibold">设置</h1>
+      <div className="border-b px-5 py-3">
+        <h1 className="text-xl font-semibold">设置</h1>
       </div>
 
       {/* 设置内容区域 */}
-      <div className="flex h-[calc(100%-65px)]">
-        {/* 左侧菜单 - 优化：移除背景色 */}
-        <div className="w-56 border-r bg-background p-4">
+      <div className="flex h-[calc(100%-53px)]">
+        {/* 左侧菜单 */}
+        <div className="w-48 border-r bg-background p-3">
           <nav className="space-y-1" role="tablist" aria-label="设置菜单">
             {settingsMenuItems.map((item) => {
               const Icon = item.icon;
@@ -63,13 +63,13 @@ export function SettingsPage() {
                   aria-selected={isActive}
                   onClick={() => setActiveTab(item.id)}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                    'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium transition-all duration-200',
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
-                  <Icon size={18} />
+                  <Icon size={16} />
                   <span>{item.label}</span>
                 </button>
               );
@@ -78,7 +78,7 @@ export function SettingsPage() {
         </div>
 
         {/* 右侧内容 */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-5">
           {activeTab === 'general' && <GeneralSettingsPanel />}
           {activeTab === 'paths' && <PathsSettingsPanel />}
           {activeTab === 'benchmark' && <BenchmarkPanel />}
@@ -114,24 +114,24 @@ function GeneralSettingsPanel() {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-2xl space-y-4">
       <div>
-        <h2 className="text-xl font-semibold">API 兼容性设置</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-lg font-semibold">API 兼容性设置</h2>
+        <p className="text-xs text-muted-foreground">
           配置 Ollama 和 LM Studio API 兼容层端口
         </p>
       </div>
 
       {/* Ollama 配置 */}
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-lg border bg-card p-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Plug size={20} className="text-primary" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Plug size={16} className="text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold">Ollama API</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-sm font-semibold">Ollama API</h3>
+              <p className="text-xs text-muted-foreground">
                 启用 Ollama 兼容的 API 端点
               </p>
             </div>
@@ -143,21 +143,21 @@ function GeneralSettingsPanel() {
               onChange={(e) => setOllamaEnabled(e.target.checked)}
               className="peer sr-only"
             />
-            <div className="h-6 w-11 rounded-full bg-muted peer-checked:bg-primary transition-colors duration-200 after:content-[''] after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-background after:transition-transform after:duration-200 peer-checked:after:translate-x-full" />
-            <span className="text-sm text-muted-foreground">启用</span>
+            <div className="h-5 w-9 rounded-full bg-muted peer-checked:bg-primary transition-colors duration-200 after:content-[''] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-background after:transition-transform after:duration-200 peer-checked:after:translate-x-full" />
+            <span className="text-xs text-muted-foreground">启用</span>
           </label>
         </div>
 
         {ollamaEnabled && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">端口</label>
+          <div className="mt-3">
+            <label className="block text-xs font-medium mb-1.5">端口</label>
             <input
               type="number"
               min="1"
               max="65535"
               value={ollamaPort}
               onChange={(e) => setOllamaPort(e.target.value)}
-              className="w-full max-w-[200px] rounded-md border bg-background px-3 py-2 text-sm"
+              className="w-full max-w-[160px] rounded-md border bg-background px-2.5 py-1.5 text-xs"
               placeholder="11434"
             />
           </div>
@@ -165,15 +165,15 @@ function GeneralSettingsPanel() {
       </div>
 
       {/* LM Studio 配置 */}
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-lg border bg-card p-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Plug size={20} className="text-primary" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Plug size={16} className="text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold">LM Studio API</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-sm font-semibold">LM Studio API</h3>
+              <p className="text-xs text-muted-foreground">
                 启用 LM Studio 兼容的 API 端点
               </p>
             </div>
@@ -185,21 +185,21 @@ function GeneralSettingsPanel() {
               onChange={(e) => setLmstudioEnabled(e.target.checked)}
               className="peer sr-only"
             />
-            <div className="h-6 w-11 rounded-full bg-muted peer-checked:bg-primary transition-colors duration-200 after:content-[''] after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-background after:transition-transform after:duration-200 peer-checked:after:translate-x-full" />
-            <span className="text-sm text-muted-foreground">启用</span>
+            <div className="h-5 w-9 rounded-full bg-muted peer-checked:bg-primary transition-colors duration-200 after:content-[''] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-background after:transition-transform after:duration-200 peer-checked:after:translate-x-full" />
+            <span className="text-xs text-muted-foreground">启用</span>
           </label>
         </div>
 
         {lmstudioEnabled && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">端口</label>
+          <div className="mt-3">
+            <label className="block text-xs font-medium mb-1.5">端口</label>
             <input
               type="number"
               min="1"
               max="65535"
               value={lmstudioPort}
               onChange={(e) => setLmstudioPort(e.target.value)}
-              className="w-full max-w-[200px] rounded-md border bg-background px-3 py-2 text-sm"
+              className="w-full max-w-[160px] rounded-md border bg-background px-2.5 py-1.5 text-xs"
               placeholder="1234"
             />
           </div>
@@ -211,9 +211,9 @@ function GeneralSettingsPanel() {
         <button
           onClick={handleSave}
           disabled={saveStatus === 'saving'}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Save size={16} />
+          <Save size={14} />
           {saveStatus === 'saving' ? '保存中...' :
            saveStatus === 'success' ? '已保存 ✓' :
            saveStatus === 'error' ? '保存失败' :
@@ -263,41 +263,41 @@ function McpPanel() {
  */
 function AboutPanel() {
   return (
-    <div className="max-w-3xl">
-      <div className="text-center mb-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary mx-auto mb-4 text-3xl">
+    <div className="max-w-2xl mx-auto">
+      <div className="text-center mb-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary mx-auto mb-3 text-2xl">
           🐏
         </div>
-        <h2 className="text-2xl font-bold">Shepherd</h2>
-        <p className="text-muted-foreground">高性能轻量级 llama.cpp 模型管理系统</p>
+        <h2 className="text-xl font-bold">Shepherd</h2>
+        <p className="text-sm text-muted-foreground">高性能轻量级 llama.cpp 模型管理系统</p>
       </div>
 
-      <div className="rounded-lg border bg-card p-6 space-y-4">
-        <div className="flex items-center justify-between py-2 border-b">
-          <span className="text-muted-foreground">版本</span>
-          <span className="font-mono font-medium">v0.1.2</span>
+      <div className="rounded-lg border bg-card p-4 space-y-2">
+        <div className="flex items-center justify-between py-1.5 border-b">
+          <span className="text-sm text-muted-foreground">版本</span>
+          <span className="font-mono text-sm font-medium">v0.1.3</span>
         </div>
-        <div className="flex items-center justify-between py-2 border-b">
-          <span className="text-muted-foreground">构建时间</span>
-          <span className="font-mono text-sm">2026-02-19</span>
+        <div className="flex items-center justify-between py-1.5 border-b">
+          <span className="text-sm text-muted-foreground">构建时间</span>
+          <span className="font-mono text-xs">2026-02-19</span>
         </div>
-        <div className="flex items-center justify-between py-2 border-b">
-          <span className="text-muted-foreground">Go 版本</span>
-          <span className="font-mono text-sm">1.25+</span>
+        <div className="flex items-center justify-between py-1.5 border-b">
+          <span className="text-sm text-muted-foreground">Go 版本</span>
+          <span className="font-mono text-xs">1.25+</span>
         </div>
-        <div className="flex items-center justify-between py-2 border-b">
-          <span className="text-muted-foreground">React 版本</span>
-          <span className="font-mono text-sm">18.x</span>
+        <div className="flex items-center justify-between py-1.5 border-b">
+          <span className="text-sm text-muted-foreground">React 版本</span>
+          <span className="font-mono text-xs">19.x</span>
         </div>
-        <div className="flex items-center justify-between py-2">
-          <span className="text-muted-foreground">许可证</span>
-          <span className="text-sm">MIT</span>
+        <div className="flex items-center justify-between py-1.5">
+          <span className="text-sm text-muted-foreground">许可证</span>
+          <span className="text-xs">Apache 2.0</span>
         </div>
       </div>
 
-      <div className="mt-6 text-center text-sm text-muted-foreground">
-        <p>© 2026 Shepherd Project. All rights reserved.</p>
-        <p className="mt-2">
+      <div className="mt-4 text-center text-xs text-muted-foreground">
+        <p>© 2026 Shepherd Project. Licensed under Apache 2.0</p>
+        <p className="mt-1">
           <a
             href="https://github.com/shepherd-project/shepherd"
             target="_blank"
@@ -317,9 +317,9 @@ function AboutPanel() {
  */
 function PathsSettingsPanel() {
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-3xl space-y-5">
       {/* Llama.cpp 路径配置 */}
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-lg border bg-card p-4">
         <PathConfigPanel type="llamacpp" />
       </div>
 
@@ -327,7 +327,7 @@ function PathsSettingsPanel() {
       <div className="border-t" />
 
       {/* 模型路径配置 */}
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-lg border bg-card p-4">
         <PathConfigPanel type="models" />
       </div>
     </div>

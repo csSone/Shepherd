@@ -140,29 +140,29 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
       : '配置用于扫描和管理模型文件的目录';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* 标题和添加按钮 */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         </div>
-        <Button size="sm" onClick={handleOpenAddDialog}>
-          <Plus size={16} className="mr-1" />
+        <Button size="sm" onClick={handleOpenAddDialog} className="h-7 px-2.5 text-xs">
+          <Plus size={14} className="mr-1" />
           添加路径
         </Button>
       </div>
 
       {/* 路径列表 */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
           加载中...
         </div>
       ) : paths.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed rounded-lg">
-          <FolderOpen size={48} className="text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">暂无配置的路径</p>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg">
+          <FolderOpen size={36} className="text-muted-foreground mb-2" />
+          <p className="text-xs text-muted-foreground">暂无配置的路径</p>
+          <p className="text-xs text-muted-foreground mt-1">
             点击上方按钮添加{title}
           </p>
         </div>

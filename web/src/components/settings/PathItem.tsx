@@ -25,18 +25,18 @@ export function PathItem({
   };
 
   return (
-    <div className="group flex items-start gap-4 p-4 rounded-lg border bg-card hover:border-border/80 transition-all">
+    <div className="group flex items-start gap-3 p-3 rounded-lg border bg-card hover:border-border/80 transition-all">
       {/* 图标 */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <FolderOpen size={20} />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <FolderOpen size={16} />
       </div>
 
       {/* 内容区域 */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h4 className="font-medium truncate">{displayName}</h4>
+          <h4 className="text-sm font-medium truncate">{displayName}</h4>
         </div>
-        <p className="text-sm text-muted-foreground truncate mt-0.5">{path.path}</p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{path.path}</p>
         {path.description && (
           <p className="text-xs text-muted-foreground mt-1">{path.description}</p>
         )}
@@ -51,8 +51,9 @@ export function PathItem({
             onClick={handleTest}
             disabled={isTesting}
             title="测试路径"
+            className="h-7 w-7"
           >
-            <TestTube size={16} />
+            <TestTube size={14} />
           </Button>
         )}
         <Button
@@ -60,17 +61,18 @@ export function PathItem({
           size="icon"
           onClick={onEdit}
           title="编辑"
+          className="h-7 w-7"
         >
-          <Edit size={16} />
+          <Edit size={14} />
         </Button>
         <Button
           variant="ghost"
           size="icon"
           onClick={onRemove}
-          className="text-destructive hover:text-destructive"
+          className="text-destructive hover:text-destructive h-7 w-7"
           title="删除"
         >
-          <Trash2 size={16} />
+          <Trash2 size={14} />
         </Button>
       </div>
     </div>
