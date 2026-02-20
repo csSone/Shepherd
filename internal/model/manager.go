@@ -57,8 +57,17 @@ func NewManager(cfg *config.Config, cfgMgr *config.Manager, procMgr *process.Man
 		cancel:     cancel,
 	}
 
+	// Log initialization info
+	paths := m.getScanPaths()
+	if len(paths) == 0 {
+		fmt.Printf("[WARN] ModelManager: 未配置模型扫描路径\n")
+	} else {
+		fmt.Printf("[INFO] ModelManager: 初始化完成，配置路径: %v\n", paths)
+	}
+
 	// Load saved models
 	m.loadModels()
+	fmt.Printf("[INFO] ModelManager: 从配置加载了 %d 个模型\n", len(m.models))
 
 	return m
 }
@@ -87,9 +96,15 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 		ScannedAt: time.Now(),
 	}
 
+	scanPaths := m.getScanPaths()
+	fmt.Printf("[INFO] ModelManager: 开始扫描 %d 个路径\n", len(scanPaths))
+
 	// Scan each configured path
-	for _, scanPath := range m.getScanPaths() {
+	for _, scanPath := range scanPaths {
+		fmt.Printf("[INFO] ModelManager: 正在扫描路径: %s\n", scanPath)
 		pathModels, pathErrors := m.scanPath(ctx, scanPath)
+		fmt.Printf("[INFO] ModelManager: 路径 %s 扫描完成: 找到 %d 个模型, %d 个错误\n",
+			scanPath, len(pathModels), len(pathErrors))
 		result.Models = append(result.Models, pathModels...)
 		result.Errors = append(result.Errors, pathErrors...)
 		result.TotalFiles += len(pathModels) + len(pathErrors)
@@ -97,16 +112,21 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	}
 
 	result.Duration = time.Since(result.ScannedAt)
+	fmt.Printf("[INFO] ModelManager: 扫描完成，总共找到 %d 个模型，耗时 %v\n",
+		len(result.Models), result.Duration)
 
 	// Update models map
 	m.mu.Lock()
 	for _, model := range result.Models {
 		m.models[model.ID] = model
 	}
+	modelCount := len(m.models)
 	m.mu.Unlock()
+	fmt.Printf("[INFO] ModelManager: 模型缓存已更新，当前共 %d 个模型\n", modelCount)
 
 	// Save to config
 	m.saveModels()
+	fmt.Printf("[INFO] ModelManager: 已保存 %d 个模型到配置\n", len(result.Models))
 
 	return result, nil
 }
@@ -381,8 +401,10 @@ func (m *Manager) getScanPaths() []string {
 		for _, pc := range m.config.Model.PathConfigs {
 			paths = append(paths, pc.Path)
 		}
+		fmt.Printf("[DEBUG] getScanPaths: 从 PathConfigs 返回 %d 个路径: %v\n", len(paths), paths)
 		return paths
 	}
+	fmt.Printf("[DEBUG] getScanPaths: 从 Paths 返回 %d 个路径: %v\n", len(m.config.Model.Paths), m.config.Model.Paths)
 	return m.config.Model.Paths
 }
 
@@ -672,18 +694,23 @@ func (m *Manager) SetFavourite(modelID string, favourite bool) error {
 // loadModels loads models from config
 func (m *Manager) loadModels() {
 	if m.configMgr == nil {
+		fmt.Printf("[WARN] loadModels: configMgr is nil, skipping load\n")
 		return
 	}
 
 	configModels, err := m.configMgr.LoadModelsConfig()
 	if err != nil {
+		fmt.Printf("[ERROR] loadModels: failed to load models config: %v\n", err)
 		return
 	}
+
+	fmt.Printf("[INFO] loadModels: loaded %d models from config\n", len(configModels))
 
 	// Load aliases and favourites
 	aliases, _ := m.configMgr.LoadAliasMap()
 	favourites, _ := m.configMgr.LoadFavouriteMap()
 
+	loadedCount := 0
 	for _, cfgModel := range configModels {
 		// Try to load the model from disk
 		if info, err := os.Stat(cfgModel.Path); err == nil && !info.IsDir() {
@@ -697,9 +724,15 @@ func (m *Manager) loadModels() {
 					model.Favourite = fav
 				}
 				m.models[model.ID] = model
+				loadedCount++
+			} else {
+				fmt.Printf("[WARN] loadModels: failed to load model %s: %v\n", cfgModel.Path, err)
 			}
+		} else {
+			fmt.Printf("[WARN] loadModels: model file not found: %s\n", cfgModel.Path)
 		}
 	}
+	fmt.Printf("[INFO] loadModels: successfully loaded %d models into cache\n", loadedCount)
 }
 
 // saveModels saves models to config
