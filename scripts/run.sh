@@ -162,6 +162,7 @@ main() {
     case "$MODE" in
         master)
             print_info "启动 Master 模式..."
+            ;;
         client)
             if [ -z "$MASTER_ADDR" ]; then
                 print_error "Client 模式需要指定 Master 地址 (--master)"
