@@ -219,14 +219,15 @@ export function useDownloadStats(downloads: DownloadTask[] | undefined) {
 export function useModelFiles(source: 'huggingface' | 'modelscope', repoId: string) {
   return useQuery({
     queryKey: ['model-files', source, repoId],
-    queryFn: async () => {
-      const response = await downloadsApi.listModelFiles(source, repoId);
+    queryFn: async ({ signal }) => {
+      const response = await downloadsApi.listModelFiles(source, repoId, signal);
       if (!response.success) {
         throw new Error(response.error || '获取文件列表失败');
       }
       return response.data;
     },
-    enabled: !!source && !!repoId,
+    enabled: !!source && !!repoId && repoId.length > 3, // 至少 3 个字符才请求
     staleTime: 5 * 60 * 1000, // 5 分钟缓存
+    gcTime: 10 * 60 * 1000, // 10 分钟后清理缓存
   });
 }

@@ -335,15 +335,28 @@ func (l *Logger) log(level LogLevel, msg string, fields []Field) {
 	for _, w := range l.outputs {
 		n, err := w.Write([]byte(logLine))
 		if err != nil {
+			// 记录错误到 stderr 作为降级方案
+			fmt.Fprintf(os.Stderr, "[ERROR] 写入日志失败: %v\n", err)
+			continue // 跳过这个输出，继续处理其他的
 		}
 		if n != len(logLine) {
+			fmt.Fprintf(os.Stderr, "[WARN] 写入不完整: %d/%d\n", n, len(logLine))
 		}
 		// Flush if the writer supports it (e.g., *os.File)
+		// 注意：只对普通文件进行 Sync，stdout/stderr 不支持 Sync 操作
 		if f, ok := w.(*os.File); ok {
-			if err := f.Sync(); err != nil {
+			// 检查是否是普通文件（不是 stdout/stderr）
+			fileInfo, err := f.Stat()
+			if err == nil && (fileInfo.Mode()&os.ModeType) == 0 {
+				// 普通文件，执行 Sync
+				if err := f.Sync(); err != nil {
+					// Sync 失败不是致命错误，记录后继续
+					fmt.Fprintf(os.Stderr, "[WARN] 同步文件失败: %v\n", err)
+				}
+				// 更新文件大小
+				l.currentSize = fileInfo.Size()
 			}
-			info, _ := f.Stat()
-			l.currentSize = info.Size()
+			// stdout/stderr 或其他特殊文件类型，跳过 Sync
 		}
 	}
 

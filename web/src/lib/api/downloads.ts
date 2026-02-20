@@ -78,7 +78,8 @@ export const downloadsApi = {
   /**
    * 获取模型文件列表
    * 使用查询参数以支持 repoId 中包含斜杠 (如 Qwen/Qwen2-7B-Instruct)
+   * 支持 AbortSignal 用于取消请求
    */
-  listModelFiles: (source: 'huggingface' | 'modelscope', repoId: string): Promise<ModelFilesResponse> =>
-    apiClient.get<ModelFilesResponse>(`/repo/files?source=${source}&repoId=${encodeURIComponent(repoId)}`),
+  listModelFiles: (source: 'huggingface' | 'modelscope', repoId: string, signal?: AbortSignal): Promise<ModelFilesResponse> =>
+    apiClient.get<ModelFilesResponse>(`/repo/files?source=${source}&repoId=${encodeURIComponent(repoId)}`, undefined, signal),
 };

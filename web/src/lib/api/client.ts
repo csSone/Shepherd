@@ -65,13 +65,14 @@ class ApiClient {
   /**
    * GET 请求
    */
-  async get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
+  async get<T>(endpoint: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
     const url = this.buildUrl(endpoint, params);
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal, // 支持 AbortSignal，用于取消请求
     });
 
     if (!response.ok) {
