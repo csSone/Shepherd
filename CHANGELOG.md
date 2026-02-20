@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### 模型加载配置增强
+- **完整的加载模型对话框** - 参考并超越 LlamacppServer，实现功能全面的模型加载配置界面
+  - **左右分区布局** - 左列基础配置，右列高级参数，逻辑清晰
+  - **参数分组** - 上下文与加速、采样与生成、惩罚机制、批处理与并发、KV缓存配置、其他参数
+  - **llama.cpp 版本选择** - 支持多个后端路径配置（ROCm/Vulkan 等）
+  - **主 GPU 选择** - 下拉选择可用的 GPU 设备
+  - **能力开关** - 思考、工具使用、直译、嵌入 等模型能力配置
+  - **Flash Attention 加速** - 开关控制（on/off）
+  - **禁用内存映射** - true/false 切换，优化性能
+  - **锁定物理内存** - 防止内存交换
+  - **输入向量模式** - logitsAll 参数
+  - **重排序模式** - reranking 参数
+  - **Min-P 采样** - 高级采样参数
+  - **存在惩罚/频率惩罚** - 精细控制生成行为
+  - **微批大小** - uBatchSize 参数
+  - **并行槽位数** - parallelSlots 参数
+  - **KV 缓存配置** - 内存上限、统一缓存、类型K/V（f16/f32/q8_0）
+  - **DirectIO 模式** - default/true/false
+  - **禁用 Jinja 模板** - disableJinja 参数
+  - **内置聊天模板** - chatTemplate 选择
+  - **上下文移位** - contextShift 参数
+  - **额外参数** - 多行文本框，支持任意命令行参数
+
+- **GPU 设备检测增强** - 兼容 LlamacppServer 的设备数据格式
+  - 使用 `llama-bench --list-devices` 获取设备信息
+  - 返回双格式：简单设备字符串数组（LlamacppServer 兼容）+ 详细 GPU 信息
+  - 后备方案：`roc-smi --json` 用于 AMD GPU 检测
+
+- **VRAM 显存估算** - 使用 `llama-fit-params` 工具实现真实显存估算
+  - 新增 API 端点：`POST /api/models/vram/estimate`
+  - 根据模型路径和参数估算显存需求
+  - UI 集成：估算按钮位于取消和开始加载按钮之间
+  - 实时显示估算结果（GB 单位）
+
+- **模型能力配置** - 新增模型能力的存储和读取
+  - `GET /api/models/capabilities/get` - 获取模型能力配置
+  - `POST /api/models/capabilities/set` - 保存模型能力配置
+  - 支持的能力：thinking（思考）、tools（工具使用）、rerank（重排序）、embedding（嵌入）
+
 #### 前端架构优化
 - **国际化 (i18n) 支持** - 完整的多语言国际化实现
   - 集成 i18next + react-i18next + i18next-browser-languagedetector

@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Search, RefreshCw, Filter, Grid3X3, List } from 'lucide-react';
-import { useModels, useLoadModel, useUnloadModel, useSetModelFavourite, useScanModels, useFilteredModels } from '@/features/models/hooks';
+import { Search, RefreshCw, Filter, Grid3X3, List, Pencil, MessageSquare } from 'lucide-react';
+import { useModels, useLoadModel, useUnloadModel, useSetModelFavourite, useUpdateModelAlias, useScanModels, useFilteredModels } from '@/features/models/hooks';
 import { ModelCard } from '@/components/models/ModelCard';
 import { LoadModelDialog } from '@/components/models/LoadModelDialog';
+import { EditAliasDialog } from '@/components/models/EditAliasDialog';
+import { TestModelDialog } from '@/components/models/TestModelDialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Model, ModelStatus } from '@/types';
@@ -17,6 +19,7 @@ export function ModelsPage() {
   const loadModel = useLoadModel();
   const unloadModel = useUnloadModel();
   const setFavourite = useSetModelFavourite();
+  const updateAlias = useUpdateModelAlias();
   const scanModels = useScanModels();
 
   // UI 状态
@@ -27,6 +30,12 @@ export function ModelsPage() {
 
   // 加载对话框状态
   const [dialogModel, setDialogModel] = useState<Model | null>(null);
+
+  // 编辑别名对话框状态
+  const [editAliasModel, setEditAliasModel] = useState<Model | null>(null);
+
+  // 测试模型对话框状态
+  const [testModel, setTestModel] = useState<Model | null>(null);
 
   // 过滤模型
   const filteredModels = useFilteredModels(models, {
@@ -69,13 +78,36 @@ export function ModelsPage() {
     scanModels.mutate();
   };
 
+  // 处理编辑别名
+  const handleEditAlias = (model: Model) => {
+    setEditAliasModel(model);
+  };
+
+  const handleAliasConfirm = (alias: string) => {
+    if (editAliasModel) {
+      updateAlias.mutate(
+        { modelId: editAliasModel.id, alias },
+        {
+          onSuccess: () => {
+            setEditAliasModel(null);
+          },
+        }
+      );
+    }
+  };
+
+  // 处理测试模型
+  const handleTestModel = (model: Model) => {
+    setTestModel(model);
+  };
+
   return (
     <div className="space-y-6">
       {/* 标题和操作 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">模型管理</h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-gray-300">
             共 {models?.length || 0} 个模型，已加载 {models?.filter((m) => m.isLoaded).length || 0} 个
           </p>
         </div>
@@ -160,11 +192,11 @@ export function ModelsPage() {
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
-            <p className="text-gray-600 dark:text-gray-400">加载中...</p>
+            <p className="text-gray-600 dark:text-gray-300">加载中...</p>
           </div>
         </div>
       ) : filteredModels.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+        <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-300">
           <p className="text-lg mb-2">没有找到模型</p>
           <p className="text-sm">尝试调整搜索条件或扫描模型目录</p>
         </div>
@@ -184,6 +216,26 @@ export function ModelsPage() {
               onLoad={() => handleLoadClick(model)}
               onUnload={() => handleUnloadClick(model.id)}
               onToggleFavourite={() => handleToggleFavourite(model.id, model.favourite)}
+              actions={
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditAlias(model)}
+                    title="编辑别名"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleTestModel(model)}
+                    title="测试模型"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </Button>
+                </div>
+              }
             />
           ))}
         </div>
@@ -198,6 +250,34 @@ export function ModelsPage() {
           modelId={dialogModel.id}
           modelName={dialogModel.alias || dialogModel.name}
           isLoading={loadModel.isPending}
+        />
+      )}
+
+      {/* Edit Alias Dialog */}
+      {editAliasModel && (
+        <EditAliasDialog
+          isOpen={!!editAliasModel}
+          onClose={() => setEditAliasModel(null)}
+          onConfirm={handleAliasConfirm}
+          modelId={editAliasModel.id}
+          modelName={editAliasModel.name}
+          currentAlias={editAliasModel.alias}
+          isLoading={updateAlias.isPending}
+        />
+      )}
+
+      {/* Test Model Dialog */}
+      {testModel && (
+        <TestModelDialog
+          isOpen={!!testModel}
+          onClose={() => setTestModel(null)}
+          modelId={testModel.id}
+          modelName={testModel.alias || testModel.name}
+          isModelLoaded={testModel.isLoaded}
+          onLoadModel={() => {
+            setTestModel(null);
+            handleLoadClick(testModel);
+          }}
         />
       )}
     </div>

@@ -117,7 +117,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
             <h3 className="font-medium text-gray-900 dark:text-white truncate">
               {task.fileName || task.repoId}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-sm text-gray-500 dark:text-gray-300 truncate">
               {task.repoId}
             </p>
           </div>
@@ -131,10 +131,10 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
       {/* 来源标签 */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">
+        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs">
           {getSourceLabel(task.source)}
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <span className="text-xs text-gray-500 dark:text-gray-300">
           → {task.path}
         </span>
       </div>
@@ -142,7 +142,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
       {/* 进度条 */}
       <div className="mb-3">
         <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className="text-gray-600 dark:text-gray-300">
             {formatSize(task.downloadedBytes)} / {formatSize(task.totalBytes)}
           </span>
           <span className="font-medium text-gray-900 dark:text-white">{progressPercent}%</span>
@@ -161,7 +161,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
         {/* 分块进度 */}
         {task.partsTotal > 1 && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
             分块: {task.partsCompleted} / {task.partsTotal}
           </div>
         )}
@@ -169,7 +169,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
       {/* 速度和预计时间 */}
       {isActive && task.speed > 0 && (
-        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 mb-3">
           <span>速度: {formatSpeed(task.speed)}</span>
           {task.eta > 0 && <span>预计: {formatTime(task.eta)}</span>}
         </div>
@@ -177,7 +177,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
       {/* 错误信息 */}
       {task.state === 'failed' && task.error && (
-        <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400 mb-3">
+        <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300 mb-3">
           {task.error}
         </div>
       )}
@@ -231,7 +231,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
         )}
 
         {/* 创建时间 */}
-        <div className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+        <div className="ml-auto text-xs text-gray-500 dark:text-gray-300">
           {new Date(task.createdAt).toLocaleString('zh-CN')}
         </div>
       </div>

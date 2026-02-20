@@ -28,6 +28,23 @@ export class ApiClient {
     })
     return res.json()
   }
+
+  async put(path: string, body: any): Promise<any> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return res.json()
+  }
+
+  async delete(path: string): Promise<any> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    return res.json()
+  }
 }
 
 /**

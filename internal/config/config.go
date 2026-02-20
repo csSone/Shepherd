@@ -35,12 +35,13 @@ type Config struct {
 	Model         ModelConfig           `mapstructure:"model" yaml:"model" json:"model"`
 	Llamacpp      LlamacppConfig        `mapstructure:"llamacpp" yaml:"llamacpp" json:"llamacpp"`
 	Download      DownloadConfig        `mapstructure:"download" yaml:"download" json:"download"`
+	ModelRepo     ModelRepoConfig       `mapstructure:"model_repo" yaml:"model_repo" json:"modelRepo"`
 	Security      SecurityConfig        `mapstructure:"security" yaml:"security" json:"security"`
 	Compatibility CompatibilityConfig   `mapstructure:"compatibility" yaml:"compatibility" json:"compatibility"`
 	Log           LogConfig             `mapstructure:"log" yaml:"log" json:"log"`
-	Storage       storage.StorageConfig `mapstructure:"storage" yaml:"storage" json:"storage"` // 存储配置
+	Storage       storage.StorageConfig `mapstructure:"storage" yaml:"storage" json:"storage"`
 	// Master-Client 分布式配置
-	Mode   string       `mapstructure:"mode" yaml:"mode" json:"mode"` // master|client|standalone
+	Mode   string       `mapstructure:"mode" yaml:"mode" json:"mode"`
 	Master MasterConfig `mapstructure:"master" yaml:"master" json:"master"`
 	Client ClientConfig `mapstructure:"client" yaml:"client" json:"client"`
 	// Node 节点配置
@@ -92,6 +93,13 @@ type DownloadConfig struct {
 	ChunkSize     int    `mapstructure:"chunk_size" yaml:"chunk_size" json:"chunkSize"` // bytes
 	RetryCount    int    `mapstructure:"retry_count" yaml:"retry_count" json:"retryCount"`
 	Timeout       int    `mapstructure:"timeout" yaml:"timeout" json:"timeout"` // seconds
+}
+
+// ModelRepoConfig contains model repository configuration
+type ModelRepoConfig struct {
+	Endpoint string `mapstructure:"endpoint" yaml:"endpoint" json:"endpoint"` // huggingface.co or hf-mirror.com
+	Token    string `mapstructure:"token" yaml:"token" json:"token"`          // HuggingFace API token
+	Timeout  int    `mapstructure:"timeout" yaml:"timeout" json:"timeout"`    // seconds
 }
 
 // SecurityConfig contains security settings
@@ -256,11 +264,15 @@ type CondaEnvConfig struct {
 
 // ModelConfigEntry represents a model configuration entry in models.json
 type ModelConfigEntry struct {
-	ModelID      string            `json:"modelId"`
-	Path         string            `json:"path,omitempty"`
-	Size         int64             `json:"size,omitempty"`
-	Alias        string            `json:"alias,omitempty"`
-	Favourite    bool              `json:"favourite"`
+	ModelID   string `json:"modelId"`
+	Path      string `json:"path,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Alias     string `json:"alias,omitempty"`
+	Favourite bool   `json:"favourite"`
+	// 分卷模型相关字段
+	TotalSize    int64             `json:"totalSize,omitempty"`  // 所有分卷的总大小
+	ShardCount   int               `json:"shardCount,omitempty"` // 分卷数量
+	ShardFiles   []string          `json:"shardFiles,omitempty"` // 所有分卷文件路径
 	PrimaryModel *PrimaryModelInfo `json:"primaryModel,omitempty"`
 	Mmproj       *MmprojInfo       `json:"mmproj,omitempty"`
 }
@@ -277,6 +289,7 @@ type PrimaryModelInfo struct {
 // MmprojInfo contains information about the multimodal projector
 type MmprojInfo struct {
 	FileName     string `json:"fileName"`
+	Size         int64  `json:"size,omitempty"` // mmproj 文件大小（字节）
 	Name         string `json:"name,omitempty"`
 	Architecture string `json:"architecture,omitempty"`
 }
@@ -466,6 +479,11 @@ func DefaultConfig() *Config {
 					"collect_logs",
 				},
 			},
+		},
+		ModelRepo: ModelRepoConfig{
+			Endpoint: "huggingface.co",
+			Token:    "",
+			Timeout:  30,
 		},
 	}
 }

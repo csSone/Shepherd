@@ -11,6 +11,7 @@ interface CreateDownloadDialogProps {
   onClose: () => void;
   onConfirm: (params: CreateDownloadParams) => void;
   isLoading?: boolean;
+  preFill?: { source: DownloadSource; repoId: string } | null;
 }
 
 export function CreateDownloadDialog({
@@ -18,6 +19,7 @@ export function CreateDownloadDialog({
   onClose,
   onConfirm,
   isLoading = false,
+  preFill = null,
 }: CreateDownloadDialogProps) {
   const [source, setSource] = useState<DownloadSource>('huggingface');
   const [repoId, setRepoId] = useState('');
@@ -25,6 +27,15 @@ export function CreateDownloadDialog({
   const [path, setPath] = useState('');
   const [maxRetries, setMaxRetries] = useState('3');
   const [chunkSize, setChunkSize] = useState('');
+
+  // 当 preFill 变化时，更新表单值
+  useEffect(() => {
+    if (preFill) {
+      setSource(preFill.source);
+      setRepoId(preFill.repoId);
+      setFileName('');
+    }
+  }, [preFill]);
 
   // 文件列表状态
   const [availableFiles, setAvailableFiles] = useState<ModelFileInfo[]>([]);

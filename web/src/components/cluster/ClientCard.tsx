@@ -97,7 +97,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           </div>
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white">{client.name}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-300">
               {client.address}:{client.port}
             </p>
           </div>
@@ -112,13 +112,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
       <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
         <div className="flex items-center gap-2 text-sm">
           <Cpu className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className="text-gray-600 dark:text-gray-300">
             {client.capabilities.cpuCount} 核心
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <HardDrive className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className="text-gray-600 dark:text-gray-300">
             {formatSize(client.capabilities.memory)}
           </span>
         </div>
@@ -126,13 +126,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           <>
             <div className="flex items-center gap-2 text-sm">
               <Server className="w-4 h-4 text-purple-500" />
-              <span className="text-gray-600 dark:text-gray-400">
+              <span className="text-gray-600 dark:text-gray-300">
                 {client.capabilities.gpuCount} GPU
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <HardDrive className="w-4 h-4 text-purple-500" />
-              <span className="text-gray-600 dark:text-gray-400">
+              <span className="text-gray-600 dark:text-gray-300">
                 {formatSize(client.capabilities.gpuMemory)}
               </span>
             </div>
@@ -159,7 +159,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
         <div className="space-y-2 mb-4">
           {/* CPU */}
           <div>
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
               <span>CPU</span>
               <span>{cpuPercent.toFixed(1)}%</span>
             </div>
@@ -180,7 +180,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
 
           {/* 内存 */}
           <div>
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
               <span>内存</span>
               <span>
                 {formatSize(client.resources.memoryUsed)} / {formatSize(client.resources.memoryTotal)}
@@ -205,7 +205,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           {client.capabilities.gpuCount > 0 && (
             <>
               <div>
-                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
                   <span>GPU</span>
                   <span>{gpuPercent.toFixed(1)}%</span>
                 </div>
@@ -221,7 +221,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
               </div>
 
               <div>
-                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
                   <span>GPU 内存</span>
                   <span>
                     {formatSize(client.resources.gpuMemoryUsed)} / {formatSize(client.resources.gpuMemoryTotal)}
@@ -248,7 +248,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
 
       {/* 最后见到时间和操作 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
           <Clock className="w-3 h-3" />
           <span>{formatLastSeen(client.lastSeen)}</span>
         </div>
@@ -270,13 +270,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
       {/* 元数据 */}
       {Object.keys(client.metadata).length > 0 && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-gray-500 dark:text-gray-400">
+          <summary className="cursor-pointer text-xs text-gray-500 dark:text-gray-300">
             元数据
           </summary>
           <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded text-xs">
             {Object.entries(client.metadata).map(([key, value]) => (
               <div key={key} className="flex justify-between gap-4">
-                <span className="text-gray-600 dark:text-gray-400">{key}:</span>
+                <span className="text-gray-600 dark:text-gray-300">{key}:</span>
                 <span className="text-gray-900 dark:text-white font-mono">{String(value)}</span>
               </div>
             ))}

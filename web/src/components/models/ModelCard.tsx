@@ -73,6 +73,17 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
   const isLoading = model.status === 'loading' || model.isLoading;
   const isLoaded = model.status === 'loaded' || model.status === 'running' || model.isLoaded;
 
+  // 调试日志：检查 Qwen3.5-397B 模型的数据
+  if (model.name.includes('Qwen3.5-397B')) {
+    console.log('[ModelCard] Qwen3.5-397B 渲染数据:', {
+      name: model.name,
+      size: model.size,
+      totalSize: model.totalSize,
+      shardCount: model.shardCount,
+      displaySize: formatSize(model.totalSize ?? model.size),
+    });
+  }
+
   return (
     <div className="group relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-all duration-200">
       {/* 收藏按钮 */}
@@ -98,7 +109,7 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
             {model.alias || model.displayName || model.name}
           </h3>
           {model.pathPrefix && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+            <p className="text-xs text-gray-400 dark:text-gray-300 truncate">
               来自: {model.pathPrefix}
             </p>
           )}
@@ -108,28 +119,35 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
       {/* 模型元数据 */}
       <div className="space-y-2 mb-3">
         {/* 架构 */}
-        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
           <Cpu className="w-4 h-4" />
           <span className="truncate">{model.metadata.architecture}</span>
         </div>
 
-        {/* 大小 */}
-        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        {/* 大小 - 优先使用 totalSize（分卷模型的总大小） */}
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
           <HardDrive className="w-4 h-4" />
-          <span>{formatSize(model.size)}</span>
+          <span>
+            {formatSize(model.totalSize ?? model.size)}
+            {model.shardCount && model.shardCount > 1 && (
+              <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                ({model.shardCount} 分卷)
+              </span>
+            )}
+          </span>
         </div>
 
-        {/* 量化 */}
-        {model.metadata.quantization && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            量化: {model.metadata.quantization}
+        {/* 量化 - 优先使用 fileTypeDescriptor（更详细的描述） */}
+        {(model.metadata.fileTypeDescriptor || model.metadata.quantization) && (
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            量化: {model.metadata.fileTypeDescriptor || model.metadata.quantization}
           </div>
         )}
 
-        {/* 上下文长度 */}
-        {model.metadata.contextLength && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            上下文: {model.metadata.contextLength.toLocaleString()}
+        {/* 上下文长度 - 只有大于 0 时才显示 */}
+        {model.metadata.contextLength && model.metadata.contextLength > 0 && (
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            上下文: {model.metadata.contextLength?.toString()}
           </div>
         )}
       </div>
@@ -163,7 +181,7 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
       {/* 槽位信息 */}
       {isLoaded && model.slots && model.slots.length > 0 && (
         <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-900 rounded-md">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">处理槽位</div>
+          <div className="text-xs text-gray-600 dark:text-gray-300 mb-1">处理槽位</div>
           <div className="flex gap-1 flex-wrap">
             {model.slots.map((slot) => (
               <div
@@ -172,7 +190,7 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
                   'w-6 h-6 rounded flex items-center justify-center text-xs',
                   slot.isProcessing
                     ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                 )}
               >
                 {slot.id}
@@ -228,7 +246,7 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
       </div>
 
       {/* 扫描时间 */}
-      <div className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+      <div className="mt-2 text-xs text-gray-400 dark:text-gray-400">
         扫描于: {new Date(model.scannedAt).toLocaleString('zh-CN')}
       </div>
     </div>

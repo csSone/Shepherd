@@ -1,4 +1,4 @@
-import { Bell, Search, User } from 'lucide-react';
+import { Bell, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -29,9 +29,6 @@ export function Header() {
         <ThemeToggle />
         <Button variant="ghost" size="icon" aria-label={t('header.notifications')}>
           <Bell size={20} />
-        </Button>
-        <Button variant="ghost" size="icon" aria-label={t('header.user')}>
-          <User size={20} />
         </Button>
       </div>
     </header>

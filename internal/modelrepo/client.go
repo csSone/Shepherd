@@ -2,12 +2,14 @@
 package modelrepo
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
-	"time"
-	"encoding/json"
+	"net/url"
+	"os"
 	"strings"
+	"time"
 )
 
 // Source represents the model repository source
@@ -18,37 +20,96 @@ const (
 	SourceModelScope  Source = "modelscope"
 )
 
+// Endpoint URLs
+const (
+	EndpointHuggingFace   = "huggingface.co"
+	EndpointHuggingMirror = "hf-mirror.com"
+)
+
 // Client is a model repository client
 type Client struct {
 	httpClient *http.Client
-	hfToken    string // Optional HuggingFace authentication token
+	hfToken    string
+	endpoint   string
 }
 
 // NewClient creates a new model repository client
 func NewClient() *Client {
-	// 设置合理的超时时间
-	timeout := 10 * time.Second // 10 秒超时，避免用户等待太久
+	return NewClientWithConfig(EndpointHuggingFace, "", 30*time.Second)
+}
+
+// NewClientWithConfig creates a new model repository client with full configuration
+func NewClientWithConfig(endpoint, token string, timeout time.Duration) *Client {
+	if endpoint == "" {
+		endpoint = EndpointHuggingFace
+	}
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// 支持 HTTP 代理
+	if proxyURL := os.Getenv("HTTPS_PROXY"); proxyURL != "" {
+		if parsedURL, err := url.Parse(proxyURL); err == nil {
+			transport.Proxy = http.ProxyURL(parsedURL)
+		}
+	} else if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
+		if parsedURL, err := url.Parse(proxyURL); err == nil {
+			transport.Proxy = http.ProxyURL(parsedURL)
+		}
+	}
 
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: timeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   5 * time.Second, // 连接超时
-					KeepAlive: 30 * time.Second,
-				}).DialContext,
-				MaxIdleConns:          100,
-				IdleConnTimeout:       90 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			},
+			Timeout:   timeout,
+			Transport: transport,
 		},
+		hfToken:  token,
+		endpoint: endpoint,
+	}
+}
+
+// SetEndpoint sets the HuggingFace endpoint
+func (c *Client) SetEndpoint(endpoint string) {
+	if endpoint != "" {
+		c.endpoint = endpoint
 	}
 }
 
 // SetHFToken sets the HuggingFace authentication token
 func (c *Client) SetHFToken(token string) {
 	c.hfToken = token
+}
+
+// GetEndpoint returns the current endpoint
+func (c *Client) GetEndpoint() string {
+	return c.endpoint
+}
+
+// GetHFToken returns the current token (masked)
+func (c *Client) GetHFToken() string {
+	if c.hfToken == "" {
+		return ""
+	}
+	return "***"
+}
+
+// GetAvailableEndpoints returns available HuggingFace endpoints
+func GetAvailableEndpoints() map[string]string {
+	return map[string]string{
+		"huggingface.co": "HuggingFace 官方",
+		"hf-mirror.com":  "HuggingFace 镜像",
+	}
 }
 
 // FileInfo represents information about a model file
@@ -72,8 +133,7 @@ func (c *Client) GenerateDownloadURL(source Source, repoID, fileName string) (st
 
 // generateHuggingFaceURL generates a HuggingFace download URL
 func (c *Client) generateHuggingFaceURL(repoID, fileName string) (string, error) {
-	// HuggingFace URL format: https://huggingface.co/{repoId}/resolve/main/{fileName}
-	base := fmt.Sprintf("https://huggingface.co/%s/resolve/main/", repoID)
+	base := fmt.Sprintf("https://%s/%s/resolve/main/", c.endpoint, repoID)
 	if fileName != "" {
 		base += fileName
 	}
@@ -93,14 +153,13 @@ func (c *Client) generateModelScopeURL(repoID, fileName string) (string, error) 
 
 // ListGGUFFiles lists GGUF files in a HuggingFace repository
 func (c *Client) ListGGUFFiles(repoID string) ([]FileInfo, error) {
-	url := fmt.Sprintf("https://huggingface.co/api/models/%s?tree=1&recursive=1", repoID)
+	apiURL := fmt.Sprintf("https://%s/api/models/%s?tree=1&recursive=1", c.endpoint, repoID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add auth token if available
 	if c.hfToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.hfToken)
 	}
@@ -129,12 +188,11 @@ func (c *Client) ListGGUFFiles(repoID string) ([]FileInfo, error) {
 
 	var files []FileInfo
 	for _, item := range result.Tree {
-		// Only include files (not directories)
 		if item.Type == "file" && isGGUFFile(item.Path) {
 			files = append(files, FileInfo{
 				Name:        item.Path,
 				Size:        item.Size,
-				DownloadURL: fmt.Sprintf("https://huggingface.co/%s/resolve/main/%s", repoID, item.Path),
+				DownloadURL: fmt.Sprintf("https://%s/%s/resolve/main/%s", c.endpoint, repoID, item.Path),
 			})
 		}
 	}
@@ -154,4 +212,71 @@ func ParseRepoID(repoID string) (owner, model string, err error) {
 		return "", "", fmt.Errorf("invalid repo ID format (expected 'owner/model'): %s", repoID)
 	}
 	return parts[0], parts[1], nil
+}
+
+// HuggingFaceModel represents a model from HuggingFace search results
+type HuggingFaceModel struct {
+	ID           string   `json:"id"`
+	ModelID      string   `json:"modelId"`
+	Author       string   `json:"author"`
+	SHA          string   `json:"sha"`
+	Private      bool     `json:"private"`
+	CreatedAt    string   `json:"createdAt"`
+	LastModified string   `json:"lastModified"`
+	Tags         []string `json:"tags"`
+	Downloads    int      `json:"downloads"`
+	Likes        int      `json:"likes"`
+	LibraryName  string   `json:"library_name"`
+}
+
+// SearchResult represents the search response from HuggingFace
+type SearchResult struct {
+	Models []HuggingFaceModel `json:"items"`
+	Count  int                `json:"count"`
+	Total  int                `json:"total"`
+}
+
+// SearchHuggingFaceModels searches for models on HuggingFace
+func (c *Client) SearchHuggingFaceModels(query string, limit int) (*SearchResult, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	apiURL := fmt.Sprintf("https://%s/api/models?search=%s&limit=%d",
+		c.endpoint, url.QueryEscape(query), limit)
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.hfToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.hfToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to search models: %s", resp.Status)
+	}
+
+	var result SearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// HasGGUFFiles checks if a repository contains GGUF files
+func (c *Client) HasGGUFFiles(repoID string) (bool, error) {
+	files, err := c.ListGGUFFiles(repoID)
+	if err != nil {
+		return false, err
+	}
+	return len(files) > 0, nil
 }

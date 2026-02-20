@@ -279,8 +279,13 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 
 // isModelFile checks if a file is a supported model file (GGUF, SafeTensors, etc.)
 func (m *Manager) isModelFile(path string) bool {
-	// Check file extension
 	base := filepath.Base(path)
+
+	// 排除 mmproj 文件（这些是多模态投影器，应该作为主模型的附件，而非独立模型）
+	// mmproj 文件命名模式: mmproj.gguf, mmproj-f16.gguf, mmproj-F32.gguf, xxx-mmproj.gguf
+	if strings.Contains(base, "mmproj") || strings.HasPrefix(base, "mmproj") {
+		return false
+	}
 
 	// 支持的模型格式
 	// GGUF 格式 (主要支持，可被 llama.cpp 加载)
@@ -986,6 +991,13 @@ func (m *Manager) loadModels() {
 
 	loadedCount := 0
 	for _, cfgModel := range configModels {
+		// 跳过 mmproj 文件（这些是多模态投影器，应该作为主模型的附件）
+		base := filepath.Base(cfgModel.Path)
+		if strings.Contains(base, "mmproj") || strings.HasPrefix(base, "mmproj") {
+			fmt.Printf("[INFO] loadModels: 跳过 mmproj 文件: %s\n", cfgModel.Path)
+			continue
+		}
+
 		// Try to load the model from disk
 		if info, err := os.Stat(cfgModel.Path); err == nil && !info.IsDir() {
 			model, err := m.loadModel(cfgModel.Path)
@@ -997,6 +1009,28 @@ func (m *Manager) loadModels() {
 				if fav, ok := favourites[model.ID]; ok {
 					model.Favourite = fav
 				}
+
+				// 加载分卷模型信息（如果配置中有保存）
+				if cfgModel.ShardCount > 0 && len(cfgModel.ShardFiles) > 0 {
+					model.TotalSize = cfgModel.TotalSize
+					model.ShardCount = cfgModel.ShardCount
+					model.ShardFiles = cfgModel.ShardFiles
+					fmt.Printf("[INFO] loadModels: 加载分卷模型 %s，共 %d 个分卷，总大小 %.2f GB\n",
+						model.Name, model.ShardCount, float64(model.TotalSize)/(1024*1024*1024))
+				}
+
+				// 加载 mmproj 路径（如果配置中有保存）
+				if cfgModel.Mmproj != nil && cfgModel.Mmproj.FileName != "" {
+					mmprojPath := filepath.Join(filepath.Dir(cfgModel.Path), cfgModel.Mmproj.FileName)
+					if info, err := os.Stat(mmprojPath); err == nil {
+						model.MmprojPath = mmprojPath
+						fmt.Printf("[INFO] loadModels: 加载 mmproj 文件 %s (%.2f GB)\n",
+							cfgModel.Mmproj.FileName, float64(info.Size())/(1024*1024*1024))
+					} else {
+						fmt.Printf("[WARN] loadModels: mmproj 文件不存在: %s\n", mmprojPath)
+					}
+				}
+
 				m.models[model.ID] = model
 				loadedCount++
 			} else {
@@ -1007,6 +1041,14 @@ func (m *Manager) loadModels() {
 		}
 	}
 	fmt.Printf("[INFO] loadModels: successfully loaded %d models into cache\n", loadedCount)
+
+	// ========== 合并分卷文件 ==========
+	// 注意：如果配置中已经保存了分卷信息，这里不需要再次合并
+	// 但如果配置中没有分卷信息，则尝试合并
+	mergedCount := m.mergeSplitModels()
+	if mergedCount > 0 {
+		fmt.Printf("[INFO] loadModels: 已合并 %d 组分卷文件\n", mergedCount)
+	}
 }
 
 // saveModels saves models to config
@@ -1026,6 +1068,13 @@ func (m *Manager) saveModels() {
 			Favourite: model.Favourite,
 		}
 
+		// 保存分卷模型信息
+		if model.ShardCount > 0 {
+			entry.TotalSize = model.TotalSize
+			entry.ShardCount = model.ShardCount
+			entry.ShardFiles = model.ShardFiles
+		}
+
 		// Add primary model info if available
 		if model.Metadata != nil {
 			entry.PrimaryModel = &config.PrimaryModelInfo{
@@ -1038,11 +1087,21 @@ func (m *Manager) saveModels() {
 		}
 
 		// Add mmproj info if available
-		if model.MmprojMeta != nil {
+		if model.MmprojPath != "" {
+			// 获取 mmproj 文件大小
+			mmprojSize := int64(0)
+			if info, err := os.Stat(model.MmprojPath); err == nil {
+				mmprojSize = info.Size()
+			}
+
 			entry.Mmproj = &config.MmprojInfo{
-				FileName:     filepath.Base(model.MmprojPath),
-				Name:         model.MmprojMeta.Name,
-				Architecture: model.MmprojMeta.Architecture,
+				FileName: filepath.Base(model.MmprojPath),
+				Size:     mmprojSize,
+			}
+			// 如果有元数据，也保存
+			if model.MmprojMeta != nil {
+				entry.Mmproj.Name = model.MmprojMeta.Name
+				entry.Mmproj.Architecture = model.MmprojMeta.Architecture
 			}
 		}
 
@@ -1516,17 +1575,81 @@ func (m *Manager) mergeSplitModels() int {
 			shardFiles[i] = m.Path
 		}
 
+		// ========== 查找并添加 mmproj 文件大小 ==========
+		// 参考 LlamacppServer GGUFBundle.java 的实现
+		mmprojSize := int64(0)
+		mmprojPath := ""
+
+		if len(models) > 0 {
+			dir := filepath.Dir(models[0].Path)
+			baseName := extractModelName(filepath.Base(models[0].Path))
+
+			// 尝试多种 mmproj 命名模式（按优先级）
+			candidates := []string{
+				// 模式 1: mmproj-{basename}.gguf (最常见)
+				filepath.Join(dir, "mmproj-"+baseName+".gguf"),
+				// 模式 2: {basename}-mmproj.gguf
+				filepath.Join(dir, baseName+"-mmproj.gguf"),
+				// 模式 3: {basename}-mmproj-F32.gguf (精度变体)
+				filepath.Join(dir, baseName+"-mmproj-F32.gguf"),
+				filepath.Join(dir, baseName+"-mmproj-f32.gguf"),
+				// 模式 4: {basename}-mmproj-F16.gguf
+				filepath.Join(dir, baseName+"-mmproj-F16.gguf"),
+				filepath.Join(dir, baseName+"-mmproj-f16.gguf"),
+				// 模式 5: 目录内任何包含 "mmproj" 的 .gguf 文件（最后尝试）
+			}
+
+			// 首先尝试特定的命名模式
+			for _, candidate := range candidates {
+				if info, err := os.Stat(candidate); err == nil {
+					mmprojSize = info.Size()
+					mmprojPath = candidate
+					fmt.Printf("[INFO] 找到 mmproj 文件: %s (%.2f GB)\n",
+						filepath.Base(candidate), float64(mmprojSize)/(1024*1024*1024))
+					break
+				}
+			}
+
+			// 如果特定模式都找不到，尝试目录内搜索
+			if mmprojPath == "" {
+				entries, err := os.ReadDir(dir)
+				if err == nil {
+					for _, entry := range entries {
+						if !entry.IsDir() && strings.Contains(strings.ToLower(entry.Name()), "mmproj") && strings.HasSuffix(strings.ToLower(entry.Name()), ".gguf") {
+							fullPath := filepath.Join(dir, entry.Name())
+							if info, err := os.Stat(fullPath); err == nil {
+								mmprojSize = info.Size()
+								mmprojPath = fullPath
+								fmt.Printf("[INFO] 通过目录搜索找到 mmproj 文件: %s (%.2f GB)\n",
+									entry.Name(), float64(mmprojSize)/(1024*1024*1024))
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// 更新 TotalSize 包含 mmproj 文件
+		totalSizeWithMmproj := totalSize + mmprojSize
+
 		fmt.Printf("[DEBUG] 合并前: primary.Name=%s, len(models)=%d, len(shardFiles)=%d\n",
 			primary.Name, len(models), len(shardFiles))
 
 		// 更新主模型的属性
 		primary.Name = extractModelName(filepath.Base(primary.Path))
-		primary.TotalSize = totalSize
+		primary.TotalSize = totalSizeWithMmproj
 		primary.ShardCount = len(models)
 		primary.ShardFiles = shardFiles
+		if mmprojPath != "" {
+			primary.MmprojPath = mmprojPath
+		}
 
-		fmt.Printf("[DEBUG] 合并后: primary.Name=%s, ShardCount=%d, TotalSize=%d, len(ShardFiles)=%d\n",
-			primary.Name, primary.ShardCount, primary.TotalSize, len(primary.ShardFiles))
+		fmt.Printf("[DEBUG] 合并后: primary.Name=%s, ShardCount=%d, TotalSize=%.2f GB (分卷) + %.2f GB (mmproj) = %.2f GB\n",
+			primary.Name, primary.ShardCount,
+			float64(totalSize)/(1024*1024*1024),
+			float64(mmprojSize)/(1024*1024*1024),
+			float64(primary.TotalSize)/(1024*1024*1024))
 
 		// 删除其他分卷的模型记录
 		for i := 1; i < len(models); i++ {

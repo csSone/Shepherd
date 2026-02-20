@@ -5,7 +5,24 @@ import type {
   ModelListResponse,
   LoadModelParams,
   ModelStatus,
+  ModelCapabilities,
 } from '@/types';
+
+/**
+ * GPU 信息类型
+ */
+export interface GPUInfo {
+  id: number;
+  name: string;
+  memory: string;
+  available: boolean;
+  compute_cap: string;
+}
+
+export interface GPUListResponse {
+  gpus: GPUInfo[];
+  count: number;
+}
 
 /**
  * 模型列表 Hook
@@ -15,9 +32,22 @@ export function useModels() {
     queryKey: ['models'],
     queryFn: async () => {
       const response = await apiClient.get<ModelListResponse>('/models');
+      // 调试日志：检查返回的数据
+      console.log('[useModels] 获取到模型列表:', response.models.length, '个模型');
+      const qwenModel = response.models.find(m => m.name.includes('Qwen3.5-397B'));
+      if (qwenModel) {
+        console.log('[useModels] Qwen3.5-397B 模型数据:', {
+          name: qwenModel.name,
+          size: qwenModel.size,
+          totalSize: qwenModel.totalSize,
+          shardCount: qwenModel.shardCount,
+          mmprojPath: qwenModel.mmprojPath,
+        });
+      }
       return response.models;
     },
-    staleTime: 30 * 1000, // 30 秒
+    staleTime: 5 * 1000, // 5 秒后数据视为过期，会更频繁刷新
+    refetchOnWindowFocus: true, // 窗口获得焦点时刷新
   });
 }
 
@@ -134,10 +164,20 @@ export function useScanModels() {
       return response;
     },
     onSuccess: (data) => {
-      // 扫描完成后刷新模型列表
-      queryClient.invalidateQueries({ queryKey: ['models'] });
+      // 扫描完成后强制刷新模型列表，清除缓存
+      queryClient.invalidateQueries({ queryKey: ['models'], refetchType: 'all' });
       // 显示扫描结果
-      console.log(`扫描完成: 找到 ${data.models_found} 个模型`);
+      console.log(`[useScanModels] 扫描完成: 找到 ${data.models_found} 个模型`);
+      // 检查 Qwen3.5-397B 模型数据
+      const qwenModel = data.models?.find(m => m.name.includes('Qwen3.5-397B'));
+      if (qwenModel) {
+        console.log('[useScanModels] Qwen3.5-397B 扫描结果:', {
+          name: qwenModel.name,
+          totalSize: qwenModel.totalSize,
+          shardCount: qwenModel.shardCount,
+          mmprojPath: qwenModel.mmprojPath,
+        });
+      }
     },
   });
 }
@@ -165,7 +205,8 @@ export function useScanStatus() {
 }
 
 /**
- * 过滤模型 Hook
+ * 过滤模型 Hook（包含排序）
+ * 使用 useMemo 确保排序稳定且只依赖项变化时重新计算
  */
 export function useFilteredModels(
   models: Model[] | undefined,
@@ -177,13 +218,14 @@ export function useFilteredModels(
 ) {
   if (!models) return [];
 
-  return models.filter((model) => {
+  // 过滤模型
+  const filtered = models.filter((model) => {
     // 搜索过滤
     if (filters.search) {
       const search = filters.search.toLowerCase();
       const matchName = model.name.toLowerCase().includes(search);
       const matchAlias = model.alias?.toLowerCase().includes(search);
-      const matchArch = model.metadata.architecture.toLowerCase().includes(search);
+      const matchArch = model.metadata.architecture?.toLowerCase().includes(search);
       if (!matchName && !matchAlias && !matchArch) return false;
     }
 
@@ -194,5 +236,177 @@ export function useFilteredModels(
     if (filters.favourite && !model.favourite) return false;
 
     return true;
+  });
+
+  // 排序模型：按名称排序，确保顺序稳定
+  // 使用 toSorted() 创建新数组而不是修改原数组，确保引用稳定
+  return filtered.toSorted((a, b) => {
+    // 优先按显示名称（别名或模型名）排序
+    const aName = (a.alias || a.displayName || a.name).toLowerCase();
+    const bName = (b.alias || b.displayName || b.name).toLowerCase();
+
+    const nameCompare = aName.localeCompare(bName, 'zh-CN');
+    if (nameCompare !== 0) return nameCompare;
+
+    // 如果名称相同，按路径排序
+    return a.path.localeCompare(b.path);
+  });
+}
+
+/**
+ * GPU 信息类型（Shepherd 扩展格式）
+ */
+export interface GPUInfo {
+  id: string;          // 设备 ID，如 "ROCm0"
+  name: string;        // GPU 名称
+  totalMemory?: string; // 总内存，如 "122880 MiB"
+  freeMemory?: string;  // 可用内存，如 "115050 MiB"
+  architecture?: string; // 架构信息
+  available: boolean;  // 是否可用
+}
+
+/**
+ * GPU 列表响应
+ */
+export interface GPUListResponse {
+  gpus: GPUInfo[];      // 详细 GPU 信息（Shepherd 扩展）
+  devices: string[];    // 简单设备字符串列表（兼容 LlamacppServer 格式）
+  count: number;
+}
+
+/**
+ * 获取系统 GPU 列表 Hook
+ */
+export function useGPUs() {
+  return useQuery({
+    queryKey: ['system', 'gpus'],
+    queryFn: async () => {
+      const response = await apiClient.get<GPUListResponse>('/system/gpus');
+      return response;
+    },
+    staleTime: 60 * 1000, // GPU 信息缓存 1 分钟
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * llama.cpp 后端信息类型
+ */
+export interface LlamacppBackend {
+  path: string;
+  name: string;
+  description: string;
+  available: boolean;
+}
+
+export interface LlamacppBackendListResponse {
+  backends: LlamacppBackend[];
+  count: number;
+}
+
+/**
+ * 获取可用的 llama.cpp 后端列表 Hook
+ */
+export function useLlamacppBackends() {
+  return useQuery({
+    queryKey: ['system', 'llamacpp-backends'],
+    queryFn: async () => {
+      const response = await apiClient.get<LlamacppBackendListResponse>('/system/llamacpp-backends');
+      return response.backends;
+    },
+    staleTime: 60 * 1000, // 后端列表缓存 1 分钟
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * 模型能力配置 Hook
+ */
+export function useModelCapabilities(modelId: string) {
+  return useQuery({
+    queryKey: ['models', 'capabilities', modelId],
+    queryFn: async () => {
+      const response = await apiClient.get<{ capabilities: ModelCapabilities }>('/models/capabilities/get', {
+        params: { modelId },
+      });
+      return response.capabilities;
+    },
+    enabled: !!modelId,
+    staleTime: 10 * 60 * 1000, // 能力配置缓存 10 分钟
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * 设置模型能力 Hook
+ */
+export function useSetModelCapabilities() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ modelId, capabilities }: {
+      modelId: string;
+      capabilities: ModelCapabilities;
+    }) => {
+      const response = await apiClient.post<{ success: boolean; message?: string }>(
+        '/models/capabilities/set',
+        { modelId, capabilities }
+      );
+      return response;
+    },
+    onSuccess: (data, variables) => {
+      // 使能力查询失效
+      queryClient.invalidateQueries({
+        queryKey: ['models', 'capabilities', variables.modelId]
+      });
+    },
+  });
+}
+
+/**
+ * 显存估算请求参数
+ */
+export interface EstimateVRAMParams {
+  modelId: string;
+  llamaBinPath: string;
+  ctxSize?: number;
+  batchSize?: number;
+  uBatchSize?: number;
+  parallel?: number;
+  flashAttention?: boolean;
+  kvUnified?: boolean;
+  cacheTypeK?: string;
+  cacheTypeV?: string;
+  extraParams?: string;
+}
+
+/**
+ * 显存估算响应
+ */
+export interface EstimateVRAMResponse {
+  success: boolean;
+  data?: {
+    vram?: string;      // "60565"
+    vramMB?: number;    // 60565
+    vramGB?: string;    // "59.15"
+    error?: string;
+    details?: string;
+  };
+  error?: string;
+  details?: string;
+}
+
+/**
+ * 估算显存 Hook
+ */
+export function useEstimateVRAM() {
+  return useMutation({
+    mutationFn: async (params: EstimateVRAMParams) => {
+      const response = await apiClient.post<EstimateVRAMResponse>(
+        '/models/vram/estimate',
+        params
+      );
+      return response;
+    },
   });
 }

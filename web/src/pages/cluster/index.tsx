@@ -79,7 +79,7 @@ export function ClusterPage() {
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {overview?.totalClients || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">总客户端</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">总客户端</div>
             </div>
           </div>
         </div>
@@ -93,7 +93,7 @@ export function ClusterPage() {
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {overview?.onlineClients || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">在线</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">在线</div>
             </div>
           </div>
         </div>
@@ -107,7 +107,7 @@ export function ClusterPage() {
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {overview?.busyClients || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">忙碌</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">忙碌</div>
             </div>
           </div>
         </div>
@@ -121,7 +121,7 @@ export function ClusterPage() {
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {overview?.runningTasks || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">运行中任务</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">运行中任务</div>
             </div>
           </div>
         </div>
@@ -195,7 +195,7 @@ export function ClusterPage() {
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : filteredClients.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-300">
               <Server className="w-12 h-12 mb-4" />
               <p className="text-lg mb-2">暂无客户端</p>
               <p className="text-sm">点击"扫描网络"来发现局域网中的客户端</p>
@@ -218,7 +218,7 @@ export function ClusterPage() {
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : !tasks || tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-300">
               <Clock className="w-12 h-12 mb-4" />
               <p className="text-lg">暂无任务</p>
             </div>
@@ -238,12 +238,12 @@ export function ClusterPage() {
                       className={cn(
                         'px-2 py-1 rounded text-xs font-medium',
                         task.status === 'completed'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                           : task.status === 'running'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
                             : task.status === 'failed'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300'
                       )}
                     >
                       {task.status}
@@ -251,13 +251,13 @@ export function ClusterPage() {
                   </div>
 
                   {task.assignedTo && (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
                       分配给: {task.assignedTo}
                     </div>
                   )}
 
                   {task.error && (
-                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
+                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">
                       {task.error}
                     </div>
                   )}

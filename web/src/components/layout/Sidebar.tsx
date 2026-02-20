@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useUIStore } from '@/stores/uiStore';
 import { useConfig } from '@/lib/config';
 import { cn } from '@/lib/utils';
+import { UserMenu } from './UserMenu';
 import {
   LayoutDashboard,
   Package,
@@ -90,9 +91,11 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t p-4">
+      <div className="border-t p-4 space-y-4">
+        <UserMenu sidebarOpen={sidebarOpen} />
+        
         {sidebarOpen && (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground pt-2 border-t">
             <div>Shepherd v0.1.2</div>
             <div className="mt-1">{t('footer.copyright')}</div>
           </div>

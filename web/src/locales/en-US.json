@@ -11,7 +11,12 @@
     "close": "Close",
     "refresh": "Refresh",
     "settings": "Settings",
-    "back": "Back"
+    "back": "Back",
+    "saved": "Saved",
+    "active": "Active",
+    "unsavedChanges": "Unsaved changes",
+    "allChangesSaved": "All changes saved",
+    "editProfile": "Edit Profile"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -72,16 +77,54 @@
     "send": "Send",
     "clearHistory": "Clear History"
   },
-  "settings": {
-    "title": "Settings",
-    "general": "General Settings",
-    "api": "API Configuration",
-    "paths": "Path Configuration",
-    "llamacppPaths": "llama.cpp Paths",
-    "modelPaths": "Model Paths"
-  },
   "footer": {
     "version": "Version",
     "copyright": "© 2026 Shepherd Project"
+  },
+  "user": {
+    "guest": "Guest",
+    "profile": "Profile",
+    "settings": "Settings",
+    "admin": "Administrator",
+    "user": "User",
+    "username": "Username",
+    "displayName": "Display Name",
+    "displayNamePlaceholder": "Enter your display name",
+    "email": "Email",
+    "emailPlaceholder": "Enter email address",
+    "role": "Role",
+    "joinedAt": "Joined",
+    "logout": "Logout",
+    "theme": "Theme",
+    "notificationsOn": "Notifications On",
+    "notificationsOff": "Notifications Off",
+    "settingsDescription": "Customize your personal preferences"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "api": "API Configuration",
+    "paths": "Path Configuration",
+    "llamacppPaths": "llama.cpp Paths",
+    "modelPaths": "Model Paths",
+    "appearance": "Appearance",
+    "notifications": "Notifications",
+    "theme": "Theme",
+    "themeDescription": "Choose your preferred interface theme",
+    "themeLightDesc": "Bright light theme",
+    "themeDarkDesc": "Eye-friendly dark theme",
+    "themeSystemDesc": "Follow system settings",
+    "language": "Language",
+    "languageDescription": "Select interface language",
+    "notificationsDescription": "Manage your notification preferences",
+    "pushNotifications": "Push Notifications",
+    "pushNotificationsDesc": "Receive real-time push notifications",
+    "desktopNotifications": "Desktop Notifications",
+    "desktopNotificationsDesc": "Show notification popups on desktop",
+    "emailNotifications": "Email Notifications",
+    "emailNotificationsDesc": "Receive important notifications via email (coming soon)",
+    "autoSave": "Auto Save",
+    "autoSaveDescription": "Automatically save conversations and settings",
+    "data": "Data Management"
   }
 }

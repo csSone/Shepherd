@@ -24,6 +24,36 @@ export interface ModelFilesResponse {
 }
 
 /**
+ * HuggingFace 模型信息
+ */
+export interface HuggingFaceModel {
+  id: string;
+  modelId: string;
+  author: string;
+  sha: string;
+  private: boolean;
+  createdAt: string;
+  lastModified: string;
+  tags: string[];
+  downloads: number;
+  likes: number;
+  library_name: string;
+}
+
+/**
+ * HuggingFace 搜索结果响应
+ */
+export interface HuggingFaceSearchResponse {
+  success: boolean;
+  data: {
+    items: HuggingFaceModel[];
+    count: number;
+    total: number;
+  };
+  error?: string;
+}
+
+/**
  * 下载管理 API
  */
 export const downloadsApi = {
@@ -82,4 +112,28 @@ export const downloadsApi = {
    */
   listModelFiles: (source: 'huggingface' | 'modelscope', repoId: string, signal?: AbortSignal): Promise<ModelFilesResponse> =>
     apiClient.get<ModelFilesResponse>(`/repo/files?source=${source}&repoId=${encodeURIComponent(repoId)}`, undefined, signal),
+
+  /**
+   * 搜索 HuggingFace 模型
+   */
+  searchHuggingFace: (query: string, limit?: number, signal?: AbortSignal): Promise<HuggingFaceSearchResponse> =>
+    apiClient.get<HuggingFaceSearchResponse>(`/repo/search?q=${encodeURIComponent(query)}&limit=${limit || 20}`, undefined, signal),
+
+  /**
+   * 获取模型仓库配置
+   */
+  getModelRepoConfig: (): Promise<{ success: boolean; data: { endpoint: string; token: string; timeout: number }; error?: string }> =>
+    apiClient.get('/repo/config'),
+
+  /**
+   * 更新模型仓库配置
+   */
+  updateModelRepoConfig: (config: { endpoint?: string; token?: string; timeout?: number }): Promise<{ success: boolean; data: { endpoint: string; token: string; timeout: number }; error?: string }> =>
+    apiClient.put('/repo/config', config),
+
+  /**
+   * 获取可用端点列表
+   */
+  getAvailableEndpoints: (): Promise<{ success: boolean; data: Record<string, string>; error?: string }> =>
+    apiClient.get('/repo/endpoints'),
 };

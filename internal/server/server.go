@@ -4,24 +4,31 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	api "github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
 	compatibilityapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/compatibility"
 	filesystemapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/filesystem"
-	api "github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/paths"
 	storageapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
-	modelrepoclient "github.com/shepherd-project/shepherd/Shepherd/internal/modelrepo"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
+	modelrepoclient "github.com/shepherd-project/shepherd/Shepherd/internal/modelrepo"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/port"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
@@ -36,37 +43,59 @@ type ModelDTO struct {
 	Path        string                 `json:"path"`
 	PathPrefix  string                 `json:"pathPrefix"`
 	Size        int64                  `json:"size"`
-	TotalSize   int64                  `json:"totalSize,omitempty"`   // 包含所有分卷的总大小
-	ShardCount  int                    `json:"shardCount,omitempty"`  // 分卷数量
+	TotalSize   int64                  `json:"totalSize,omitempty"`  // 包含所有分卷的总大小
+	ShardCount  int                    `json:"shardCount,omitempty"` // 分卷数量
 	ShardFiles  []string               `json:"shardFiles,omitempty"` // 所有分卷文件路径
+	MmprojPath  string                 `json:"mmprojPath,omitempty"` // mmproj 文件路径
 	Favourite   bool                   `json:"favourite"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Status      string                 `json:"status"`
 	IsLoaded    bool                   `json:"isLoaded"`
-	ScannedAt   string                 `json:"scannedAt,omitempty"`  // 扫描时间（ISO 8601 格式）
+	ScannedAt   string                 `json:"scannedAt,omitempty"` // 扫描时间（ISO 8601 格式）
+}
+
+// nonEmptyString 返回非空字符串，如果是空字符串则返回 nil
+// 这样 JSON 序列化时会省略该字段而不是返回空字符串
+func nonEmptyString(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // Server represents the HTTP server
 type Server struct {
-	engine       *gin.Engine
-	httpServer   *http.Server
-	config       *Config
-	handlers     *Handlers
-	wsMgr        *websocket.Manager
-	modelMgr     *model.Manager
-	storageMgr   *storage.Manager
-	downloadMgr  *DownloadManager // 下载管理器
-	nodeAdapter  *api.NodeAdapter // Node API 适配器
-	repoClient   *modelrepoclient.Client // 模型仓库客户端
+	engine      *gin.Engine
+	httpServer  *http.Server
+	config      *Config
+	handlers    *Handlers
+	wsMgr       *websocket.Manager
+	modelMgr    *model.Manager
+	storageMgr  *storage.Manager
+	downloadMgr *DownloadManager        // 下载管理器
+	nodeAdapter *api.NodeAdapter        // Node API 适配器
+	repoClient  *modelrepoclient.Client // 模型仓库客户端
 
 	// 新增字段：WebSocket Hub 和端口管理器
-	wsHub        *WebSocketHub
+	wsHub         *WebSocketHub
 	portAllocator *port.PortAllocator
+
+	// 模型能力存储
+	capabilities  map[string]*ModelCapabilities // modelId -> capabilities
+	capabilitiesMu sync.RWMutex
 
 	mu     sync.RWMutex
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+}
+
+// ModelCapabilities 表示模型能力配置
+type ModelCapabilities struct {
+	Thinking  bool `json:"thinking"`  // 思考能力（如 DeepSeek-R1）
+	Tools     bool `json:"tools"`     // 工具使用/函数调用
+	Rerank    bool `json:"rerank"`    // 重排序能力
+	Embedding bool `json:"embedding"` // 嵌入向量生成
 }
 
 // Config contains server configuration
@@ -128,11 +157,16 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 	// Create port allocator (新增)
 	s.portAllocator = port.NewPortAllocator(8081, 9000)
 
-	// Create model repository client
+	// Create model repository client with config
+	cfg := config.ConfigMgr.Get()
+	timeout := time.Duration(cfg.ModelRepo.Timeout) * time.Second
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	s.repoClient = modelrepoclient.NewClientWithConfig(cfg.ModelRepo.Endpoint, cfg.ModelRepo.Token, timeout)
 
 	// Create compatibility server manager
 	compatServerManager := compatibilityapi.NewServerManager(modelMgr)
-	s.repoClient = modelrepoclient.NewClient()
 
 	// Create API handlers
 	s.handlers.OpenAI = openai.NewHandler(modelMgr)
@@ -179,6 +213,10 @@ func (s *Server) setupRoutes() {
 	{
 		// Server info
 		api.GET("/info", s.handleServerInfo)
+
+		// System info
+		api.GET("/system/gpus", s.handleGetGPUs)
+		api.GET("/system/llamacpp-backends", s.handleGetLlamacppBackends)
 
 		// Configuration routes
 		config := api.Group("/config")
@@ -233,6 +271,15 @@ func (s *Server) setupRoutes() {
 		models := api.Group("/models")
 		{
 			models.GET("", s.handleListModels)
+
+			// 模型能力管理（必须在 :id 路由之前）
+			models.GET("/capabilities/get", s.handleGetModelCapabilities)
+			models.POST("/capabilities/set", s.handleSetModelCapabilities)
+
+			// 显存估算（必须在 :id 路由之前）
+			models.POST("/vram/estimate", s.handleEstimateVRAM)
+
+			// 模型具体操作（包含 :id 参数的路由必须在最后）
 			models.GET("/:id", s.handleGetModel)
 			models.POST("/:id/load", s.handleLoadModel)
 			models.POST("/:id/unload", s.handleUnloadModel)
@@ -264,6 +311,10 @@ func (s *Server) setupRoutes() {
 		repo := api.Group("/repo")
 		{
 			repo.GET("/files", s.handleListModelFiles)
+			repo.GET("/search", s.handleSearchModels)
+			repo.GET("/config", s.handleGetModelRepoConfig)
+			repo.PUT("/config", s.handleUpdateModelRepoConfig)
+			repo.GET("/endpoints", s.handleGetAvailableEndpoints)
 		}
 
 		// Process routes
@@ -544,6 +595,312 @@ func (s *Server) handleServerInfo(c *gin.Context) {
 	})
 }
 
+// handleGetGPUs 返回系统可用的 GPU 列表
+// 返回格式兼容 LlamacppServer 的设备列表格式
+func (s *Server) handleGetGPUs(c *gin.Context) {
+	// 首先尝试使用 llama-bench 获取设备列表（与 LlamacppServer 一致）
+	llamacppBinPath := ""
+	if s.config != nil && s.config.ServerCfg != nil && len(s.config.ServerCfg.Llamacpp.Paths) > 0 {
+		// 使用第一个可用的 llama.cpp 路径
+		for _, p := range s.config.ServerCfg.Llamacpp.Paths {
+			if fileInfo, err := os.Stat(p.Path); err == nil && fileInfo.IsDir() {
+				llamacppBinPath = p.Path
+				break
+			}
+		}
+	}
+
+	deviceStrings := []string{}  // 简单设备描述字符串（兼容 LlamacppServer）
+	gpus := []gin.H{}             // 详细 GPU 信息（Shepherd 扩展）
+
+	if llamacppBinPath != "" {
+		// 尝试使用 llama-bench 获取设备列表
+		benchPath := llamacppBinPath + "/llama-bench"
+		cmd := exec.Command(benchPath, "--list-devices")
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			// 解析 llama-bench 输出
+			lines := strings.Split(string(output), "\n")
+			inDeviceList := false
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				if strings.Contains(line, "Available devices") {
+					inDeviceList = true
+					continue
+				}
+				if inDeviceList {
+					// 解析设备行，例如: "ROCm0: AMD Radeon Graphics (122880 MiB, 115050 MiB free)"
+					deviceStrings = append(deviceStrings, line)
+
+					// 同时提取详细信息
+					parts := strings.SplitN(line, ":", 2)
+					if len(parts) == 2 {
+						deviceID := strings.TrimSpace(parts[0])
+						description := strings.TrimSpace(parts[1])
+
+						// 提取内存信息
+						var totalMemory, freeMemory string
+						// 使用正则表达式提取内存信息
+						memRe := regexp.MustCompile(`\((\d+) MiB(?:, (\d+) MiB free)?\)`)
+						if memMatches := memRe.FindStringSubmatch(description); len(memMatches) > 0 {
+							totalMemory = memMatches[1] + " MiB"
+							if len(memMatches) > 2 && memMatches[2] != "" {
+								freeMemory = memMatches[2] + " MiB"
+							}
+						}
+
+						gpus = append(gpus, gin.H{
+							"id":          deviceID,
+							"name":        description,
+							"totalMemory": totalMemory,
+							"freeMemory":  freeMemory,
+							"available":   true,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// 如果 llama-bench 失败，回退到 roc-smi
+	if len(deviceStrings) == 0 {
+		cmd := exec.Command("roc-smi", "--json")
+		output, err := cmd.Output()
+		if err == nil {
+			var rocmOutput []map[string]interface{}
+			if err := json.Unmarshal(output, &rocmOutput); err == nil {
+				for i, gpu := range rocmOutput {
+					// 提取 GPU 关键信息
+					gpuName := ""
+					if name, ok := gpu["card_name"].(string); ok {
+						gpuName = name
+					} else if name, ok := gpu["Card name"].(string); ok {
+						gpuName = name
+					}
+
+					// 获取架构信息
+					architecture := ""
+					if arch, ok := gpu["card_series"].(string); ok {
+						architecture = arch
+					} else if arch, ok := gpu["Card series"].(string); ok {
+						architecture = arch
+					}
+
+					// 获取 VRAM
+					var totalMemory, freeMemory string
+					if vram, ok := gpu["vram_total_memory"].(float64); ok {
+						totalMemory = fmt.Sprintf("%.0f MiB", vram/(1024*1024))
+					}
+					if vramFree, ok := gpu["vram_total_free_memory"].(float64); ok {
+						freeMemory = fmt.Sprintf("%.0f MiB", vramFree/(1024*1024))
+					}
+
+					// 构建 device string（类似 llama-bench 格式）
+					deviceID := fmt.Sprintf("ROCm%d", i)
+					deviceString := fmt.Sprintf("%s: %s", deviceID, gpuName)
+					if totalMemory != "" {
+						deviceString += fmt.Sprintf(" (%s", totalMemory)
+						if freeMemory != "" {
+							deviceString += fmt.Sprintf(", %s free", freeMemory)
+						}
+						deviceString += ")"
+					}
+					deviceStrings = append(deviceStrings, deviceString)
+
+					gpus = append(gpus, gin.H{
+						"id":          deviceID,
+						"name":        gpuName,
+						"architecture": architecture,
+						"totalMemory": totalMemory,
+						"freeMemory":  freeMemory,
+						"available":   true,
+					})
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"devices": deviceStrings,  // 简单设备字符串列表（兼容 LlamacppServer）
+		"gpus":    gpus,            // 详细 GPU 信息（Shepherd 扩展）
+		"count":   len(gpus),
+	})
+}
+
+// handleGetLlamacppBackends 返回可用的 llama.cpp 后端列表
+func (s *Server) handleGetLlamacppBackends(c *gin.Context) {
+	backends := []gin.H{}
+
+	// 从配置中获取 llama.cpp 路径
+	if s.config != nil && s.config.ServerCfg != nil {
+		paths := s.config.ServerCfg.Llamacpp.Paths
+		for _, p := range paths {
+			// 检查路径是否存在
+			available := false
+			if fileInfo, err := os.Stat(p.Path); err == nil {
+				// 检查是否是目录
+				available = fileInfo.IsDir()
+			}
+
+			backends = append(backends, gin.H{
+				"path":        p.Path,
+				"name":        p.Name,
+				"description": p.Description,
+				"available":   available,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"backends": backends,
+		"count":    len(backends),
+	})
+}
+
+// handleEstimateVRAM 估算模型显存需求
+func (s *Server) handleEstimateVRAM(c *gin.Context) {
+	var req struct {
+		ModelID         string   `json:"modelId"`
+		LlamaBinPath    string   `json:"llamaBinPath"`
+		CtxSize         int      `json:"ctxSize"`
+		BatchSize       int      `json:"batchSize"`
+		UBatchSize      int      `json:"uBatchSize"`
+		Parallel        int      `json:"parallel"`
+		FlashAttention  bool     `json:"flashAttention"`
+		KVUnified       bool     `json:"kvUnified"`
+		CacheTypeK      string   `json:"cacheTypeK"`
+		CacheTypeV      string   `json:"cacheTypeV"`
+		ExtraParams     string   `json:"extraParams"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求: " + err.Error()})
+		return
+	}
+
+	// 验证必需参数
+	if req.ModelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 modelId 参数"})
+		return
+	}
+	if req.LlamaBinPath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 llamaBinPath 参数"})
+		return
+	}
+
+	// 从模型管理器获取模型信息
+	model, exists := s.modelMgr.GetModel(req.ModelID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "模型不存在: " + req.ModelID})
+		return
+	}
+
+	// 构建模型文件路径
+	var modelPath string
+	if model.ShardCount > 0 && len(model.ShardFiles) > 0 {
+		// 分卷模型，使用主模型文件
+		modelPath = model.ShardFiles[0]
+	} else {
+		modelPath = model.Path
+	}
+
+	// 构建 llama-fit-params 命令
+	args := []string{
+		"--model", modelPath,
+	}
+
+	// 添加支持的参数
+	if req.CtxSize > 0 {
+		args = append(args, "--ctx-size", fmt.Sprintf("%d", req.CtxSize))
+	}
+	if req.BatchSize > 0 {
+		args = append(args, "--batch-size", fmt.Sprintf("%d", req.BatchSize))
+	}
+	if req.UBatchSize > 0 {
+		args = append(args, "--ubatch-size", fmt.Sprintf("%d", req.UBatchSize))
+	}
+	if req.Parallel > 0 {
+		args = append(args, "--parallel", fmt.Sprintf("%d", req.Parallel))
+	}
+	if req.FlashAttention {
+		args = append(args, "--flash-attn", "1")
+	}
+	if req.KVUnified {
+		args = append(args, "--kv-unified", "1")
+	}
+	if req.CacheTypeK != "" {
+		args = append(args, "--cache-type-k", req.CacheTypeK)
+	}
+	if req.CacheTypeV != "" {
+		args = append(args, "--cache-type-v", req.CacheTypeV)
+	}
+
+	// 构建完整命令
+	cmdPath := filepath.Join(req.LlamaBinPath, "llama-fit-params")
+	cmd := exec.Command(cmdPath, args...)
+
+	// 执行命令（设置30秒超时）
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	if err != nil {
+		// 检查是否有部分输出
+		logger.Error("llama-fit-params 执行失败", "error", err.Error(), "output", outputStr)
+
+		// 尝试从错误输出中提取错误信息
+		errorMsg := "估算失败"
+		if strings.Contains(outputStr, "llama_model_load") || strings.Contains(outputStr, "failed to load model") {
+			errorMsg = "模型加载失败，请检查模型文件是否正确"
+		} else if strings.Contains(outputStr, "llama_params_fit") {
+			errorMsg = "参数拟合失败，请检查参数是否有效"
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"error":   errorMsg,
+			"details": outputStr,
+		})
+		return
+	}
+
+	// 解析输出，提取显存估算值
+	vramMB := 0
+
+	// 匹配格式: "llama_params_fit_impl: projected to use XXX MiB of device memory"
+	vramRe := regexp.MustCompile(`llama_params_fit_impl: projected to use (\d+) MiB`)
+	if matches := vramRe.FindStringSubmatch(outputStr); len(matches) > 1 {
+		vramMB, _ = strconv.Atoi(matches[1])
+	}
+
+	// 构建响应
+	result := gin.H{
+		"success": vramMB > 0,
+	}
+
+	if vramMB > 0 {
+		result["vram"] = fmt.Sprintf("%d", vramMB)
+		result["vramMB"] = vramMB
+		result["vramGB"] = fmt.Sprintf("%.2f", float64(vramMB)/1024)
+	} else {
+		// 如果没有找到显存值，检查是否有错误信息
+		errorRe := regexp.MustCompile(`llama_init_from_model.*`)
+		if errorMatch := errorRe.FindString(outputStr); errorMatch != "" {
+			result["error"] = strings.TrimSpace(errorMatch)
+		} else {
+			result["error"] = "无法解析显存估算结果"
+		}
+		result["details"] = outputStr
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": vramMB > 0,
+		"data":    result,
+	})
+}
+
 // handleGetConfig 返回当前配置（不包含敏感信息）
 func (s *Server) handleGetConfig(c *gin.Context) {
 	if s.config == nil || s.config.ServerCfg == nil {
@@ -663,14 +1020,19 @@ func (s *Server) handleListModels(c *gin.Context) {
 			dto.ShardFiles = m.ShardFiles
 		}
 
+		// 添加 mmproj 路径
+		if m.MmprojPath != "" {
+			dto.MmprojPath = m.MmprojPath
+		}
+
 		// 添加扫描时间（处理零值情况）
 		if !m.ScannedAt.IsZero() {
 			dto.ScannedAt = m.ScannedAt.Format(time.RFC3339)
 		}
 
-		// Convert metadata
+		// Convert metadata - 包含所有 gguf-parser-go 提供的字段
 		if m.Metadata != nil {
-			dto.Metadata = map[string]interface{}{
+			metadata := map[string]interface{}{
 				"name":            m.Metadata.Name,
 				"architecture":    m.Metadata.Architecture,
 				"quantization":    m.Metadata.Quantization,
@@ -678,7 +1040,22 @@ func (s *Server) handleListModels(c *gin.Context) {
 				"embeddingLength": m.Metadata.EmbeddingLength,
 				"layerCount":      m.Metadata.BlockSize,
 				"headCount":       m.Metadata.HeadCount,
+				// 新增的 gguf-parser-go 字段
+				"type":                nonEmptyString(m.Metadata.Type),
+				"author":              nonEmptyString(m.Metadata.Author),
+				"url":                 nonEmptyString(m.Metadata.URL),
+				"description":         nonEmptyString(m.Metadata.Description),
+				"license":             nonEmptyString(m.Metadata.License),
+				"fileType":            m.Metadata.FileType,
+				"fileTypeDescriptor":  nonEmptyString(m.Metadata.FileTypeDescriptor),
+				"quantizationVersion": m.Metadata.QuantizationVersion,
+				"parameters":          m.Metadata.Parameters,
+				"bitsPerWeight":       m.Metadata.BitsPerWeight,
+				"alignment":           m.Metadata.Alignment,
+				"fileSize":            m.Metadata.FileSize,
+				"modelSize":           m.Metadata.ModelSize,
 			}
+			dto.Metadata = metadata
 		}
 
 		// Add status info
@@ -821,6 +1198,85 @@ func (s *Server) handleSetFavourite(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "收藏设置成功"})
 }
 
+// handleGetModelCapabilities 获取模型能力配置
+func (s *Server) handleGetModelCapabilities(c *gin.Context) {
+	modelID := c.Query("modelId")
+	if modelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 modelId 参数"})
+		return
+	}
+
+	s.capabilitiesMu.RLock()
+	caps, exists := s.capabilities[modelID]
+	s.capabilitiesMu.RUnlock()
+
+	if !exists {
+		// 如果没有配置过，返回默认值（全部为 false）
+		c.JSON(http.StatusOK, gin.H{
+			"modelId":      modelID,
+			"capabilities": &ModelCapabilities{},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"modelId":      modelID,
+		"capabilities": caps,
+		"success":      true,
+	})
+}
+
+// handleSetModelCapabilities 设置模型能力配置
+func (s *Server) handleSetModelCapabilities(c *gin.Context) {
+	var req struct {
+		ModelID string             `json:"modelId"`
+		Capabilities *ModelCapabilities `json:"capabilities"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求: " + err.Error()})
+		return
+	}
+
+	if req.ModelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 modelId"})
+		return
+	}
+
+	if req.Capabilities == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 capabilities"})
+		return
+	}
+
+	// 应用约束规则：rerank 和 embedding 互斥
+	if req.Capabilities.Rerank && req.Capabilities.Embedding {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "rerank 和 embedding 不能同时启用"})
+		return
+	}
+
+	// 如果启用了 rerank 或 embedding，则禁用 thinking 和 tools
+	if req.Capabilities.Rerank || req.Capabilities.Embedding {
+		req.Capabilities.Thinking = false
+		req.Capabilities.Tools = false
+	}
+
+	// 保存到内存存储
+	s.capabilitiesMu.Lock()
+	s.capabilities[req.ModelID] = req.Capabilities
+	s.capabilitiesMu.Unlock()
+
+	logger.Info("模型能力已更新", "modelId", req.ModelID,
+		"thinking", req.Capabilities.Thinking,
+		"tools", req.Capabilities.Tools,
+		"rerank", req.Capabilities.Rerank,
+		"embedding", req.Capabilities.Embedding)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "模型能力已保存",
+	})
+}
+
 func (s *Server) handleScanModels(c *gin.Context) {
 	result, err := s.modelMgr.Scan(c.Request.Context())
 	if err != nil {
@@ -862,10 +1318,10 @@ func (s *Server) handleCreateDownload(c *gin.Context) {
 	// 2. 旧格式: { url, target_path } - 直接URL下载(向后兼容)
 
 	var req struct {
-		Source    modelrepoclient.Source `json:"source"`
-		RepoID    string               `json:"repoId"`
-		FileName  string               `json:"fileName"`
-		Path      string               `json:"path"`
+		Source   modelrepoclient.Source `json:"source"`
+		RepoID   string                 `json:"repoId"`
+		FileName string                 `json:"fileName"`
+		Path     string                 `json:"path"`
 
 		// 旧格式参数(向后兼容)
 		URL        string `json:"url"`
@@ -1028,6 +1484,134 @@ func (s *Server) handleListModelFiles(c *gin.Context) {
 	})
 }
 
+// handleSearchModels handles requests to search for models on HuggingFace
+func (s *Server) handleSearchModels(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "缺少必要参数: 需要 q 查询参数",
+		})
+		return
+	}
+
+	// Parse limit parameter (default 20)
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
+			limit = parsedLimit
+		}
+	}
+
+	result, err := s.repoClient.SearchHuggingFaceModels(query, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "搜索模型失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    result,
+	})
+}
+
+// handleGetModelRepoConfig returns the current model repository configuration
+func (s *Server) handleGetModelRepoConfig(c *gin.Context) {
+	cfg := s.config.ConfigMgr.Get()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"endpoint": cfg.ModelRepo.Endpoint,
+			"token":    maskToken(cfg.ModelRepo.Token),
+			"timeout":  cfg.ModelRepo.Timeout,
+		},
+	})
+}
+
+// maskToken masks the token for security
+func maskToken(token string) string {
+	if token == "" {
+		return ""
+	}
+	if len(token) <= 8 {
+		return "***"
+	}
+	return token[:4] + "****" + token[len(token)-4:]
+}
+
+// handleUpdateModelRepoConfig updates the model repository configuration
+func (s *Server) handleUpdateModelRepoConfig(c *gin.Context) {
+	var req struct {
+		Endpoint string `json:"endpoint"`
+		Token    string `json:"token"`
+		Timeout  int    `json:"timeout"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "无效的请求数据",
+		})
+		return
+	}
+
+	cfg := s.config.ConfigMgr.Get()
+
+	// Update endpoint if provided
+	if req.Endpoint != "" {
+		cfg.ModelRepo.Endpoint = req.Endpoint
+	}
+
+	// Update token if provided (allow empty string to clear token)
+	if req.Token != "" {
+		cfg.ModelRepo.Token = req.Token
+	}
+
+	// Update timeout if provided
+	if req.Timeout > 0 {
+		cfg.ModelRepo.Timeout = req.Timeout
+	}
+
+	// Save config
+	if err := s.config.ConfigMgr.Save(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "保存配置失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Update the repo client with new settings
+	timeout := time.Duration(cfg.ModelRepo.Timeout) * time.Second
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	s.repoClient = modelrepoclient.NewClientWithConfig(cfg.ModelRepo.Endpoint, cfg.ModelRepo.Token, timeout)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"endpoint": cfg.ModelRepo.Endpoint,
+			"token":    maskToken(cfg.ModelRepo.Token),
+			"timeout":  cfg.ModelRepo.Timeout,
+		},
+	})
+}
+
+// handleGetAvailableEndpoints returns available HuggingFace endpoints
+func (s *Server) handleGetAvailableEndpoints(c *gin.Context) {
+	endpoints := modelrepoclient.GetAvailableEndpoints()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    endpoints,
+	})
+}
+
 func (s *Server) handleListProcesses(c *gin.Context) {
 	processMgr := s.modelMgr.GetProcessManager()
 	if processMgr == nil {
@@ -1039,13 +1623,13 @@ func (s *Server) handleListProcesses(c *gin.Context) {
 
 	// 转换为切片格式
 	type ProcessInfo struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		PID      int    `json:"pid"`
-		Port     int    `json:"port"`
-		CtxSize  int    `json:"ctx_size"`
-		Running  bool   `json:"running"`
-		Loading  bool   `json:"loading"`
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		PID     int    `json:"pid"`
+		Port    int    `json:"port"`
+		CtxSize int    `json:"ctx_size"`
+		Running bool   `json:"running"`
+		Loading bool   `json:"loading"`
 	}
 
 	var processes []ProcessInfo
@@ -1173,8 +1757,18 @@ func (s *Server) handleLogStream(c *gin.Context) {
 	// Send existing entries if requested
 	if fromBeginning {
 		entries := logStream.GetEntries(limit)
-		for _, entry := range entries {
-			s.sendSSE(c, &entry)
+		if len(entries) > 0 {
+			// Batch send historical logs to reduce network I/O
+			var buf strings.Builder
+			for _, entry := range entries {
+				data := fmt.Sprintf("data: {\"timestamp\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n\n",
+					entry.Timestamp.Format(time.RFC3339),
+					entry.Level,
+					entry.Message)
+				buf.WriteString(data)
+			}
+			c.Writer.WriteString(buf.String())
+			c.Writer.Flush()
 		}
 	}
 

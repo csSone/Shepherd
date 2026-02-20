@@ -33,67 +33,16 @@ func NewGGUFReader(path string) (*GGUFReader, error) {
 
 // ReadMetadata reads and parses the metadata from a GGUF file
 // This is the main entry point for GGUF metadata extraction
+// Uses gguf-parser-go library for reliable parsing
 func ReadMetadata(path string) (*Metadata, error) {
-	r, err := NewGGUFReader(path)
+	// 使用新的 Parser（基于 gguf-parser-go）
+	parser, err := NewParser(path)
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	defer parser.Close()
 
-	// Try to memory map the file for efficient reading
-	if err := r.memoryMap(); err != nil {
-		// Fall back to standard reading if memory mapping fails
-		r.reader = NewReader(r.file)
-	}
-
-	// Read header
-	header, err := r.reader.ReadHeader()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read GGUF header: %w", err)
-	}
-
-	// Parse metadata key-value pairs
-	meta := &Metadata{
-		Extra: make(map[string]interface{}),
-	}
-
-	for i := uint64(0); i < header.MetadataKVCount; i++ {
-		key, err := r.reader.ReadString()
-		if err != nil {
-			// 如果读取键失败，尝试跳过这个字段
-			fmt.Printf("[WARN] Failed to read metadata key at index %d: %v, attempting to continue\n", i, err)
-			// 无法安全恢复，停止解析
-			break
-		}
-
-		valueType, err := r.reader.ReadType()
-		if err != nil {
-			fmt.Printf("[WARN] Failed to read value type for key '%s': %v, attempting to continue\n", key, err)
-			// 尝试跳过剩余的键值对
-			// 由于我们不知道有多少数据，只能尝试恢复
-			continue
-		}
-
-		value, err := r.reader.readValueOrSkip(key, valueType)
-		if err != nil {
-			// 如果读取值失败，记录警告并尝试跳过这个字段
-			fmt.Printf("[WARN] Failed to read value for key '%s' (type %v): %v, attempting to continue\n", key, valueType, err)
-			// 尝试跳过并继续解析下一个字段
-			// 注意：这可能导致后续字段也解析失败
-			continue
-		}
-
-		// Store the metadata
-		if err := meta.setField(key, value, valueType); err != nil {
-			// Log warning but continue parsing
-			fmt.Printf("[WARN] Failed to set field '%s': %v\n", key, err)
-		}
-	}
-
-	// Post-processing: derive computed fields
-	meta.Quantization = meta.GetQuantizationString()
-
-	return meta, nil
+	return parser.GetMetadata()
 }
 
 // memoryMap attempts to memory map the file for efficient reading

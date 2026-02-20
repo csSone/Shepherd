@@ -11,7 +11,12 @@
     "close": "关闭",
     "refresh": "刷新",
     "settings": "设置",
-    "back": "返回"
+    "back": "返回",
+    "saved": "已保存",
+    "active": "已启用",
+    "unsavedChanges": "有未保存的更改",
+    "allChangesSaved": "所有更改已保存",
+    "editProfile": "编辑资料"
   },
   "sidebar": {
     "dashboard": "仪表盘",
@@ -72,16 +77,54 @@
     "send": "发送",
     "clearHistory": "清空历史"
   },
+  "footer": {
+    "version": "版本",
+    "copyright": "© 2026 Shepherd Project"
+  },
+  "user": {
+    "guest": "访客",
+    "profile": "个人资料",
+    "settings": "个人设置",
+    "admin": "管理员",
+    "user": "普通用户",
+    "username": "用户名",
+    "displayName": "显示名称",
+    "displayNamePlaceholder": "输入您的显示名称",
+    "email": "邮箱",
+    "emailPlaceholder": "请输入邮箱地址",
+    "role": "角色",
+    "joinedAt": "加入时间",
+    "logout": "退出登录",
+    "theme": "主题",
+    "notificationsOn": "通知已开启",
+    "notificationsOff": "通知已关闭",
+    "settingsDescription": "自定义您的个人偏好设置"
+  },
   "settings": {
     "title": "设置",
     "general": "通用设置",
     "api": "API 配置",
     "paths": "路径配置",
     "llamacppPaths": "llama.cpp 路径",
-    "modelPaths": "模型路径"
-  },
-  "footer": {
-    "version": "版本",
-    "copyright": "© 2026 Shepherd Project"
+    "modelPaths": "模型路径",
+    "appearance": "外观",
+    "notifications": "通知",
+    "theme": "主题",
+    "themeDescription": "选择您喜欢的界面主题",
+    "themeLightDesc": "明亮的浅色主题",
+    "themeDarkDesc": "护眼的深色主题",
+    "themeSystemDesc": "跟随系统设置",
+    "language": "语言",
+    "languageDescription": "选择界面显示语言",
+    "notificationsDescription": "管理您的通知偏好",
+    "pushNotifications": "推送通知",
+    "pushNotificationsDesc": "接收实时推送通知",
+    "desktopNotifications": "桌面通知",
+    "desktopNotificationsDesc": "在桌面显示通知弹窗",
+    "emailNotifications": "邮件通知",
+    "emailNotificationsDesc": "通过邮件接收重要通知（即将推出）",
+    "autoSave": "自动保存",
+    "autoSaveDescription": "自动保存对话和设置更改",
+    "data": "数据管理"
   }
 }

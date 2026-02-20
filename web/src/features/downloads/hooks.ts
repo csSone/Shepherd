@@ -226,8 +226,87 @@ export function useModelFiles(source: 'huggingface' | 'modelscope', repoId: stri
       }
       return response.data;
     },
-    enabled: !!source && !!repoId && repoId.length > 3, // 至少 3 个字符才请求
-    staleTime: 5 * 60 * 1000, // 5 分钟缓存
-    gcTime: 10 * 60 * 1000, // 10 分钟后清理缓存
+    enabled: !!source && !!repoId && repoId.length > 3,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+/**
+ * 搜索 HuggingFace 模型 Hook
+ */
+export function useHuggingFaceSearch(query: string, limit?: number) {
+  return useQuery({
+    queryKey: ['huggingface-search', query, limit],
+    queryFn: async ({ signal }) => {
+      const response = await downloadsApi.searchHuggingFace(query, limit, signal);
+      if (!response.success) {
+        throw new Error(response.error || '搜索模型失败');
+      }
+      return response.data;
+    },
+    enabled: !!query && query.length >= 2,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+interface ModelRepoConfig {
+  endpoint: string;
+  token: string;
+  timeout: number;
+}
+
+/**
+ * 获取模型仓库配置 Hook
+ */
+export function useModelRepoConfig() {
+  return useQuery({
+    queryKey: ['model-repo-config'],
+    queryFn: async () => {
+      const response = await downloadsApi.getModelRepoConfig();
+      if (!response.success) {
+        throw new Error(response.error || '获取配置失败');
+      }
+      return response.data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * 获取可用端点列表 Hook
+ */
+export function useAvailableEndpoints() {
+  return useQuery({
+    queryKey: ['model-repo-endpoints'],
+    queryFn: async () => {
+      const response = await downloadsApi.getAvailableEndpoints();
+      if (!response.success) {
+        throw new Error(response.error || '获取端点列表失败');
+      }
+      return response.data;
+    },
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+/**
+ * 更新模型仓库配置 Hook
+ */
+export function useUpdateModelRepoConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (config: Partial<ModelRepoConfig>) => {
+      const response = await downloadsApi.updateModelRepoConfig(config);
+      if (!response.success) {
+        throw new Error(response.error || '更新配置失败');
+      }
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['model-repo-config'] });
+    },
   });
 }
