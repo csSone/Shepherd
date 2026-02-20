@@ -459,36 +459,125 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 }
 
 func (s *Server) handleListModels(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"models": []interface{}{}})
+	models := s.modelMgr.ListModels()
+	c.JSON(http.StatusOK, gin.H{"models": models, "total": len(models)})
 }
 
 func (s *Server) handleGetModel(c *gin.Context) {
 	id := c.Param("id")
-	c.JSON(http.StatusOK, gin.H{"id": id})
+	model, exists := s.modelMgr.GetModel(id)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "模型不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"model": model})
 }
 
 func (s *Server) handleLoadModel(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+
+	var req model.LoadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 使用默认值
+		req = model.LoadRequest{
+			ModelID: id,
+			CtxSize: 4096,
+		}
+	} else {
+		req.ModelID = id
+	}
+
+	result, err := s.modelMgr.Load(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !result.Success {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "模型加载成功",
+		"model_id": result.ModelID,
+		"port":     result.Port,
+		"ctx_size": result.CtxSize,
+	})
 }
 
 func (s *Server) handleUnloadModel(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if err := s.modelMgr.Unload(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "模型卸载成功"})
 }
 
 func (s *Server) handleSetAlias(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+
+	var req struct {
+		Alias string `json:"alias"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求"})
+		return
+	}
+
+	if err := s.modelMgr.SetAlias(id, req.Alias); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "别名设置成功"})
 }
 
 func (s *Server) handleSetFavourite(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+
+	var req struct {
+		Favourite bool `json:"favourite"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求"})
+		return
+	}
+
+	if err := s.modelMgr.SetFavourite(id, req.Favourite); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "收藏设置成功"})
 }
 
 func (s *Server) handleScanModels(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	result, err := s.modelMgr.Scan(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "扫描完成",
+		"models_found": len(result.Models),
+		"errors":       len(result.Errors),
+		"duration_ms":  result.Duration.Milliseconds(),
+		"models":       result.Models,
+		"scan_errors":  result.Errors,
+	})
 }
 
 func (s *Server) handleGetScanStatus(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	status := s.modelMgr.GetScanStatus()
+	c.JSON(http.StatusOK, gin.H{
+		"scanning":     status.Scanning,
+		"progress":     status.Progress,
+		"current_path": status.CurrentPath,
+		"started_at":   status.StartedAt,
+		"errors":       status.Errors,
+	})
 }
 
 func (s *Server) handleListDownloads(c *gin.Context) {
