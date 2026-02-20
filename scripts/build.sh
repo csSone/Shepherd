@@ -96,7 +96,7 @@ fi
 go build \
     -ldflags "${LDFLAGS}" \
     -o "${BUILD_DIR}/${BINARY_NAME}" \
-    "${CMD_DIR}/main.go"
+    ./${CMD_DIR}
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ 编译成功!${NC}"
