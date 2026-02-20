@@ -76,3 +76,6 @@ data/
 *.db-wal
 
 AGENTS.md
+
+# Local configuration files (uncomment if you want to ignore them)
+internal/model/config

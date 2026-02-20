@@ -1,5 +1,3 @@
-<div align="center">
-
 # 🐏 Shepherd
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev)
@@ -9,8 +7,6 @@
 **高性能轻量级分布式 llama.cpp ·管理系统**
 
 [功能特性](#-功能特性) • [快速开始](#-快速开始) • [文档](#-文档) • [贡献](#-贡献)
-
-</div>
 
 ---
 
@@ -93,8 +89,9 @@ Shepherd 现在支持统一的 **Node 架构**，每个节点可以灵活地扮�
 - **实时进度** - 下载速度、ETA、分块进度显示
 - **动态刷新** - 优化轮询策略，仅活跃任务时刷新
 
-### 🎨 Web 前端
-- **React + TypeScript** - 现代化前端技术栈
+- ### 🎨 Web 前端
+- - **React + TypeScript** - 现代化前端技术栈
+- - **前端版本**: React 19.2.0、Vite 7.x、TypeScript 5.x、Tailwind CSS 4.x
 - **独立配置** - 前端拥有独立配置文件，可连接任意后端
 - **多后端支持** - 支持配置多个后端地址，运行时切换
 - **实时 UI 更新** - SSE 实时事件推送
@@ -106,8 +103,7 @@ Shepherd 现在支持统一的 **Node 架构**，每个节点可以灵活地扮�
 
 ### 安装
 
-<details>
-<summary><b>从源码编译</b></summary>
+### 从源码编译
 
 ```bash
 # 克隆仓库
@@ -131,10 +127,7 @@ make build
 
 **更多脚本信息请查看：** [scripts/README.md](scripts/README.md)
 
-</details>
-
-<details>
-<summary><b>使用 Makefile</b></summary>
+### 使用 Makefile
 
 ```bash
 make build        # 编译当前平台
@@ -143,14 +136,9 @@ make release      # 打包发布版本
 make install      # 安装到系统
 ```
 
-</details>
-
-<details>
-<summary><b>下载预编译版本</b></summary>
+### 下载预编译版本
 
 前往 [Releases](https://github.com/shepherd-project/shepherd/releases) 下载对应平台的二进制文件。
-
-</details>
 
 ### 配置
 
@@ -875,6 +863,11 @@ make clean
 - [ ] v1.0.0 - 生产就绪
 
 ---
+
+## 版本对照表
+- 前端: React 19.2.0, Vite 7.x, TypeScript 5.x, Tailwind CSS 4.x
+- 后端: Go 1.25.7
+- Node.js: 18+
 
 ## 📄 许可证
 

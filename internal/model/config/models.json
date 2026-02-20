@@ -1,11 +1,29 @@
 [
   {
-    "modelId": "test-model-0f8d9783956d62ce",
+    "modelId": "gpt-oss-120b-Derestricted.MXFP4_MOE-831881cd6cbb7c2e",
+    "path": "/home/user/.cache/huggingface/hub/Oss-120b/gpt-oss-120b-Derestricted.MXFP4_MOE.gguf",
+    "size": 63387347008,
+    "favourite": false,
+    "primaryModel": {
+      "fileName": "gpt-oss-120b-Derestricted.MXFP4_MOE.gguf"
+    }
+  },
+  {
+    "modelId": "test-model-4d8b24da19231e48",
     "alias": "Test Model",
     "favourite": false
   },
   {
-    "modelId": "test-model-b4e6f2559f4082b3",
+    "modelId": "test-model-17a0549615461eb7",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-f49c1aaee78816bf",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-c0e80d6f5c8b0769",
     "favourite": true
   }
 ]

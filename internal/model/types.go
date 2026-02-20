@@ -32,6 +32,11 @@ type Model struct {
 	MmprojPath string
 	MmprojMeta *gguf.Metadata
 
+	// 分卷文件信息（Split GGUF files）
+	ShardCount int      // 分卷数量，0 表示非分卷模型
+	ShardFiles []string // 所有分卷文件路径（仅主模型使用）
+	TotalSize  int64    // 包含所有分卷的总大小（仅主模型使用）
+
 	// Scanning info
 	ScannedAt  time.Time
 	SourcePath string // Original scan path
@@ -126,12 +131,15 @@ type LoadRequest struct {
 
 // LoadResult represents the result of a load operation
 type LoadResult struct {
-	Success  bool
-	ModelID  string
-	Port     int
-	CtxSize  int
-	Error    error
-	Duration time.Duration
+	Success       bool
+	ModelID       string
+	Port          int
+	CtxSize       int
+	Error         error
+	Duration      time.Duration
+	Async         bool   // 异步加载标志
+	Loading       bool   // 正在加载中（仅当 Async=true 时有效）
+	AlreadyLoaded bool   // 模型已加载（仅当 Async=true 时有效）
 }
 
 // ModelFilter represents filter criteria for model search

@@ -1,0 +1,87 @@
+{
+  "common": {
+    "search": "Search...",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "refresh": "Refresh",
+    "settings": "Settings",
+    "back": "Back"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "models": "Models",
+    "downloads": "Downloads",
+    "cluster": "Cluster",
+    "chat": "Chat",
+    "logs": "Logs",
+    "settings": "Settings",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "header": {
+    "notifications": "Notifications",
+    "user": "User"
+  },
+  "theme": {
+    "light": "Light Mode",
+    "dark": "Dark Mode",
+    "system": "System"
+  },
+  "language": {
+    "title": "Language",
+    "chinese": "简体中文",
+    "english": "English"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to Shepherd",
+    "overview": "System Overview"
+  },
+  "models": {
+    "title": "Model Management",
+    "loaded": "Loaded Models",
+    "available": "Available Models",
+    "load": "Load",
+    "unload": "Unload",
+    "loadModel": "Load Model",
+    "unloadConfirm": "Are you sure you want to unload this model?"
+  },
+  "downloads": {
+    "title": "Download Management",
+    "active": "Active",
+    "completed": "Completed",
+    "failed": "Failed",
+    "createDownload": "Create Download"
+  },
+  "cluster": {
+    "title": "Cluster Management",
+    "nodes": "Nodes",
+    "status": "Status",
+    "online": "Online",
+    "offline": "Offline"
+  },
+  "chat": {
+    "title": "Chat",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "clearHistory": "Clear History"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General Settings",
+    "api": "API Configuration",
+    "paths": "Path Configuration",
+    "llamacppPaths": "llama.cpp Paths",
+    "modelPaths": "Model Paths"
+  },
+  "footer": {
+    "version": "Version",
+    "copyright": "© 2026 Shepherd Project"
+  }
+}

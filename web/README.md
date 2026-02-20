@@ -5,7 +5,7 @@
 ## 技术栈
 
 - **构建工具**: Vite
-- **框架**: React 18
+- **框架**: React 19.2.0
 - **语言**: TypeScript 5
 - **路由**: React Router v6
 - **状态管理**: Zustand + React Query
@@ -22,7 +22,7 @@
 cd web
 npm install
 npm run dev
-```
+```bash
 
 ## 配置
 
@@ -39,7 +39,7 @@ npm run dev
 
 # 方式 3: 自动热重载（开发时推荐）
 ./scripts/watch-sync-config.sh
-```
+```bash
 
 ### 端口配置
 
@@ -55,7 +55,7 @@ backend:
     - "http://10.0.0.193:9190"  # 局域网地址
     - "http://localhost:9190"   # 本地地址
   currentIndex: 0                # 当前使用的后端索引
-```
+```bash
 
 ## 开发命令
 
@@ -77,7 +77,7 @@ npm run type-check
 
 # 代码检查
 npm run lint
-```
+```bash
 
 ## 项目结构
 

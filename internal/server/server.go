@@ -22,6 +22,7 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	modelrepoclient "github.com/shepherd-project/shepherd/Shepherd/internal/modelrepo"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/port"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
 )
@@ -35,10 +36,14 @@ type ModelDTO struct {
 	Path        string                 `json:"path"`
 	PathPrefix  string                 `json:"pathPrefix"`
 	Size        int64                  `json:"size"`
+	TotalSize   int64                  `json:"totalSize,omitempty"`   // 包含所有分卷的总大小
+	ShardCount  int                    `json:"shardCount,omitempty"`  // 分卷数量
+	ShardFiles  []string               `json:"shardFiles,omitempty"` // 所有分卷文件路径
 	Favourite   bool                   `json:"favourite"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Status      string                 `json:"status"`
 	IsLoaded    bool                   `json:"isLoaded"`
+	ScannedAt   string                 `json:"scannedAt,omitempty"`  // 扫描时间（ISO 8601 格式）
 }
 
 // Server represents the HTTP server
@@ -53,6 +58,10 @@ type Server struct {
 	downloadMgr  *DownloadManager // 下载管理器
 	nodeAdapter  *api.NodeAdapter // Node API 适配器
 	repoClient   *modelrepoclient.Client // 模型仓库客户端
+
+	// 新增字段：WebSocket Hub 和端口管理器
+	wsHub        *WebSocketHub
+	portAllocator *port.PortAllocator
 
 	mu     sync.RWMutex
 	ctx    context.Context
@@ -113,6 +122,12 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 	// Create WebSocket manager
 	s.wsMgr = websocket.NewManager(modelMgr)
 
+	// Create WebSocket Hub (新增)
+	s.wsHub = NewWebSocketHub()
+
+	// Create port allocator (新增)
+	s.portAllocator = port.NewPortAllocator(8081, 9000)
+
 	// Create model repository client
 
 	// Create compatibility server manager
@@ -155,6 +170,9 @@ func (s *Server) setupMiddleware() {
 func (s *Server) setupRoutes() {
 	// WebSocket endpoint (for SSE)
 	s.engine.GET("/api/events", s.handleEvents)
+
+	// WebSocket endpoint (新增)
+	s.engine.GET("/ws", s.handleWebSocket)
 
 	// API routes
 	api := s.engine.Group("/api")
@@ -310,6 +328,9 @@ func (s *Server) Start() error {
 
 	// Start WebSocket manager
 	s.wsMgr.Start()
+
+	// Start WebSocket Hub (新增)
+	go s.wsHub.Run()
 
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.WebPort)
@@ -612,8 +633,16 @@ func (s *Server) handleListModels(c *gin.Context) {
 	models := s.modelMgr.ListModels()
 	statuses := s.modelMgr.ListStatus()
 
+	fmt.Printf("[DEBUG] handleListModels: 总共 %d 个模型\n", len(models))
+
 	var dtos []ModelDTO
 	for _, m := range models {
+		// 调试日志：检查分卷信息
+		if m.ShardCount > 0 {
+			fmt.Printf("[DEBUG] 分卷模型: %s, ShardCount=%d, TotalSize=%d, Files=%d\n",
+				m.Name, m.ShardCount, m.TotalSize, len(m.ShardFiles))
+		}
+
 		dto := ModelDTO{
 			ID:          m.ID,
 			Name:        m.Name,
@@ -625,6 +654,18 @@ func (s *Server) handleListModels(c *gin.Context) {
 			Favourite:   m.Favourite,
 			Status:      "stopped",
 			IsLoaded:    false,
+		}
+
+		// 添加分卷信息
+		if m.ShardCount > 0 {
+			dto.ShardCount = m.ShardCount
+			dto.TotalSize = m.TotalSize
+			dto.ShardFiles = m.ShardFiles
+		}
+
+		// 添加扫描时间（处理零值情况）
+		if !m.ScannedAt.IsZero() {
+			dto.ScannedAt = m.ScannedAt.Format(time.RFC3339)
 		}
 
 		// Convert metadata
@@ -665,6 +706,9 @@ func (s *Server) handleGetModel(c *gin.Context) {
 func (s *Server) handleLoadModel(c *gin.Context) {
 	id := c.Param("id")
 
+	// 检查是否异步加载（查询参数 async=true）
+	asyncMode := c.DefaultQuery("async", "true") == "true"
+
 	var req model.LoadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// 使用默认值
@@ -676,10 +720,45 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 		req.ModelID = id
 	}
 
-	result, err := s.modelMgr.Load(&req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	var result *model.LoadResult
+	var err error
+
+	if asyncMode {
+		// 异步加载
+		result, err = s.modelMgr.LoadAsync(&req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 立即返回异步响应
+		if result.Loading {
+			c.JSON(http.StatusOK, gin.H{
+				"message":  "模型正在加载中",
+				"model_id": result.ModelID,
+				"async":    true,
+				"status":   "loading",
+			})
+			return
+		}
+
+		if result.AlreadyLoaded {
+			// 模型已加载
+			c.JSON(http.StatusOK, gin.H{
+				"message":  "模型已加载",
+				"model_id": result.ModelID,
+				"port":     result.Port,
+				"status":   "loaded",
+			})
+			return
+		}
+	} else {
+		// 同步加载（旧模式，保持兼容性）
+		result, err = s.modelMgr.Load(&req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	if !result.Success {

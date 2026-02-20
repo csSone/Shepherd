@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useUIStore } from '@/stores/uiStore';
 import { useConfig } from '@/lib/config';
 import { cn } from '@/lib/utils';
@@ -14,28 +15,22 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-/**
- * 完整的导航项配置
- */
 const allNavItems = [
-  { path: '/', icon: LayoutDashboard, label: '仪表盘', feature: 'dashboard' },
-  { path: '/models', icon: Package, label: '模型管理', feature: 'models' },
-  { path: '/downloads', icon: Download, label: '下载管理', feature: 'downloads' },
-  { path: '/cluster', icon: Network, label: '集群管理', feature: 'cluster' },
-  {path: '/chat', icon: MessageSquare, label: '聊天', feature: 'chat' },
-  { path: '/logs', icon: ScrollText, label: '日志', feature: 'logs' },
-  { path: '/settings', icon: Settings, label: '设置', feature: 'settings' },
+  { path: '/', icon: LayoutDashboard, labelKey: 'sidebar.dashboard', feature: 'dashboard' },
+  { path: '/models', icon: Package, labelKey: 'sidebar.models', feature: 'models' },
+  { path: '/downloads', icon: Download, labelKey: 'sidebar.downloads', feature: 'downloads' },
+  { path: '/cluster', icon: Network, labelKey: 'sidebar.cluster', feature: 'cluster' },
+  {path: '/chat', icon: MessageSquare, labelKey: 'sidebar.chat', feature: 'chat' },
+  { path: '/logs', icon: ScrollText, labelKey: 'sidebar.logs', feature: 'logs' },
+  { path: '/settings', icon: Settings, labelKey: 'sidebar.settings', feature: 'settings' },
 ];
 
-/**
- * 侧边栏组件
- */
 export function Sidebar() {
   const location = useLocation();
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const config = useConfig();
+  const { t } = useTranslation();
 
-  // 根据配置过滤导航项
   const navItems = allNavItems.filter(
     (item) => config.features[item.feature as keyof typeof config.features] !== false
   );
@@ -47,7 +42,6 @@ export function Sidebar() {
         sidebarOpen ? 'w-64' : 'w-16'
       )}
     >
-      {/* Logo 区域 */}
       <div className="flex h-16 items-center justify-between border-b px-4">
         {sidebarOpen && (
           <Link to="/" className="flex items-center gap-2 font-semibold">
@@ -60,13 +54,12 @@ export function Sidebar() {
         <button
           onClick={toggleSidebar}
           className="ml-auto rounded-lg p-2 hover:bg-accent"
-          aria-label={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+          aria-label={sidebarOpen ? t('sidebar.collapse') : t('sidebar.expand')}
         >
           {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </button>
       </div>
 
-      {/* 导航菜单 */}
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-2">
           {navItems.map((item) => {
@@ -84,13 +77,12 @@ export function Sidebar() {
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
-                  {/* 选中状态指示条 - 左侧边框 */}
                   {isActive && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 rounded-r-full bg-current opacity-80" />
                   )}
 
                   <Icon size={20} className={cn(isActive && 'drop-shadow-sm')} />
-                  {sidebarOpen && <span className="drop-shadow-sm">{item.label}</span>}
+                  {sidebarOpen && <span className="drop-shadow-sm">{t(item.labelKey as any)}</span>}
                 </Link>
               </li>
             );
@@ -98,12 +90,11 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* 底部信息 */}
       <div className="border-t p-4">
         {sidebarOpen && (
           <div className="text-xs text-muted-foreground">
             <div>Shepherd v0.1.2</div>
-            <div className="mt-1">© 2026 Shepherd Project</div>
+            <div className="mt-1">{t('footer.copyright')}</div>
           </div>
         )}
       </div>

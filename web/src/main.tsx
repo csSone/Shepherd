@@ -2,8 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-
-// 加载前端配置
+import './lib/i18n'
 import { configLoader } from './lib/configLoader'
 import { updateApiClientUrl } from './lib/api/client'
 

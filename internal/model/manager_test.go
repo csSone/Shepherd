@@ -442,3 +442,325 @@ func BenchmarkListModels(b *testing.B) {
 		manager.ListModels()
 	}
 }
+
+// TestLoadAsync tests asynchronous model loading
+func TestLoadAsync(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	// 创建测试模型
+	tmpDir := t.TempDir()
+	modelPath := filepath.Join(tmpDir, "test-model.gguf")
+	err := createMinimalGGUF(modelPath)
+	require.NoError(t, err)
+
+	// 加载模型
+	model, err := manager.loadModel(modelPath)
+	require.NoError(t, err)
+
+	manager.mu.Lock()
+	manager.models[model.ID] = model
+	manager.mu.Unlock()
+
+	// 测试异步加载
+	t.Run("异步加载返回立即响应", func(t *testing.T) {
+		req := &LoadRequest{
+			ModelID: model.ID,
+			CtxSize: 4096,
+		}
+
+		result, err := manager.LoadAsync(req)
+
+		// 应该立即返回而不阻塞
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.Async)
+		assert.True(t, result.Loading)
+	})
+
+	// 等待异步加载完成或失败
+	time.Sleep(2 * time.Second)
+
+	// 检查状态
+	status, exists := manager.GetStatus(model.ID)
+	if exists {
+		// 状态应该被设置（可能是 loading, loaded 或 error）
+		assert.NotEqual(t, StateUnloaded, status.State)
+	}
+}
+
+// TestLoadAsyncAlreadyLoaded tests loading an already loaded model
+func TestLoadAsyncAlreadyLoaded(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	// 创建测试模型
+	tmpDir := t.TempDir()
+	modelPath := filepath.Join(tmpDir, "test-model.gguf")
+	err := createMinimalGGUF(modelPath)
+	require.NoError(t, err)
+
+	model, err := manager.loadModel(modelPath)
+	require.NoError(t, err)
+
+	manager.mu.Lock()
+	manager.models[model.ID] = model
+	manager.mu.Unlock()
+
+	// 手动设置为已加载状态
+	manager.mu.Lock()
+	manager.statuses[model.ID] = &ModelStatus{
+		ID:       model.ID,
+		Name:     model.Name,
+		State:    StateLoaded,
+		Port:     8081,
+		LoadedAt: time.Now(),
+	}
+	manager.mu.Unlock()
+
+	// 尝试再次加载
+	req := &LoadRequest{
+		ModelID: model.ID,
+		CtxSize: 4096,
+	}
+
+	result, err := manager.LoadAsync(req)
+
+	assert.NoError(t, err)
+	assert.True(t, result.Async)
+	assert.True(t, result.AlreadyLoaded)
+	assert.False(t, result.Loading)
+}
+
+// TestLoadAsyncAlreadyLoading tests loading while already loading
+func TestLoadAsyncAlreadyLoading(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	// 创建测试模型
+	tmpDir := t.TempDir()
+	modelPath := filepath.Join(tmpDir, "test-model.gguf")
+	err := createMinimalGGUF(modelPath)
+	require.NoError(t, err)
+
+	model, err := manager.loadModel(modelPath)
+	require.NoError(t, err)
+
+	manager.mu.Lock()
+	manager.models[model.ID] = model
+	manager.mu.Unlock()
+
+	// 手动设置为加载中状态
+	manager.mu.Lock()
+	manager.statuses[model.ID] = &ModelStatus{
+		ID:    model.ID,
+		Name:  model.Name,
+		State: StateLoading,
+	}
+	manager.mu.Unlock()
+
+	// 尝试再次加载
+	req := &LoadRequest{
+		ModelID: model.ID,
+		CtxSize: 4096,
+	}
+
+	result, err := manager.LoadAsync(req)
+
+	assert.NoError(t, err)
+	assert.True(t, result.Async)
+	assert.True(t, result.Loading)
+	assert.False(t, result.AlreadyLoaded)
+}
+
+// TestIsLoading tests the isLoading helper method
+func TestIsLoading(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	modelID := "test-model"
+
+	// 初始状态：未加载
+	assert.False(t, manager.isLoading(modelID))
+
+	// 设置为加载中
+	manager.mu.Lock()
+	manager.statuses[modelID] = &ModelStatus{
+		ID:    modelID,
+		State: StateLoading,
+	}
+	manager.mu.Unlock()
+
+	assert.True(t, manager.isLoading(modelID))
+
+	// 设置为已加载
+	manager.mu.Lock()
+	manager.statuses[modelID].State = StateLoaded
+	manager.mu.Unlock()
+
+	assert.False(t, manager.isLoading(modelID))
+}
+
+// TestLoadAsyncNonExistentModel tests loading a non-existent model
+func TestLoadAsyncNonExistentModel(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	req := &LoadRequest{
+		ModelID: "non-existent-model",
+		CtxSize: 4096,
+	}
+
+	result, err := manager.LoadAsync(req)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "model not found")
+}
+
+// TestLoadResultAsyncFields tests LoadResult async fields
+func TestLoadResultAsyncFields(t *testing.T) {
+	result := &LoadResult{
+		Success:       true,
+		ModelID:       "test-model",
+		Port:          8081,
+		CtxSize:       4096,
+		Async:         true,
+		Loading:       true,
+		AlreadyLoaded: false,
+	}
+
+	assert.True(t, result.Async)
+	assert.True(t, result.Loading)
+	assert.False(t, result.AlreadyLoaded)
+}
+
+// BenchmarkLoadAsync benchmarks asynchronous loading
+func BenchmarkLoadAsync(b *testing.B) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	// 创建测试模型
+	modelPath := "/tmp/bench-model.gguf"
+	_ = createMinimalGGUF(modelPath)
+	defer os.Remove(modelPath)
+
+	model, _ := manager.loadModel(modelPath)
+	manager.mu.Lock()
+	manager.models[model.ID] = model
+	manager.mu.Unlock()
+
+	req := &LoadRequest{
+		ModelID: model.ID,
+		CtxSize: 4096,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		manager.LoadAsync(req)
+		// 清理状态以便下次测试
+		manager.mu.Lock()
+		delete(manager.statuses, model.ID)
+		manager.mu.Unlock()
+	}
+}
+
+// TestModelStatusTransitions tests model status state transitions
+func TestModelStatusTransitions(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	modelID := "test-model"
+
+	// 初始状态：unloaded
+	status, exists := manager.GetStatus(modelID)
+	assert.False(t, exists)
+
+	// 设置为 loading
+	manager.mu.Lock()
+	manager.statuses[modelID] = &ModelStatus{
+		ID:    modelID,
+		State: StateLoading,
+	}
+	manager.mu.Unlock()
+
+	status, exists = manager.GetStatus(modelID)
+	assert.True(t, exists)
+	assert.Equal(t, StateLoading, status.State)
+
+	// 转换到 loaded
+	manager.mu.Lock()
+	manager.statuses[modelID].State = StateLoaded
+	manager.statuses[modelID].Port = 8081
+	manager.statuses[modelID].LoadedAt = time.Now()
+	manager.mu.Unlock()
+
+	status, _ = manager.GetStatus(modelID)
+	assert.Equal(t, StateLoaded, status.State)
+	assert.Equal(t, 8081, status.Port)
+
+	// 转换到 error
+	manager.mu.Lock()
+	manager.statuses[modelID].State = StateError
+	manager.statuses[modelID].Error = fmt.Errorf("test error")
+	manager.mu.Unlock()
+
+	status, _ = manager.GetStatus(modelID)
+	assert.Equal(t, StateError, status.State)
+	assert.NotNil(t, status.Error)
+}
+
+// TestListStatus tests listing all model statuses
+func TestListStatus(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfgMgr := config.NewManager("standalone")
+	procMgr := process.NewManager()
+
+	manager := NewManager(cfg, cfgMgr, procMgr)
+
+	// 添加多个状态
+	modelIDs := []string{"model-1", "model-2", "model-3"}
+
+	states := []LoadState{StateLoaded, StateLoading, StateError}
+
+	for i, modelID := range modelIDs {
+		manager.mu.Lock()
+		manager.statuses[modelID] = &ModelStatus{
+			ID:    modelID,
+			State: states[i],
+		}
+		manager.mu.Unlock()
+	}
+
+	// 列出所有状态
+	allStatuses := manager.ListStatus()
+
+	assert.Len(t, allStatuses, 3)
+
+	for _, modelID := range modelIDs {
+		status, exists := allStatuses[modelID]
+		assert.True(t, exists)
+		assert.NotEmpty(t, status.ID)
+	}
+}

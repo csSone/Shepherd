@@ -1,59 +1,5 @@
 [
   {
-    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-00006-of-00006-f65126a499365826",
-    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00006-of-00006.gguf",
-    "size": 16564496480,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00006-of-00006.gguf"
-    }
-  },
-  {
-    "modelId": "Qwen3-Embedding-0.6B-f16-b0a55519aa5064a0",
-    "path": "/home/user/workspace/LlamacppServer/build/models/Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-Embedding-0.6B-f16/Qwen3-Embedding-0.6B-f16.gguf",
-    "size": 1197629632,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3-Embedding-0.6B-f16.gguf"
-    }
-  },
-  {
-    "modelId": "Qwen3-Embedding-8B-Q8_0-971704e569c974a3",
-    "path": "/home/user/workspace/LlamacppServer/build/models/Qwen/Qwen3-Embedding-8B-GGUF/Qwen3-Embedding-8B-Q8_0/Qwen3-Embedding-8B-Q8_0.gguf",
-    "size": 8047105824,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3-Embedding-8B-Q8_0.gguf"
-    }
-  },
-  {
-    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-00004-of-00006-11ac08aa6187d820",
-    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00004-of-00006.gguf",
-    "size": 49899765376,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00004-of-00006.gguf"
-    }
-  },
-  {
-    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-00003-of-00006-c4b4a4713346e727",
-    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00003-of-00006.gguf",
-    "size": 49958456576,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00003-of-00006.gguf"
-    }
-  },
-  {
-    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-00002-of-00006-315d8be862871ff9",
-    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00002-of-00006.gguf",
-    "size": 49762122880,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00002-of-00006.gguf"
-    }
-  },
-  {
     "modelId": "gpt-oss-120b-Derestricted.MXFP4_MOE-831881cd6cbb7c2e",
     "path": "/home/user/.cache/huggingface/hub/Oss-120b/gpt-oss-120b-Derestricted.MXFP4_MOE.gguf",
     "size": 63387347008,
@@ -72,21 +18,30 @@
     }
   },
   {
-    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-00005-of-00006-d136307246170c48",
-    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00005-of-00006.gguf",
-    "size": 49958456576,
-    "favourite": false,
-    "primaryModel": {
-      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00005-of-00006.gguf"
-    }
-  },
-  {
     "modelId": "Qwen3-Coder-Next-MXFP4_MOE-f7d5b07e53a116fb",
     "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3-Coder-Next-GGUF/Qwen3-Coder-Next-MXFP4_MOE/Qwen3-Coder-Next-MXFP4_MOE.gguf",
     "size": 43741630240,
     "favourite": false,
     "primaryModel": {
       "fileName": "Qwen3-Coder-Next-MXFP4_MOE.gguf"
+    }
+  },
+  {
+    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-6parts-cb2516275af10ed5",
+    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00001-of-00006.gguf",
+    "size": 10943104,
+    "favourite": false,
+    "primaryModel": {
+      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00001-of-00006.gguf"
+    }
+  },
+  {
+    "modelId": "Qwen3-Embedding-0.6B-f16-b0a55519aa5064a0",
+    "path": "/home/user/workspace/LlamacppServer/build/models/Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-Embedding-0.6B-f16/Qwen3-Embedding-0.6B-f16.gguf",
+    "size": 1197629632,
+    "favourite": false,
+    "primaryModel": {
+      "fileName": "Qwen3-Embedding-0.6B-f16.gguf"
     }
   },
   {
@@ -99,12 +54,12 @@
     }
   },
   {
-    "modelId": "Qwen3.5-397B-A17B-MXFP4_MOE-00001-of-00006-62b5ca36026ff118",
-    "path": "/home/user/workspace/LlamacppServer/build/models/unsloth/Qwen3.5-397B-A17B-GGUF/Qwen3.5-397B-A17B-MXFP4_MOE/Qwen3.5-397B-A17B-MXFP4_MOE-00001-of-00006.gguf",
-    "size": 10943104,
+    "modelId": "Qwen3-Embedding-8B-Q8_0-971704e569c974a3",
+    "path": "/home/user/workspace/LlamacppServer/build/models/Qwen/Qwen3-Embedding-8B-GGUF/Qwen3-Embedding-8B-Q8_0/Qwen3-Embedding-8B-Q8_0.gguf",
+    "size": 8047105824,
     "favourite": false,
     "primaryModel": {
-      "fileName": "Qwen3.5-397B-A17B-MXFP4_MOE-00001-of-00006.gguf"
+      "fileName": "Qwen3-Embedding-8B-Q8_0.gguf"
     }
   }
 ]

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -115,18 +116,36 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	fmt.Printf("[INFO] ModelManager: 扫描完成，总共找到 %d 个模型，耗时 %v\n",
 		len(result.Models), result.Duration)
 
-	// Update models map
+	// Update models map（先清空，再添加）
 	m.mu.Lock()
+	m.models = make(map[string]*Model) // 清空旧数据
 	for _, model := range result.Models {
 		m.models[model.ID] = model
 	}
+
+	// ========== 新增：合并分卷文件 ==========
+	mergedCount := m.mergeSplitModels()
+	if mergedCount > 0 {
+		fmt.Printf("[INFO] ModelManager: 已合并 %d 组分卷文件\n", mergedCount)
+	}
+
 	modelCount := len(m.models)
 	m.mu.Unlock()
 	fmt.Printf("[INFO] ModelManager: 模型缓存已更新，当前共 %d 个模型\n", modelCount)
 
 	// Save to config
 	m.saveModels()
-	fmt.Printf("[INFO] ModelManager: 已保存 %d 个模型到配置\n", len(result.Models))
+	fmt.Printf("[INFO] ModelManager: 已保存 %d 个模型到配置\n", len(m.models))
+
+	// 更新 result.Models 为合并后的模型列表
+	// 这样 Scan API 返回的是合并后的结果
+	m.mu.RLock()
+	result.Models = make([]*Model, 0, len(m.models))
+	for _, model := range m.models {
+		modelCopy := *model
+		result.Models = append(result.Models, &modelCopy)
+	}
+	m.mu.RUnlock()
 
 	return result, nil
 }
@@ -609,7 +628,14 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 	// Find available port
 	port := m.findAvailablePort()
 
-	cmd, err := process.BuildCommand(binPath, model.Path, port, opts)
+	// 使用主分卷文件路径（第一卷）
+	modelPath := model.Path
+	if len(model.ShardFiles) > 0 {
+		modelPath = model.ShardFiles[0]
+		fmt.Printf("[INFO] 使用分卷模型主文件: %s (共 %d 个分卷)\n", modelPath, len(model.ShardFiles))
+	}
+
+	cmd, err := process.BuildCommand(binPath, modelPath, port, opts)
 	if err != nil {
 		m.mu.Lock()
 		status.State = StateError
@@ -653,6 +679,181 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 		CtxSize:  req.CtxSize,
 		Duration: duration,
 	}, nil
+}
+
+// LoadAsync 异步加载模型（立即返回，后台加载）
+func (m *Manager) LoadAsync(req *LoadRequest) (*LoadResult, error) {
+	// Get model
+	model, exists := m.GetModel(req.ModelID)
+	if !exists {
+		return nil, fmt.Errorf("model not found: %s", req.ModelID)
+	}
+
+	// Check if already loaded
+	m.mu.RLock()
+	if status, exists := m.statuses[req.ModelID]; exists {
+		if status.State == StateLoaded {
+			m.mu.RUnlock()
+			return &LoadResult{
+				Success:  true,
+				ModelID:  req.ModelID,
+				Port:     status.Port,
+				Async:    true,
+				AlreadyLoaded: true,
+			}, nil
+		}
+		if status.State == StateLoading {
+			m.mu.RUnlock()
+			return &LoadResult{
+				Success:  true,
+				ModelID:  req.ModelID,
+				Async:    true,
+				Loading:  true,
+			}, nil
+		}
+	}
+	m.mu.RUnlock()
+
+	// 创建初始状态
+	m.mu.Lock()
+	status := &ModelStatus{
+		ID:    req.ModelID,
+		Name:  model.Name,
+		State: StateLoading,
+	}
+	m.statuses[req.ModelID] = status
+	m.mu.Unlock()
+
+	// 启动异步加载
+	go m.loadModelAsync(req, status)
+
+	return &LoadResult{
+		Success:  true,
+		ModelID:  req.ModelID,
+		Async:    true,
+		Loading:  true,
+	}, nil
+}
+
+// loadModelAsync 后台异步加载模型
+func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
+	startTime := time.Now()
+
+	// Find llama.cpp binary
+	binPath := m.findLlamaCppBinary()
+	if binPath == "" {
+		m.mu.Lock()
+		status.State = StateError
+		status.Error = fmt.Errorf("llama.cpp binary not found")
+		m.mu.Unlock()
+		fmt.Printf("[ERROR] ModelManager: %s - llama.cpp binary not found\n", req.ModelID)
+		return
+	}
+
+	// Build command
+	opts := map[string]interface{}{
+		"ctx_size":       req.CtxSize,
+		"batch_size":     req.BatchSize,
+		"threads":        req.Threads,
+		"gpu_layers":     req.GPULayers,
+		"temperature":    req.Temperature,
+		"top_p":          req.TopP,
+		"top_k":          req.TopK,
+		"repeat_penalty": req.RepeatPenalty,
+		"n_predict":      req.NPredict,
+	}
+
+	// Find available port
+	port := m.findAvailablePort()
+
+	// Get model
+	model, _ := m.GetModel(req.ModelID)
+
+	// 使用主分卷文件路径（第一卷）
+	modelPath := model.Path
+	if len(model.ShardFiles) > 0 {
+		modelPath = model.ShardFiles[0]
+		fmt.Printf("[INFO] ModelManager: 使用分卷模型主文件: %s (共 %d 个分卷)\n", modelPath, len(model.ShardFiles))
+	}
+
+	cmd, err := process.BuildCommand(binPath, modelPath, port, opts)
+	if err != nil {
+		m.mu.Lock()
+		status.State = StateError
+		status.Error = err
+		m.mu.Unlock()
+		fmt.Printf("[ERROR] ModelManager: %s - 构建命令失败: %v\n", req.ModelID, err)
+		return
+	}
+
+	// Start process
+	proc, err := m.processMgr.Start(req.ModelID, model.Name, cmd, binPath)
+	if err != nil {
+		m.mu.Lock()
+		status.State = StateError
+		status.Error = err
+		m.mu.Unlock()
+		fmt.Printf("[ERROR] ModelManager: %s - 启动进程失败: %v\n", req.ModelID, err)
+		return
+	}
+
+	fmt.Printf("[INFO] ModelManager: %s - 进程已启动 (PID: %d, Port: %d)\n", req.ModelID, proc.GetPID(), port)
+
+	// 等待加载完成（监控进程输出）
+	loadCompleted := make(chan bool, 1)
+	loadError := make(chan error, 1)
+
+	// 设置输出处理器检测加载完成
+	proc.SetOutputHandler(func(line string) {
+		if strings.Contains(line, "all slots are idle") {
+			select {
+			case loadCompleted <- true:
+			default:
+			}
+		}
+	})
+
+	// 等待加载完成或超时
+	select {
+	case <-loadCompleted:
+		m.mu.Lock()
+		status.State = StateLoaded
+		status.ProcessID = proc.ID
+		status.Port = port
+		status.LoadedAt = time.Now()
+		m.mu.Unlock()
+		duration := time.Since(startTime)
+		fmt.Printf("[INFO] ModelManager: %s - 加载完成 (用时: %.2f秒)\n", req.ModelID, duration.Seconds())
+
+	case err := <-loadError:
+		m.mu.Lock()
+		status.State = StateError
+		status.Error = err
+		m.mu.Unlock()
+		fmt.Printf("[ERROR] ModelManager: %s - 加载失败: %v\n", req.ModelID, err)
+		// 清理进程
+		m.processMgr.Stop(req.ModelID)
+
+	case <-time.After(10 * time.Minute):
+		m.mu.Lock()
+		status.State = StateError
+		status.Error = fmt.Errorf("模型加载超时 (10分钟)")
+		m.mu.Unlock()
+		fmt.Printf("[ERROR] ModelManager: %s - 加载超时\n", req.ModelID)
+		// 清理进程
+		m.processMgr.Stop(req.ModelID)
+	}
+}
+
+// isLoading 检查模型是否正在加载
+func (m *Manager) isLoading(modelID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if status, exists := m.statuses[modelID]; exists {
+		return status.State == StateLoading
+	}
+	return false
 }
 
 // Unload unloads a model
@@ -1211,4 +1412,137 @@ func (m *Manager) Close() error {
 // GetProcessManager returns the process manager
 func (m *Manager) GetProcessManager() *process.Manager {
 	return m.processMgr
+}
+
+// isSplitGGUF 检查是否为分卷文件
+// 返回：是否为分卷、基础名称、分卷号、总分卷数
+func isSplitGGUF(filename string) (bool, string, int, int) {
+	// 匹配模式: "name-00001-of-00006.gguf"
+	re := regexp.MustCompile(`^(.*?)-(\d{5})-of-(\d{5})\.gguf$`)
+	matches := re.FindStringSubmatch(filename)
+	if len(matches) == 4 {
+		partNum, _ := strconv.Atoi(matches[2])
+		totalParts, _ := strconv.Atoi(matches[3])
+		return true, matches[1], partNum, totalParts
+	}
+	return false, "", 0, 0
+}
+
+// extractModelName 从文件名提取模型名称，移除分卷后缀
+func extractModelName(filename string) string {
+	// 移除扩展名
+	name := strings.TrimSuffix(filename, ".gguf")
+	name = strings.TrimSuffix(name, ".GGUF")
+
+	// 移除分卷后缀
+	re := regexp.MustCompile(`-\d{5}-of-\d{5}$`)
+	name = re.ReplaceAllString(name, "")
+
+	return name
+}
+
+// generateUnifiedModelID 为分卷模型生成统一的模型ID
+func generateUnifiedModelID(baseName string, partsCount int) string {
+	hash := sha256.Sum256([]byte(baseName))
+	hashStr := hex.EncodeToString(hash[:8])
+	return fmt.Sprintf("%s-%dparts-%s", baseName, partsCount, hashStr)
+}
+
+// mergeSplitModels 合并分卷文件为单个模型
+// 返回合并的组数量
+func (m *Manager) mergeSplitModels() int {
+	// 按目录和基础名称分组
+	groups := make(map[string][]*Model)
+
+	for _, model := range m.models {
+		if isSplit, baseName, _, totalParts := isSplitGGUF(filepath.Base(model.Path)); isSplit {
+			// 生成组键：目录 + 基础名称 + 总分卷数
+			groupKey := fmt.Sprintf("%s/%s-%dparts", filepath.Dir(model.Path), baseName, totalParts)
+			groups[groupKey] = append(groups[groupKey], model)
+		}
+	}
+
+	mergedCount := 0
+
+	// 对每组进行处理
+	for groupKey, models := range groups {
+		fmt.Printf("[DEBUG] 处理分卷组: %s，找到 %d 个文件\n", groupKey, len(models))
+
+		if len(models) < 2 {
+			// 只有一个分卷，不合并
+			fmt.Printf("[DEBUG] 跳过（少于 2 个分卷）\n")
+			continue
+		}
+
+		// 检查分卷是否完整（应该是连续的 1 到 n）
+		// 按分卷号排序
+		for i := 0; i < len(models); i++ {
+			for j := i + 1; j < len(models); j++ {
+				_, _, pi, _ := isSplitGGUF(filepath.Base(models[i].Path))
+				_, _, pj, _ := isSplitGGUF(filepath.Base(models[j].Path))
+				if pi > pj {
+					models[i], models[j] = models[j], models[i]
+				}
+			}
+		}
+
+		// 验证分卷连续性
+		_, _, firstPart, totalParts := isSplitGGUF(filepath.Base(models[0].Path))
+		_ = firstPart // 避免未使用警告
+		isComplete := true
+		for i, model := range models {
+			_, _, partNum, _ := isSplitGGUF(filepath.Base(model.Path))
+			expectedPart := i + 1
+			if partNum != expectedPart {
+				isComplete = false
+				fmt.Printf("[WARN] 分卷文件不连续: %s，期望分卷 %d，实际是 %d\n",
+					model.Path, expectedPart, partNum)
+			}
+		}
+
+		if !isComplete {
+			fmt.Printf("[WARN] 分卷组 %s 不完整，只有 %d/%d 个分卷\n",
+				groupKey, len(models), totalParts)
+		}
+
+		// 使用第一卷作为主模型
+		primary := models[0]
+
+		// 计算总大小
+		totalSize := int64(0)
+		shardFiles := make([]string, len(models))
+		for i, m := range models {
+			totalSize += m.Size
+			shardFiles[i] = m.Path
+		}
+
+		fmt.Printf("[DEBUG] 合并前: primary.Name=%s, len(models)=%d, len(shardFiles)=%d\n",
+			primary.Name, len(models), len(shardFiles))
+
+		// 更新主模型的属性
+		primary.Name = extractModelName(filepath.Base(primary.Path))
+		primary.TotalSize = totalSize
+		primary.ShardCount = len(models)
+		primary.ShardFiles = shardFiles
+
+		fmt.Printf("[DEBUG] 合并后: primary.Name=%s, ShardCount=%d, TotalSize=%d, len(ShardFiles)=%d\n",
+			primary.Name, primary.ShardCount, primary.TotalSize, len(primary.ShardFiles))
+
+		// 删除其他分卷的模型记录
+		for i := 1; i < len(models); i++ {
+			delete(m.models, models[i].ID)
+		}
+
+		// 更新主模型 ID（使用统一的基础名称）
+		newID := generateUnifiedModelID(primary.Name, len(models))
+		m.models[newID] = primary
+		delete(m.models, primary.ID)
+		primary.ID = newID
+
+		mergedCount++
+		fmt.Printf("[INFO] 已合并分卷模型: %s (%d 个分卷, 总大小: %.2f GB)\n",
+			primary.Name, len(models), float64(totalSize)/(1024*1024*1024))
+	}
+
+	return mergedCount
 }

@@ -12,16 +12,11 @@ import { SettingsPage } from './pages/settings';
 import { useSSE } from './hooks/useSSE';
 import { AlertDialogProvider, AlertDialog } from './components/ui/alert-dialog';
 import { Toaster } from './components/ui/toaster';
+import { WebSocketProvider } from './providers/WebSocketProvider';
 
-// 导入代码高亮样式
 import 'highlight.js/styles/github-dark.css';
 
-/**
- * 应用内容组件
- * 在 QueryClientProvider 内部使用 SSE
- */
 function AppContent() {
-  // 启用 SSE 实时事件
   useSSE({
     onMessage: (event) => {
       console.log('SSE Event:', event);
@@ -45,17 +40,24 @@ function AppContent() {
   );
 }
 
-/**
- * 应用根组件
- */
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AlertDialogProvider>
-        <AppContent />
-        <AlertDialog />
-        <Toaster />
-      </AlertDialogProvider>
+      <WebSocketProvider
+        autoConnect={false}
+        options={{
+          maxReconnectAttempts: 5,
+          initialReconnectDelay: 1000,
+          heartbeatInterval: 30000,
+        }}
+        onError={(error) => console.error('WebSocket error:', error)}
+      >
+        <AlertDialogProvider>
+          <AppContent />
+          <AlertDialog />
+          <Toaster />
+        </AlertDialogProvider>
+      </WebSocketProvider>
     </QueryClientProvider>
   );
 }
