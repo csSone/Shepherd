@@ -88,7 +88,7 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	}
 
 	// Scan each configured path
-	for _, scanPath := range m.config.Model.Paths {
+	for _, scanPath := range m.getScanPaths() {
 		pathModels, pathErrors := m.scanPath(ctx, scanPath)
 		result.Models = append(result.Models, pathModels...)
 		result.Errors = append(result.Errors, pathErrors...)
@@ -374,13 +374,25 @@ func (m *Manager) findMmproj(modelPath string) string {
 	return ""
 }
 
+// getScanPaths returns the list of scan paths (from PathConfigs or Paths)
+func (m *Manager) getScanPaths() []string {
+	if len(m.config.Model.PathConfigs) > 0 {
+		paths := make([]string, 0, len(m.config.Model.PathConfigs))
+		for _, pc := range m.config.Model.PathConfigs {
+			paths = append(paths, pc.Path)
+		}
+		return paths
+	}
+	return m.config.Model.Paths
+}
+
 // calculatePathPrefix calculates a short path prefix for display
 func (m *Manager) calculatePathPrefix(path string) string {
 	// Get directory of the model file
 	dir := filepath.Dir(path)
 
 	// Check against configured scan paths
-	for _, scanPath := range m.config.Model.Paths {
+	for _, scanPath := range m.getScanPaths() {
 		// Clean paths for comparison
 		cleanScanPath := filepath.Clean(scanPath)
 		cleanDir := filepath.Clean(dir)
