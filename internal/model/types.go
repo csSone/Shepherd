@@ -8,17 +8,22 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/gguf"
 )
 
-// Model represents a discovered GGUF model
+// Model represents a discovered GGUF model with HuggingFace-style management
 type Model struct {
 	// Basic information
-	ID          string // Unique model ID (path hash)
-	Name        string // Model name
-	DisplayName string // Display name for UI (handles duplicates)
-	Alias       string // Display alias
-	Path        string // File path to the GGUF file
-	PathPrefix  string // Path prefix for duplicate identification (e.g., "models/A", "cache/B")
-	Size        int64  // File size in bytes
-	Favourite   bool   // User's favorite flag
+	ID          string   // Unique model ID (path hash)
+	Name        string   // Model name
+	DisplayName string   // Display name for UI (handles duplicates)
+	Alias       string   // Display alias
+	Description string   // Model description/card (HuggingFace-style)
+	Path        string   // File path to the GGUF file
+	PathPrefix  string   // Path prefix for duplicate identification (e.g., "models/A", "cache/B")
+	Size        int64    // File size in bytes
+	Favourite   bool     // User's favorite flag
+	Tags        []string // Model tags for categorization (e.g., "chat", "code", "multilingual")
+	License     string   // Model license
+	Author      string   // Model author/organization
+	Downloads   int      // Download count for downloaded models
 
 	// GGUF metadata
 	Metadata *gguf.Metadata
@@ -30,6 +35,12 @@ type Model struct {
 	// Scanning info
 	ScannedAt  time.Time
 	SourcePath string // Original scan path
+	SourceType string // "local", "huggingface", "modelscope"
+
+	// Usage statistics
+	LoadCount   int       // Number of times loaded
+	LastLoaded  time.Time // Last load time
+	TotalTokens int64     // Total tokens generated (if tracked)
 }
 
 // ModelStatus represents the loading status of a model
@@ -121,4 +132,32 @@ type LoadResult struct {
 	CtxSize  int
 	Error    error
 	Duration time.Duration
+}
+
+// ModelFilter represents filter criteria for model search
+type ModelFilter struct {
+	Tags         []string
+	Architecture string
+	MinContext   int
+	MaxSize      int64
+	LoadedOnly   bool
+	Favourites   bool
+	SearchQuery  string
+	SourceType   string
+	License      string
+}
+
+// ModelSort represents sort options for model listing
+type ModelSort struct {
+	Field     string // "name", "size", "scanned_at", "load_count"
+	Direction string // "asc", "desc"
+}
+
+// ModelSearchResult represents the result of a model search
+type ModelSearchResult struct {
+	Models        []*Model
+	Total         int
+	Filtered      int
+	Tags          map[string]int // Tag frequency
+	Architectures map[string]int // Architecture frequency
 }
