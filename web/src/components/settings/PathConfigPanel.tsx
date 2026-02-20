@@ -133,7 +133,7 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
     setIsDialogOpen(true);
   };
 
-  const title = type === 'llamacpp' ? 'Llama.cpp 路径' : '模型目录';
+  const title = type === 'llamacpp' ? 'llama.cpp 路径' : '模型目录';
   const description =
     type === 'llamacpp'
       ? '配置 llama.cpp 可执行文件所在的目录'

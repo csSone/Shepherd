@@ -39,19 +39,19 @@ interface PathTestResponse {
  */
 export const llamacppPathsApi = {
   /**
-   * 获取所有 Llama.cpp 路径
+   * 获取所有 llama.cpp 路径
    */
   list: () =>
     apiClient.get<PathListResponse<LlamaCppPathConfig>>('/config/llamacpp/paths'),
 
   /**
-   * 添加 Llama.cpp 路径
+   * 添加 llama.cpp 路径
    */
   add: (data: LlamaCppPathConfig) =>
     apiClient.post<PathMutationResponse>('/config/llamacpp/paths', data),
 
   /**
-   * 删除 Llama.cpp 路径
+   * 删除 llama.cpp 路径
    */
   remove: (path: string) =>
     apiClient.delete<PathMutationResponse>(
@@ -59,7 +59,7 @@ export const llamacppPathsApi = {
     ),
 
   /**
-   * 测试 Llama.cpp 路径
+   * 测试 llama.cpp 路径
    */
   test: (path: string) =>
     apiClient.post<PathTestResponse>('/config/llamacpp/paths/test', { path }),

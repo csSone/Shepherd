@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
 )
 
 const (
@@ -29,33 +31,36 @@ var ConfigFileNames = map[string]string{
 
 // Config represents the complete application configuration
 type Config struct {
-	Server        ServerConfig        `mapstructure:"server" yaml:"server" json:"server"`
-	Model         ModelConfig         `mapstructure:"model" yaml:"model" json:"model"`
-	Llamacpp      LlamacppConfig      `mapstructure:"llamacpp" yaml:"llamacpp" json:"llamacpp"`
-	Download      DownloadConfig      `mapstructure:"download" yaml:"download" json:"download"`
-	Security      SecurityConfig      `mapstructure:"security" yaml:"security" json:"security"`
-	Compatibility CompatibilityConfig `mapstructure:"compatibility" yaml:"compatibility" json:"compatibility"`
-	Log           LogConfig           `mapstructure:"log" yaml:"log" json:"log"`
+	Server        ServerConfig          `mapstructure:"server" yaml:"server" json:"server"`
+	Model         ModelConfig           `mapstructure:"model" yaml:"model" json:"model"`
+	Llamacpp      LlamacppConfig        `mapstructure:"llamacpp" yaml:"llamacpp" json:"llamacpp"`
+	Download      DownloadConfig        `mapstructure:"download" yaml:"download" json:"download"`
+	Security      SecurityConfig        `mapstructure:"security" yaml:"security" json:"security"`
+	Compatibility CompatibilityConfig   `mapstructure:"compatibility" yaml:"compatibility" json:"compatibility"`
+	Log           LogConfig             `mapstructure:"log" yaml:"log" json:"log"`
+	Storage       storage.StorageConfig `mapstructure:"storage" yaml:"storage" json:"storage"` // 存储配置
 	// Master-Client 分布式配置
-	Mode          string              `mapstructure:"mode" yaml:"mode" json:"mode"` // master|client|standalone
-	Master        MasterConfig        `mapstructure:"master" yaml:"master" json:"master"`
-	Client        ClientConfig        `mapstructure:"client" yaml:"client" json:"client"`
+	Mode   string       `mapstructure:"mode" yaml:"mode" json:"mode"` // master|client|standalone
+	Master MasterConfig `mapstructure:"master" yaml:"master" json:"master"`
+	Client ClientConfig `mapstructure:"client" yaml:"client" json:"client"`
+	// Node 节点配置（新架构）
+	Node NodeConfig `mapstructure:"node" yaml:"node" json:"node"`
 }
 
 // ServerConfig contains HTTP server configuration
 type ServerConfig struct {
-	WebPort       int  `mapstructure:"web_port" yaml:"web_port" json:"webPort"`
-	AnthropicPort int  `mapstructure:"anthropic_port" yaml:"anthropic_port" json:"anthropicPort"`
-	OllamaPort    int  `mapstructure:"ollama_port" yaml:"ollama_port" json:"ollamaPort"`
-	LMStudioPort  int  `mapstructure:"lmstudio_port" yaml:"lmstudio_port" json:"lmstudioPort"`
+	WebPort       int    `mapstructure:"web_port" yaml:"web_port" json:"webPort"`
+	AnthropicPort int    `mapstructure:"anthropic_port" yaml:"anthropic_port" json:"anthropicPort"`
+	OllamaPort    int    `mapstructure:"ollama_port" yaml:"ollama_port" json:"ollamaPort"`
+	LMStudioPort  int    `mapstructure:"lmstudio_port" yaml:"lmstudio_port" json:"lmstudioPort"`
 	Host          string `mapstructure:"host" yaml:"host" json:"host"`
-	ReadTimeout   int    `mapstructure:"read_timeout" yaml:"read_timeout" json:"readTimeout"`   // seconds
+	ReadTimeout   int    `mapstructure:"read_timeout" yaml:"read_timeout" json:"readTimeout"`    // seconds
 	WriteTimeout  int    `mapstructure:"write_timeout" yaml:"write_timeout" json:"writeTimeout"` // seconds
 }
 
 // ModelConfig contains model scanning and management configuration
 type ModelConfig struct {
-	Paths        []string    `mapstructure:"paths" yaml:"paths" json:"paths"`                   // 简单路径数组（向后兼容）
+	Paths        []string    `mapstructure:"paths" yaml:"paths" json:"paths"`                     // 简单路径数组（向后兼容）
 	PathConfigs  []ModelPath `mapstructure:"path_configs" yaml:"path_configs" json:"pathConfigs"` // 详细路径配置
 	AutoScan     bool        `mapstructure:"auto_scan" yaml:"auto_scan" json:"autoScan"`
 	ScanInterval int         `mapstructure:"scan_interval" yaml:"scan_interval" json:"scanInterval"` // seconds, 0 = disable
@@ -91,22 +96,22 @@ type DownloadConfig struct {
 
 // SecurityConfig contains security settings
 type SecurityConfig struct {
-	APIKeyEnabled bool   `mapstructure:"api_key_enabled" yaml:"api_key_enabled" json:"apiKeyEnabled"`
-	APIKey        string `mapstructure:"api_key" yaml:"api_key" json:"apiKey"`
-	CORSEnabled   bool   `mapstructure:"cors_enabled" yaml:"cors_enabled" json:"corsEnabled"`
+	APIKeyEnabled  bool     `mapstructure:"api_key_enabled" yaml:"api_key_enabled" json:"apiKeyEnabled"`
+	APIKey         string   `mapstructure:"api_key" yaml:"api_key" json:"apiKey"`
+	CORSEnabled    bool     `mapstructure:"cors_enabled" yaml:"cors_enabled" json:"corsEnabled"`
 	AllowedOrigins []string `mapstructure:"allowed_origins" yaml:"allowed_origins" json:"allowedOrigins"`
 }
 
 // LogConfig contains logging configuration
 type LogConfig struct {
-	Level      string `mapstructure:"level" yaml:"level" json:"level"` // debug, info, warn, error
-	Format     string `mapstructure:"format" yaml:"format" json:"format"` // json, text
-	Output     string `mapstructure:"output" yaml:"output" json:"output"` // stdout, file, both
-	Directory  string `mapstructure:"directory" yaml:"directory" json:"directory"` // log directory
-	MaxSize    int    `mapstructure:"max_size" yaml:"max_size" json:"maxSize"` // MB
+	Level      string `mapstructure:"level" yaml:"level" json:"level"`                  // debug, info, warn, error
+	Format     string `mapstructure:"format" yaml:"format" json:"format"`               // json, text
+	Output     string `mapstructure:"output" yaml:"output" json:"output"`               // stdout, file, both
+	Directory  string `mapstructure:"directory" yaml:"directory" json:"directory"`      // log directory
+	MaxSize    int    `mapstructure:"max_size" yaml:"max_size" json:"maxSize"`          // MB
 	MaxBackups int    `mapstructure:"max_backups" yaml:"max_backups" json:"maxBackups"` // number of backup files
-	MaxAge     int    `mapstructure:"max_age" yaml:"max_age" json:"maxAge"` // days
-	Compress   bool   `mapstructure:"compress" yaml:"compress" json:"compress"` // compress old logs
+	MaxAge     int    `mapstructure:"max_age" yaml:"max_age" json:"maxAge"`             // days
+	Compress   bool   `mapstructure:"compress" yaml:"compress" json:"compress"`         // compress old logs
 }
 
 // CompatibilityConfig contains API compatibility layer settings
@@ -129,10 +134,10 @@ type LMStudioConfig struct {
 
 // MasterConfig contains Master node configuration
 type MasterConfig struct {
-	Enabled         bool               `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
-	ClientConfigDir string             `mapstructure:"client_config_dir" yaml:"client_config_dir" json:"clientConfigDir"`
-	NetworkScan     NetworkScanConfig  `mapstructure:"network_scan" yaml:"network_scan" json:"networkScan"`
-	Scheduler       SchedulerConfig    `mapstructure:"scheduler" yaml:"scheduler" json:"scheduler"`
+	Enabled         bool                 `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
+	ClientConfigDir string               `mapstructure:"client_config_dir" yaml:"client_config_dir" json:"clientConfigDir"`
+	NetworkScan     NetworkScanConfig    `mapstructure:"network_scan" yaml:"network_scan" json:"networkScan"`
+	Scheduler       SchedulerConfig      `mapstructure:"scheduler" yaml:"scheduler" json:"scheduler"`
 	LogAggregation  LogAggregationConfig `mapstructure:"log_aggregation" yaml:"log_aggregation" json:"logAggregation"`
 }
 
@@ -148,27 +153,84 @@ type NetworkScanConfig struct {
 
 // SchedulerConfig contains task scheduler configuration
 type SchedulerConfig struct {
-	Strategy          string `mapstructure:"strategy" yaml:"strategy" json:"strategy"` // round_robin, least_loaded, resource_aware
-	MaxQueueSize      int    `mapstructure:"max_queue_size" yaml:"max_queue_size" json:"maxQueueSize"`
-	TaskTimeout       int    `mapstructure:"task_timeout" yaml:"task_timeout" json:"taskTimeout"` // seconds
-	RetryOnFailure    bool   `mapstructure:"retry_on_failure" yaml:"retry_on_failure" json:"retryOnFailure"`
-	MaxRetries        int    `mapstructure:"max_retries" yaml:"max_retries" json:"maxRetries"`
+	Strategy       string `mapstructure:"strategy" yaml:"strategy" json:"strategy"` // round_robin, least_loaded, resource_aware
+	MaxQueueSize   int    `mapstructure:"max_queue_size" yaml:"max_queue_size" json:"maxQueueSize"`
+	TaskTimeout    int    `mapstructure:"task_timeout" yaml:"task_timeout" json:"taskTimeout"` // seconds
+	RetryOnFailure bool   `mapstructure:"retry_on_failure" yaml:"retry_on_failure" json:"retryOnFailure"`
+	MaxRetries     int    `mapstructure:"max_retries" yaml:"max_retries" json:"maxRetries"`
 }
 
 // LogAggregationConfig contains log aggregation settings
 type LogAggregationConfig struct {
-	Enabled      bool   `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
-	MaxBufferSize int   `mapstructure:"max_buffer_size" yaml:"max_buffer_size" json:"maxBufferSize"` // bytes per client
-	FlushInterval int   `mapstructure:"flush_interval" yaml:"flush_interval" json:"flushInterval"` // seconds
+	Enabled       bool `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
+	MaxBufferSize int  `mapstructure:"max_buffer_size" yaml:"max_buffer_size" json:"maxBufferSize"` // bytes per client
+	FlushInterval int  `mapstructure:"flush_interval" yaml:"flush_interval" json:"flushInterval"`   // seconds
 }
 
 // ClientConfig contains Client node configuration
 type ClientConfig struct {
-	Enabled         bool              `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
-	MasterAddress   string            `mapstructure:"master_address" yaml:"master_address" json:"masterAddress"`
-	ClientInfo      ClientInfoConfig  `mapstructure:"client_info" yaml:"client_info" json:"clientInfo"`
-	Heartbeat       HeartbeatConfig   `mapstructure:"heartbeat" yaml:"heartbeat" json:"heartbeat"`
-	CondaEnv        CondaEnvConfig    `mapstructure:"conda_env" yaml:"conda_env" json:"condaEnv"`
+	Enabled       bool             `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
+	MasterAddress string           `mapstructure:"master_address" yaml:"master_address" json:"masterAddress"`
+	ClientInfo    ClientInfoConfig `mapstructure:"client_info" yaml:"client_info" json:"clientInfo"`
+	Heartbeat     HeartbeatConfig  `mapstructure:"heartbeat" yaml:"heartbeat" json:"heartbeat"`
+	CondaEnv      CondaEnvConfig   `mapstructure:"conda_env" yaml:"conda_env" json:"condaEnv"`
+	// 新架构字段
+	RegisterRetry     int `mapstructure:"register_retry" yaml:"register_retry" json:"registerRetry"`             // 注册重试次数
+	HeartbeatInterval int `mapstructure:"heartbeat_interval" yaml:"heartbeat_interval" json:"heartbeatInterval"` // 心跳间隔（秒）
+	HeartbeatTimeout  int `mapstructure:"heartbeat_timeout" yaml:"heartbeat_timeout" json:"heartbeatTimeout"`    // 心跳超时（秒）
+}
+
+// NodeConfig contains node configuration for the new distributed architecture
+type NodeConfig struct {
+	ID   string `mapstructure:"id" yaml:"id" json:"id"`       // 节点ID，auto表示自动生成
+	Name string `mapstructure:"name" yaml:"name" json:"name"` // 节点名称
+	Role string `mapstructure:"role" yaml:"role" json:"role"` // 节点角色: standalone/master/client/hybrid
+	// 各角色配置
+	MasterRole NodeMasterRoleConfig `mapstructure:"master_role" yaml:"master_role" json:"masterRole"` // Master角色配置
+	ClientRole NodeClientRoleConfig `mapstructure:"client_role" yaml:"client_role" json:"clientRole"` // Client角色配置
+	// 资源和执行器配置
+	Resources NodeResourceConfig `mapstructure:"resources" yaml:"resources" json:"resources"` // 资源监控配置
+	Executor  NodeExecutorConfig `mapstructure:"executor" yaml:"executor" json:"executor"`    // 命令执行器配置
+}
+
+// NodeMasterRoleConfig contains Master role specific configuration
+type NodeMasterRoleConfig struct {
+	Enabled bool          `mapstructure:"enabled" yaml:"enabled" json:"enabled"` // 是否启用Master角色
+	Port    int           `mapstructure:"port" yaml:"port" json:"port"`          // Master服务端口
+	APIKey  string        `mapstructure:"api_key" yaml:"api_key" json:"apiKey"`  // API密钥
+	SSL     NodeSSLConfig `mapstructure:"ssl" yaml:"ssl" json:"ssl"`             // SSL配置
+}
+
+// NodeClientRoleConfig contains Client role specific configuration
+type NodeClientRoleConfig struct {
+	Enabled           bool   `mapstructure:"enabled" yaml:"enabled" json:"enabled"`                                 // 是否启用Client角色
+	MasterAddress     string `mapstructure:"master_address" yaml:"master_address" json:"masterAddress"`             // Master地址
+	RegisterRetry     int    `mapstructure:"register_retry" yaml:"register_retry" json:"registerRetry"`             // 注册重试次数
+	HeartbeatInterval int    `mapstructure:"heartbeat_interval" yaml:"heartbeat_interval" json:"heartbeatInterval"` // 心跳间隔（秒）
+	HeartbeatTimeout  int    `mapstructure:"heartbeat_timeout" yaml:"heartbeat_timeout" json:"heartbeatTimeout"`    // 心跳超时（秒）
+}
+
+// NodeSSLConfig contains SSL/TLS configuration
+type NodeSSLConfig struct {
+	Enabled  bool   `mapstructure:"enabled" yaml:"enabled" json:"enabled"`      // 是否启用SSL
+	CertPath string `mapstructure:"cert_path" yaml:"cert_path" json:"certPath"` // 证书路径
+	KeyPath  string `mapstructure:"key_path" yaml:"key_path" json:"keyPath"`    // 密钥路径
+}
+
+// NodeResourceConfig contains resource monitoring configuration
+type NodeResourceConfig struct {
+	MonitorInterval   int    `mapstructure:"monitor_interval" yaml:"monitor_interval" json:"monitorInterval"`       // 监控间隔（秒）
+	ReportGPU         bool   `mapstructure:"report_gpu" yaml:"report_gpu" json:"reportGPU"`                         // 是否报告GPU信息
+	ReportTemperature bool   `mapstructure:"report_temperature" yaml:"report_temperature" json:"reportTemperature"` // 是否报告温度
+	GPUBackend        string `mapstructure:"gpu_backend" yaml:"gpu_backend" json:"gpuBackend"`                      // GPU后端: auto/nvidia/amd/intel
+}
+
+// NodeExecutorConfig contains command executor configuration
+type NodeExecutorConfig struct {
+	MaxConcurrent   int      `mapstructure:"max_concurrent" yaml:"max_concurrent" json:"maxConcurrent"`         // 最大并发任务数
+	TaskTimeout     int      `mapstructure:"task_timeout" yaml:"task_timeout" json:"taskTimeout"`               // 任务超时（秒）
+	AllowRemoteStop bool     `mapstructure:"allow_remote_stop" yaml:"allow_remote_stop" json:"allowRemoteStop"` // 是否允许远程停止
+	AllowedCommands []string `mapstructure:"allowed_commands" yaml:"allowed_commands" json:"allowedCommands"`   // 允许的命令白名单
 }
 
 // ClientInfoConfig contains client identification information
@@ -182,7 +244,7 @@ type ClientInfoConfig struct {
 // HeartbeatConfig contains heartbeat settings
 type HeartbeatConfig struct {
 	Interval int `mapstructure:"interval" yaml:"interval" json:"interval"` // seconds
-	Timeout  int `mapstructure:"timeout" yaml:"timeout" json:"timeout"`  // seconds
+	Timeout  int `mapstructure:"timeout" yaml:"timeout" json:"timeout"`    // seconds
 }
 
 // CondaEnvConfig contains conda environment configuration
@@ -194,22 +256,22 @@ type CondaEnvConfig struct {
 
 // ModelConfigEntry represents a model configuration entry in models.json
 type ModelConfigEntry struct {
-	ModelID     string              `json:"modelId"`
-	Path        string              `json:"path,omitempty"`
-	Size        int64               `json:"size,omitempty"`
-	Alias       string              `json:"alias,omitempty"`
-	Favourite   bool                `json:"favourite"`
-	PrimaryModel *PrimaryModelInfo  `json:"primaryModel,omitempty"`
-	Mmproj      *MmprojInfo         `json:"mmproj,omitempty"`
+	ModelID      string            `json:"modelId"`
+	Path         string            `json:"path,omitempty"`
+	Size         int64             `json:"size,omitempty"`
+	Alias        string            `json:"alias,omitempty"`
+	Favourite    bool              `json:"favourite"`
+	PrimaryModel *PrimaryModelInfo `json:"primaryModel,omitempty"`
+	Mmproj       *MmprojInfo       `json:"mmproj,omitempty"`
 }
 
 // PrimaryModelInfo contains information about the primary model
 type PrimaryModelInfo struct {
-	FileName         string `json:"fileName"`
-	Name             string `json:"name,omitempty"`
-	Architecture     string `json:"architecture,omitempty"`
-	ContextLength    int    `json:"contextLength,omitempty"`
-	EmbeddingLength  int    `json:"embeddingLength,omitempty"`
+	FileName        string `json:"fileName"`
+	Name            string `json:"name,omitempty"`
+	Architecture    string `json:"architecture,omitempty"`
+	ContextLength   int    `json:"contextLength,omitempty"`
+	EmbeddingLength int    `json:"embeddingLength,omitempty"`
 }
 
 // MmprojInfo contains information about the multimodal projector
@@ -251,9 +313,9 @@ func DefaultConfig() *Config {
 			AnthropicPort: 9170,
 			OllamaPort:    11434,
 			LMStudioPort:  1234,
-			Host:         "0.0.0.0",
-			ReadTimeout:  60,
-			WriteTimeout: 60,
+			Host:          "0.0.0.0",
+			ReadTimeout:   60,
+			WriteTimeout:  60,
 		},
 		Model: ModelConfig{
 			Paths:        modelPaths,
@@ -301,8 +363,19 @@ func DefaultConfig() *Config {
 			MaxAge:     7, // 7 days
 			Compress:   true,
 		},
+		Storage: storage.StorageConfig{
+			Type: storage.StorageTypeMemory,
+			SQLite: &storage.SQLiteConfig{
+				Path:      filepath.Join(cwd, "Shepherd", "data", "shepherd.db"),
+				EnableWAL: true,
+				Pragmas: map[string]string{
+					"cache_size":  "-64000", // 64MB cache
+					"synchronous": "NORMAL",
+				},
+			},
+		},
 		Master: MasterConfig{
-			Enabled:        false,
+			Enabled:         false,
 			ClientConfigDir: filepath.Join(cwd, "config", "clients"),
 			NetworkScan: NetworkScanConfig{
 				Enabled:      false,
@@ -322,7 +395,7 @@ func DefaultConfig() *Config {
 			LogAggregation: LogAggregationConfig{
 				Enabled:       true,
 				MaxBufferSize: 1024 * 1024, // 1MB per client
-				FlushInterval: 10,           // 10 seconds
+				FlushInterval: 10,          // 10 seconds
 			},
 		},
 		Client: ClientConfig{
@@ -348,6 +421,52 @@ func DefaultConfig() *Config {
 					"shepherd": "",
 				},
 			},
+			// 新架构字段默认值
+			RegisterRetry:     3,
+			HeartbeatInterval: 5,
+			HeartbeatTimeout:  15,
+		},
+		// Node 节点配置（新架构）
+		Node: NodeConfig{
+			ID:   "auto",
+			Name: "",
+			Role: "standalone",
+			MasterRole: NodeMasterRoleConfig{
+				Enabled: false,
+				Port:    9190,
+				APIKey:  "",
+				SSL: NodeSSLConfig{
+					Enabled:  false,
+					CertPath: "",
+					KeyPath:  "",
+				},
+			},
+			ClientRole: NodeClientRoleConfig{
+				Enabled:           false,
+				MasterAddress:     "",
+				RegisterRetry:     3,
+				HeartbeatInterval: 5,
+				HeartbeatTimeout:  15,
+			},
+			Resources: NodeResourceConfig{
+				MonitorInterval:   5,
+				ReportGPU:         true,
+				ReportTemperature: true,
+				GPUBackend:        "auto",
+			},
+			Executor: NodeExecutorConfig{
+				MaxConcurrent:   4,
+				TaskTimeout:     3600,
+				AllowRemoteStop: true,
+				AllowedCommands: []string{
+					"load_model",
+					"unload_model",
+					"run_llamacpp",
+					"stop_process",
+					"scan_models",
+					"collect_logs",
+				},
+			},
 		},
 	}
 }
@@ -370,7 +489,10 @@ func DefaultLaunchConfig() *LaunchConfig {
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
-	// Validate mode
+	// Validate mode (向后兼容: 空字符串默认为 standalone)
+	if c.Mode == "" {
+		c.Mode = "standalone"
+	}
 	validModes := map[string]bool{"standalone": true, "master": true, "client": true}
 	if !validModes[c.Mode] {
 		return fmt.Errorf("invalid mode: %s (must be standalone, master, or client)", c.Mode)
@@ -446,6 +568,67 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// 验证 Node 配置（新架构）
+	if err := c.validateNodeConfig(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateNodeConfig validates the Node configuration
+func (c *Config) validateNodeConfig() error {
+	// 验证节点角色
+	validRoles := map[string]bool{"standalone": true, "master": true, "client": true, "hybrid": true}
+	if !validRoles[c.Node.Role] {
+		return fmt.Errorf("invalid node role: %s (must be standalone, master, client, or hybrid)", c.Node.Role)
+	}
+
+	// 验证 MasterRole 配置
+	if c.Node.MasterRole.Enabled {
+		if c.Node.MasterRole.Port < 1 || c.Node.MasterRole.Port > 65535 {
+			return fmt.Errorf("invalid master role port: %d", c.Node.MasterRole.Port)
+		}
+		if c.Node.MasterRole.SSL.Enabled {
+			if c.Node.MasterRole.SSL.CertPath == "" {
+				return fmt.Errorf("SSL enabled but cert path is empty")
+			}
+			if c.Node.MasterRole.SSL.KeyPath == "" {
+				return fmt.Errorf("SSL enabled but key path is empty")
+			}
+		}
+	}
+
+	// 验证 ClientRole 配置
+	if c.Node.ClientRole.Enabled {
+		if c.Node.ClientRole.MasterAddress == "" {
+			return fmt.Errorf("client role enabled but master address is empty")
+		}
+		if c.Node.ClientRole.HeartbeatInterval < 1 {
+			return fmt.Errorf("heartbeat interval must be at least 1 second")
+		}
+		if c.Node.ClientRole.HeartbeatTimeout < c.Node.ClientRole.HeartbeatInterval {
+			return fmt.Errorf("heartbeat timeout must be greater than heartbeat interval")
+		}
+	}
+
+	// 验证 Resource 配置
+	if c.Node.Resources.MonitorInterval < 1 {
+		return fmt.Errorf("resource monitor interval must be at least 1 second")
+	}
+	validGPUBackends := map[string]bool{"auto": true, "nvidia": true, "amd": true, "intel": true, "": true}
+	if !validGPUBackends[c.Node.Resources.GPUBackend] {
+		return fmt.Errorf("invalid GPU backend: %s (must be auto, nvidia, amd, or intel)", c.Node.Resources.GPUBackend)
+	}
+
+	// 验证 Executor 配置
+	if c.Node.Executor.MaxConcurrent < 1 {
+		return fmt.Errorf("executor max concurrent must be at least 1")
+	}
+	if c.Node.Executor.TaskTimeout < 1 {
+		return fmt.Errorf("executor task timeout must be at least 1 second")
+	}
+
 	return nil
 }
 
@@ -471,14 +654,14 @@ func EnsureConfigDir() error {
 
 // Manager manages configuration loading and saving
 type Manager struct {
-	config            *Config
-	configPath        string
-	modelsConfigPath  string
-	launchConfigPath  string
-	mu                sync.RWMutex
-	cachedModels      []ModelConfigEntry
-	cachedModelsTime  int64
-	mode              string // 运行模式
+	config           *Config
+	configPath       string
+	modelsConfigPath string
+	launchConfigPath string
+	mu               sync.RWMutex
+	cachedModels     []ModelConfigEntry
+	cachedModelsTime int64
+	mode             string // 运行模式
 }
 
 // NewManager creates a new configuration manager

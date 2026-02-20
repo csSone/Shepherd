@@ -140,7 +140,7 @@ export interface ServerConfig {
 }
 
 /**
- * Llama.cpp 路径配置
+ * llama.cpp 路径配置
  */
 export interface LlamaCppPathConfig {
   name: string;

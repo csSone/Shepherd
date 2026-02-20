@@ -1,17 +1,12 @@
 # Shepherd Web 前端独立配置
 # 此文件由前端直接读取，不依赖后端
-#
-# 重要说明：
-# - 这是前端的主配置文件（源文件）
-# - 构建时会自动复制到 web/public/config.yaml
-# - 修改此文件后，需要运行同步脚本或重新构建
 
 # 目标后端服务器配置
 backend:
   # 后端 API 地址（可配置多个，按优先级使用）
   urls:
     - "http://10.0.0.193:9190"
-    - "http://localhost:9190"
+    - "http://192.168.1.100:9190"
   # 当前使用的后端索引（0 表示第一个）
   currentIndex: 0
   # 连接超时时间（毫秒）
@@ -24,7 +19,7 @@ backend:
 # 前端服务器配置
 server:
   # 开发服务器端口
-  port: 3030
+  port: 3000
   # 是否启用 HTTPS
   https: false
   # SSL 证书路径
@@ -35,7 +30,7 @@ server:
 cors:
   # 允许的后端源
   allowedOrigins:
-    - "http://localhost:9190"
+    - "http://10.0.0.193:9190"
     - "http://192.168.1.100:9190"
   # 是否发送凭据
   credentials: false
@@ -45,7 +40,7 @@ features:
   models: true        # 模型管理（已实现）
   downloads: true     # 下载管理（已实现）
   cluster: false      # 集群管理（开发中）
-  logs: false         # 日志查看（开发中）
+  logs: true         # 日志查看（开发中）
   chat: true          # 聊天功能（已实现）
   settings: true      # 设置页面（已实现）
   dashboard: true     # 仪表盘（已实现）

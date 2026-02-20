@@ -318,7 +318,7 @@ function AboutPanel() {
 function PathsSettingsPanel() {
   return (
     <div className="max-w-3xl space-y-5">
-      {/* Llama.cpp 路径配置 */}
+      {/* llama.cpp 路径配置 */}
       <div className="rounded-lg border bg-card p-4">
         <PathConfigPanel type="llamacpp" />
       </div>

@@ -1,0 +1,229 @@
+// Package storage provides in-memory storage implementation
+package storage
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+)
+
+// MemoryStore implements Store interface with in-memory storage
+type MemoryStore struct {
+	mu            sync.RWMutex
+	conversations map[string]*Conversation
+	messages      map[string][]*Message // conversation_id -> messages
+	messagesByID  map[string]*Message
+}
+
+// NewMemoryStore creates a new in-memory store
+func NewMemoryStore() (*MemoryStore, error) {
+	return &MemoryStore{
+		conversations: make(map[string]*Conversation),
+		messages:      make(map[string][]*Message),
+		messagesByID:  make(map[string]*Message),
+	}, nil
+}
+
+// CreateConversation creates a new conversation
+func (s *MemoryStore) CreateConversation(ctx context.Context, conv *Conversation) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if conv.ID == "" {
+		conv.ID = generateID("conv")
+	}
+
+	if conv.CreatedAt.IsZero() {
+		conv.CreatedAt = time.Now()
+	}
+
+	if conv.UpdatedAt.IsZero() {
+		conv.UpdatedAt = time.Now()
+	}
+
+	s.conversations[conv.ID] = conv
+	s.messages[conv.ID] = []*Message{}
+
+	return nil
+}
+
+// GetConversation retrieves a conversation by ID
+func (s *MemoryStore) GetConversation(ctx context.Context, id string) (*Conversation, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	conv, exists := s.conversations[id]
+	if !exists {
+		return nil, ErrConversationNotFound
+	}
+
+	// Return a copy to avoid race conditions
+	convCopy := *conv
+	return &convCopy, nil
+}
+
+// ListConversations lists all conversations
+func (s *MemoryStore) ListConversations(ctx context.Context, limit, offset int) ([]*Conversation, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	convs := make([]*Conversation, 0, len(s.conversations))
+
+	for _, conv := range s.conversations {
+		convs = append(convs, conv)
+	}
+
+	// Simple pagination (in production, should sort by updated_at)
+	if offset >= len(convs) {
+		return []*Conversation{}, nil
+	}
+
+	end := offset + limit
+	if end > len(convs) {
+		end = len(convs)
+	}
+
+	return convs[offset:end], nil
+}
+
+// UpdateConversation updates an existing conversation
+func (s *MemoryStore) UpdateConversation(ctx context.Context, conv *Conversation) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.conversations[conv.ID]; !exists {
+		return ErrConversationNotFound
+	}
+
+	conv.UpdatedAt = time.Now()
+	s.conversations[conv.ID] = conv
+
+	return nil
+}
+
+// DeleteConversation deletes a conversation and its messages
+func (s *MemoryStore) DeleteConversation(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.conversations[id]; !exists {
+		return ErrConversationNotFound
+	}
+
+	delete(s.conversations, id)
+
+	// Delete associated messages
+	for _, msg := range s.messages[id] {
+		delete(s.messagesByID, msg.ID)
+	}
+	delete(s.messages, id)
+
+	return nil
+}
+
+// CreateMessage creates a new message
+func (s *MemoryStore) CreateMessage(ctx context.Context, msg *Message) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if msg.ID == "" {
+		msg.ID = generateID("msg")
+	}
+
+	if msg.CreatedAt.IsZero() {
+		msg.CreatedAt = time.Now()
+	}
+
+	s.messagesByID[msg.ID] = msg
+	s.messages[msg.ConversationID] = append(s.messages[msg.ConversationID], msg)
+
+	// Update conversation message count and timestamp
+	if conv, exists := s.conversations[msg.ConversationID]; exists {
+		conv.MessageCount = len(s.messages[msg.ConversationID])
+		conv.UpdatedAt = time.Now()
+	}
+
+	return nil
+}
+
+// GetMessages retrieves messages for a conversation
+func (s *MemoryStore) GetMessages(ctx context.Context, conversationID string, limit, offset int) ([]*Message, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	messages, exists := s.messages[conversationID]
+	if !exists {
+		return []*Message{}, nil
+	}
+
+	if offset >= len(messages) {
+		return []*Message{}, nil
+	}
+
+	end := offset + limit
+	if end > len(messages) {
+		end = len(messages)
+	}
+
+	return messages[offset:end], nil
+}
+
+// DeleteMessages deletes all messages for a conversation
+func (s *MemoryStore) DeleteMessages(ctx context.Context, conversationID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	messages, exists := s.messages[conversationID]
+	if !exists {
+		return nil
+	}
+
+	for _, msg := range messages {
+		delete(s.messagesByID, msg.ID)
+	}
+
+	delete(s.messages, conversationID)
+
+	// Update conversation message count
+	if conv, exists := s.conversations[conversationID]; exists {
+		conv.MessageCount = 0
+		conv.UpdatedAt = time.Now()
+	}
+
+	return nil
+}
+
+// Close closes the store (no-op for memory store)
+func (s *MemoryStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.conversations = make(map[string]*Conversation)
+	s.messages = make(map[string][]*Message)
+	s.messagesByID = make(map[string]*Message)
+
+	return nil
+}
+
+// Stats returns statistics about the store
+func (s *MemoryStore) Stats() map[string]interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	totalMessages := 0
+	for _, msgs := range s.messages {
+		totalMessages += len(msgs)
+	}
+
+	return map[string]interface{}{
+		"conversations": len(s.conversations),
+		"messages":      totalMessages,
+		"type":          "memory",
+	}
+}
+
+// generateID generates a unique ID with a prefix
+func generateID(prefix string) string {
+	return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
+}

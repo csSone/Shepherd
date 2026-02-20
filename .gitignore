@@ -62,6 +62,17 @@ coverage/
 *.out
 *.coverprofile
 profile.cov
+
 # Web frontend
 web/node_modules/
 web/package-lock.json
+
+# Data directories
+data/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+AGENTS.md

@@ -5,7 +5,7 @@
 backend:
   # 后端 API 地址（可配置多个，按优先级使用）
   urls:
-    - "http://localhost:9190"
+    - "http://10.0.0.193:9190"
     - "http://192.168.1.100:9190"
   # 当前使用的后端索引（0 表示第一个）
   currentIndex: 0
@@ -30,7 +30,7 @@ server:
 cors:
   # 允许的后端源
   allowedOrigins:
-    - "http://localhost:9190"
+    - "http://10.0.0.193:9190"
     - "http://192.168.1.100:9190"
   # 是否发送凭据
   credentials: false
@@ -40,7 +40,7 @@ features:
   models: true        # 模型管理（已实现）
   downloads: true     # 下载管理（已实现）
   cluster: false      # 集群管理（开发中）
-  logs: false         # 日志查看（开发中）
+  logs: true         # 日志查看（开发中）
   chat: true          # 聊天功能（已实现）
   settings: true      # 设置页面（已实现）
   dashboard: true     # 仪表盘（已实现）

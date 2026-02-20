@@ -12,19 +12,19 @@ import (
 
 // StreamLogEntry represents a single log entry for streaming
 type StreamLogEntry struct {
-	Timestamp time.Time `json:"timestamp"`
-	Level     string    `json:"level"`
-	Message   string    `json:"message"`
+	Timestamp time.Time              `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
 	Fields    map[string]interface{} `json:"fields,omitempty"`
 }
 
 // LogStream manages a stream of log entries
 type LogStream struct {
-	mu       sync.RWMutex
-	entries  []StreamLogEntry
-	maxSize  int
+	mu          sync.RWMutex
+	entries     []StreamLogEntry
+	maxSize     int
 	subscribers map[chan StreamLogEntry]struct{}
-	closed   bool
+	closed      bool
 }
 
 // NewLogStream creates a new log stream

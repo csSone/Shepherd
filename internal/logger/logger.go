@@ -51,18 +51,18 @@ type Field struct {
 
 // Logger is the main logger structure
 type Logger struct {
-	mu            sync.Mutex
-	level         LogLevel
-	formatJSON    bool
-	outputs       []io.Writer
-	fileWriter    io.WriteCloser
-	logDir        string
-	maxSize       int64  // MB
-	maxBackups    int
-	maxAge        int    // days
-	currentSize   int64
-	currentDate   string
-	serverMode    string // standalone, master, client
+	mu          sync.Mutex
+	level       LogLevel
+	formatJSON  bool
+	outputs     []io.Writer
+	fileWriter  io.WriteCloser
+	logDir      string
+	maxSize     int64 // MB
+	maxBackups  int
+	maxAge      int // days
+	currentSize int64
+	currentDate string
+	serverMode  string // standalone, master, client
 }
 
 var (
@@ -340,11 +340,26 @@ func (l *Logger) log(level LogLevel, msg string, fields []Field) {
 		}
 		// Flush if the writer supports it (e.g., *os.File)
 		if f, ok := w.(*os.File); ok {
-		if err := f.Sync(); err != nil {
+			if err := f.Sync(); err != nil {
+			}
+			info, _ := f.Stat()
+			l.currentSize = info.Size()
 		}
-		info, _ := f.Stat()
-		l.currentSize = info.Size()
+	}
+
+	// Send to log stream for real-time viewing
+	if globalLogStream != nil {
+		fieldsMap := make(map[string]interface{})
+		for _, f := range fields {
+			fieldsMap[f.Key] = f.Value
 		}
+		entry := StreamLogEntry{
+			Timestamp: time.Now(),
+			Level:     level.String(),
+			Message:   msg,
+			Fields:    fieldsMap,
+		}
+		globalLogStream.Add(entry)
 	}
 }
 

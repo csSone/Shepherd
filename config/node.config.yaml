@@ -1,0 +1,179 @@
+# Shepherd Node 配置文件
+# 支持新架构的分布式节点配置
+
+# 节点基本配置
+node:
+  # 节点ID，"auto" 表示自动生成 UUID
+  id: "auto"
+  
+  # 节点名称，为空时使用主机名
+  name: ""
+  
+  # 节点角色: standalone | master | client | hybrid
+  # - standalone: 单机模式，不与其他节点通信
+  # - master: 作为主节点，管理其他 client 节点
+  # - client: 作为工作节点，连接 master 并执行命令
+  # - hybrid: 混合模式，既可作为 master 管理其他节点，也可作为 client 连接到上层 master
+  role: "standalone"
+  
+  # Master 角色配置（当 role 为 master 或 hybrid 时使用）
+  master_role:
+    enabled: false
+    port: 9190                    # Master 服务端口
+    api_key: ""                   # API 密钥，用于节点间身份验证
+    ssl:
+      enabled: false
+      cert_path: ""               # SSL 证书路径
+      key_path: ""                # SSL 密钥路径
+  
+  # Client 角色配置（当 role 为 client 或 hybrid 时使用）
+  client_role:
+    enabled: false
+    master_address: ""            # Master 节点地址，如 http://192.168.1.100:9190
+    register_retry: 3             # 注册重试次数
+    heartbeat_interval: 5         # 心跳间隔（秒）
+    heartbeat_timeout: 15         # 心跳超时（秒）
+  
+  # 资源监控配置
+  resources:
+    monitor_interval: 5           # 资源监控间隔（秒）
+    report_gpu: true              # 是否报告 GPU 信息
+    report_temperature: true      # 是否报告 GPU 温度
+    gpu_backend: "auto"           # GPU 后端: auto | nvidia | amd | intel
+  
+  # 命令执行器配置
+  executor:
+    max_concurrent: 4             # 最大并发任务数
+    task_timeout: 3600            # 任务超时时间（秒）
+    allow_remote_stop: true       # 是否允许远程停止任务
+    allowed_commands:             # 允许的命令白名单
+      - load_model
+      - unload_model
+      - run_llamacpp
+      - stop_process
+      - scan_models
+      - collect_logs
+
+# 服务器配置（原有配置，保持向后兼容）
+server:
+  host: "0.0.0.0"
+  web_port: 9190
+  anthropic_port: 9170
+  ollama_port: 11434
+  lmstudio_port: 1234
+  read_timeout: 60
+  write_timeout: 60
+
+# 模型配置
+model:
+  paths:
+    - "./models"
+    - "~/.cache/huggingface/hub"
+  auto_scan: true
+  scan_interval: 0
+
+# llama.cpp 配置
+llamacpp:
+  paths:
+    - path: "./llama.cpp"
+      name: "Default"
+      description: "默认 llama.cpp 路径"
+
+# 下载配置
+download:
+  directory: "./downloads"
+  max_concurrent: 4
+  chunk_size: 1048576          # 1MB
+  retry_count: 3
+  timeout: 300                 # 5 minutes
+
+# 安全配置
+security:
+  api_key_enabled: false
+  api_key: ""
+  cors_enabled: true
+  allowed_origins:
+    - "*"
+
+# API 兼容性配置
+compatibility:
+  ollama:
+    enabled: true
+    port: 11434
+  lmstudio:
+    enabled: false
+    port: 1234
+
+# 日志配置
+log:
+  level: "info"                # debug, info, warn, error
+  format: "json"               # json, text
+  output: "both"               # stdout, file, both
+  directory: "./logs"
+  max_size: 100                # MB
+  max_backups: 3
+  max_age: 7                   # days
+  compress: true
+
+# 存储配置
+storage:
+  type: "sqlite"               # sqlite, memory, redis
+  sqlite:
+    path: "./data/shepherd.db"
+    enable_wal: true
+    pragmas:
+      cache_size: "-64000"     # 64MB cache
+      synchronous: "NORMAL"
+
+# 运行模式（向后兼容）
+# 可选值: standalone, master, client
+# 注意: 新架构中推荐使用 node.role 字段
+mode: "standalone"
+
+# Master-Client 配置（向后兼容）
+master:
+  enabled: false
+  client_config_dir: "./config/clients"
+  network_scan:
+    enabled: false
+    subnets:
+      - "192.168.1.0/24"
+      - "10.0.0.0/8"
+    port_range: "9191-9200"
+    timeout: 5
+    auto_discover: false
+    interval: 0
+  scheduler:
+    strategy: "round_robin"
+    max_queue_size: 100
+    task_timeout: 300
+    retry_on_failure: true
+    max_retries: 3
+  log_aggregation:
+    enabled: true
+    max_buffer_size: 1048576   # 1MB per client
+    flush_interval: 10
+
+# Client 配置（向后兼容）
+client:
+  enabled: false
+  master_address: ""
+  client_info:
+    id: ""
+    name: ""
+    tags: []
+    metadata:
+      os: "linux"
+      arch: "amd64"
+  heartbeat:
+    interval: 30
+    timeout: 90
+  conda_env:
+    enabled: false
+    conda_path: ""
+    environments:
+      shepherd: ""
+  # 新架构字段
+  register_retry: 3
+  heartbeat_interval: 5
+  heartbeat_timeout: 15

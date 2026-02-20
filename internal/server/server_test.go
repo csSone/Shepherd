@@ -18,20 +18,27 @@ import (
 // Helper function to create a test server with model manager
 func createTestServer(t *testing.T) *Server {
 	cfg := config.DefaultConfig()
+	configMgr := config.NewManager("standalone")
+	_, _ = configMgr.Load() // 加载默认配置，忽略错误
+
 	procMgr := process.NewManager()
-	modelMgr := model.NewManager(cfg, nil, procMgr)
+	modelMgr := model.NewManager(cfg, configMgr, procMgr)
 
 	serverConfig := &Config{
 		WebPort:       8080,
 		AnthropicPort: 8070,
 		OllamaPort:    11434,
 		LMStudioPort:  1234,
-		Host:         "0.0.0.0",
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		Host:          "0.0.0.0",
+		ReadTimeout:   60 * time.Second,
+		WriteTimeout:  60 * time.Second,
+		ServerCfg:     cfg,
+		ConfigMgr:     configMgr,
 	}
 
-	return NewServer(serverConfig, modelMgr)
+	server, err := NewServer(serverConfig, modelMgr)
+	require.NoError(t, err)
+	return server
 }
 
 func TestNewServer(t *testing.T) {
@@ -176,18 +183,24 @@ func TestServerSSEEndpoint(t *testing.T) {
 
 func TestServerStartStop(t *testing.T) {
 	cfg := config.DefaultConfig()
+	configMgr := config.NewManager("standalone")
+	_, _ = configMgr.Load()
+
 	procMgr := process.NewManager()
-	modelMgr := model.NewManager(cfg, nil, procMgr)
+	modelMgr := model.NewManager(cfg, configMgr, procMgr)
 
 	serverConfig := &Config{
-		WebPort: 18080, // Use non-standard port for testing
-		Host:    "127.0.0.1",
+		WebPort:   18080, // Use non-standard port for testing
+		Host:      "127.0.0.1",
+		ServerCfg: cfg,
+		ConfigMgr: configMgr,
 	}
 
-	server := NewServer(serverConfig, modelMgr)
+	server, err := NewServer(serverConfig, modelMgr)
+	require.NoError(t, err)
 
 	// Start server
-	err := server.Start()
+	err = server.Start()
 	assert.NoError(t, err)
 
 	// Give server time to start
@@ -227,15 +240,23 @@ func TestServerConfigDefaults(t *testing.T) {
 
 func BenchmarkServerRequest(b *testing.B) {
 	cfg := config.DefaultConfig()
+	configMgr := config.NewManager("standalone")
+	_, _ = configMgr.Load()
+
 	procMgr := process.NewManager()
-	modelMgr := model.NewManager(cfg, nil, procMgr)
+	modelMgr := model.NewManager(cfg, configMgr, procMgr)
 
 	serverConfig := &Config{
-		WebPort: 8080,
-		Host:    "0.0.0.0",
+		WebPort:   8080,
+		Host:      "0.0.0.0",
+		ServerCfg: cfg,
+		ConfigMgr: configMgr,
 	}
 
-	server := NewServer(serverConfig, modelMgr)
+	server, err := NewServer(serverConfig, modelMgr)
+	if err != nil {
+		b.Fatal(err)
+	}
 	router := server.GetEngine()
 
 	req := httptest.NewRequest("GET", "/api/info", nil)

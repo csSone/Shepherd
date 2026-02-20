@@ -58,6 +58,14 @@ log:
     max_backups: 3
     max_age: 7
     compress: true
+storage:
+    type: memory  # memory|sqlite|postgresql
+    sqlite:
+        path: ./data/shepherd.db
+        enable_wal: true
+        pragmas:
+            cache_size: "-64000"
+            synchronous: "NORMAL"
 mode: standalone
 master:
     enabled: false

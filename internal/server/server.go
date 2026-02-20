@@ -11,23 +11,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
-	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/paths"
+	storageapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/master"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
 )
 
 // Server represents the HTTP server
 type Server struct {
-	engine      *gin.Engine
-	httpServer  *http.Server
-	config      *Config
-	handlers    *Handlers
-	wsMgr       *websocket.Manager
-	modelMgr    *model.Manager
+	engine     *gin.Engine
+	httpServer *http.Server
+	config     *Config
+	handlers   *Handlers
+	wsMgr      *websocket.Manager
+	modelMgr   *model.Manager
+	storageMgr *storage.Manager
 
 	mu     sync.RWMutex
 	ctx    context.Context
@@ -46,9 +50,9 @@ type Config struct {
 	WriteTimeout  time.Duration
 	WebUIPath     string
 	// Mode and ServerMode for runtime configuration
-	Mode        string // standalone|master|client
-	ServerCfg   *config.Config
-	ConfigMgr   *config.Manager // 配置管理器
+	Mode      string // standalone|master|client
+	ServerCfg *config.Config
+	ConfigMgr *config.Manager // 配置管理器
 }
 
 // Handlers contains handler instances
@@ -57,10 +61,11 @@ type Handlers struct {
 	Ollama    *ollama.Handler
 	Anthropic *anthropic.Handler
 	Paths     *paths.Handler
+	Storage   *storageapi.Handler
 }
 
 // NewServer creates a new HTTP server
-func NewServer(config *Config, modelMgr *model.Manager) *Server {
+func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	s := &Server{
@@ -71,6 +76,14 @@ func NewServer(config *Config, modelMgr *model.Manager) *Server {
 		modelMgr: modelMgr,
 	}
 
+	// Initialize storage manager
+	storageMgr, err := storage.NewManager(&config.ServerCfg.Storage)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to initialize storage manager: %w", err)
+	}
+	s.storageMgr = storageMgr
+
 	// Create WebSocket manager
 	s.wsMgr = websocket.NewManager(modelMgr)
 
@@ -79,6 +92,7 @@ func NewServer(config *Config, modelMgr *model.Manager) *Server {
 	s.handlers.Ollama = ollama.NewHandler(modelMgr)
 	s.handlers.Anthropic = anthropic.NewHandler(modelMgr)
 	s.handlers.Paths = paths.NewHandler(config.ConfigMgr)
+	s.handlers.Storage = storageapi.NewHandler(config.ConfigMgr, storageMgr)
 
 	// Setup Gin engine
 	if config.WebUIPath == "" {
@@ -91,7 +105,7 @@ func NewServer(config *Config, modelMgr *model.Manager) *Server {
 	s.setupMiddleware()
 	s.setupRoutes()
 
-	return s
+	return s, nil
 }
 
 // setupMiddleware configures server middleware
@@ -137,6 +151,22 @@ func (s *Server) setupRoutes() {
 				models.PUT("", s.handlers.Paths.UpdateModelPath)
 				models.DELETE("", s.handlers.Paths.RemoveModelPath)
 			}
+
+			// Storage configuration
+			storage := config.Group("/storage")
+			{
+				storage.GET("", s.handlers.Storage.GetStorageConfig)
+				storage.PUT("", s.handlers.Storage.UpdateStorageConfig)
+				storage.GET("/stats", s.handlers.Storage.GetStats)
+			}
+		}
+
+		// Chat/Conversation routes
+		conversations := api.Group("/conversations")
+		{
+			conversations.GET("", s.handlers.Storage.GetConversations)
+			conversations.GET("/:id", s.handlers.Storage.GetConversation)
+			conversations.DELETE("/:id", s.handlers.Storage.DeleteConversation)
 		}
 
 		// Model routes
@@ -286,7 +316,17 @@ func (s *Server) Stop() error {
 	s.wsMgr.Stop()
 	logger.Info("WebSocket 管理器已停止")
 
-	// Step 5: Wait for all goroutines to finish
+	// Step 5: Close storage manager
+	logger.Info("关闭存储管理器...")
+	if s.storageMgr != nil {
+		if err := s.storageMgr.Close(); err != nil {
+			logger.Errorf("存储管理器关闭失败: %v", err)
+		} else {
+			logger.Info("存储管理器已关闭")
+		}
+	}
+
+	// Step 6: Wait for all goroutines to finish
 	logger.Info("等待所有协程完成...")
 	s.wg.Wait()
 	logger.Info("所有协程已完成")
@@ -334,6 +374,12 @@ func (s *Server) GetEngine() *gin.Engine {
 // GetWebSocketManager returns the WebSocket manager
 func (s *Server) GetWebSocketManager() *websocket.Manager {
 	return s.wsMgr
+}
+
+func (s *Server) RegisterMasterHandler(handler *master.MasterHandler) {
+	api := s.engine.Group("/api")
+	handler.RegisterRoutes(api)
+	logger.Info("Master API routes registered")
 }
 
 // Middleware
