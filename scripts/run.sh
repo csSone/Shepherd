@@ -51,10 +51,6 @@ show_help() {
     -b, --build    运行前先编译
     -v, --version  显示版本信息
 
-Master 模式选项:
-    --port PORT    Web 服务器端口 (默认: 9190)
-    --scan         启动时自动扫描网络
-
 Client 模式选项:
     --master URL   Master 地址 (必需)
     --name NAME    Client 名称 (可选)
@@ -65,13 +61,13 @@ Client 模式选项:
     $0 standalone
 
     # Master 模式
-    $0 master --port 9190 --scan
+    $0 master
 
     # Client 模式
     $0 client --master http://192.168.1.100:9190 --name client-1
 
     # 运行前先编译
-    $0 master -b
+    $0 standalone -b
 
 EOF
 }
@@ -109,8 +105,6 @@ main() {
     local MASTER_ADDR=""
     local CLIENT_NAME=""
     local CLIENT_TAGS=""
-    local WEB_PORT="9190"
-    local AUTO_SCAN=false
 
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -142,14 +136,6 @@ main() {
                 CLIENT_TAGS="$2"
                 shift 2
                 ;;
-            --port)
-                WEB_PORT="$2"
-                shift 2
-                ;;
-            --scan)
-                AUTO_SCAN=true
-                shift
-                ;;
             *)
                 print_error "未知参数: $1"
                 show_help
@@ -173,19 +159,9 @@ main() {
     # 检查二进制文件
     check_binary
 
-    # 构建命令参数
-    local ARGS=()
-    ARGS+=("--mode=${MODE}")
-
     case "$MODE" in
         master)
             print_info "启动 Master 模式..."
-            ARGS+=("--master-addr=0.0.0.0:${WEB_PORT}")
-
-            if [ "$AUTO_SCAN" = true ]; then
-                print_info "启用自动网络扫描"
-            fi
-            ;;
         client)
             if [ -z "$MASTER_ADDR" ]; then
                 print_error "Client 模式需要指定 Master 地址 (--master)"
@@ -194,7 +170,6 @@ main() {
             fi
             print_info "启动 Client 模式..."
             print_info "Master 地址: ${MASTER_ADDR}"
-            ARGS+=("--master-address=${MASTER_ADDR}")
 
             if [ -n "$CLIENT_NAME" ]; then
                 print_info "Client 名称: ${CLIENT_NAME}"
@@ -211,15 +186,16 @@ main() {
             ;;
     esac
 
+    # 构建命令参数（使用位置参数）
+    local ARGS=()
+    ARGS+=("${MODE}")
+
     # 显示启动信息
     echo ""
     echo "=========================================="
-    echo "  🐏 Shepherd v${MODE}"
+    echo "  🐏 Shepherd"
     echo "=========================================="
     echo "  模式: ${MODE}"
-    if [ "$MODE" = "master" ]; then
-        echo "  端口: ${WEB_PORT}"
-    fi
     if [ "$MODE" = "client" ]; then
         echo "  Master: ${MASTER_ADDR}"
     fi
