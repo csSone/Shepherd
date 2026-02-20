@@ -59,9 +59,7 @@ export function ModelsPage() {
 
   // 处理扫描
   const handleScan = () => {
-    if (confirm('确定要重新扫描模型目录吗？')) {
-      scanModels.mutate();
-    }
+    scanModels.mutate();
   };
 
   return (
