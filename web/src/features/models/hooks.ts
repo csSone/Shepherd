@@ -123,12 +123,21 @@ export function useScanModels() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await apiClient.post<{ success: boolean }>('/scan');
+      const response = await apiClient.post<{
+        message: string;
+        models_found: number;
+        errors: number;
+        duration_ms: number;
+        models: Model[];
+        scan_errors: Array<{ path: string; error: string }>;
+      }>('/scan');
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // 扫描完成后刷新模型列表
       queryClient.invalidateQueries({ queryKey: ['models'] });
+      // 显示扫描结果
+      console.log(`扫描完成: 找到 ${data.models_found} 个模型`);
     },
   });
 }
