@@ -266,9 +266,9 @@ func (m *Manager) isModelFile(path string) bool {
 	// 支持的模型格式
 	// GGUF 格式 (主要支持，可被 llama.cpp 加载)
 	patterns := []string{
-		".gguf",        // GGUF 格式
+		".gguf", // GGUF 格式
 		".GGUF",
-		"gguf-",        // 分卷 GGUF
+		"gguf-", // 分卷 GGUF
 	}
 
 	// 检查文件扩展名
@@ -512,6 +512,35 @@ func (m *Manager) GetModel(id string) (*Model, bool) {
 
 // ListModels returns all models
 func (m *Manager) ListModels() []*Model {
+	m.mu.RLock()
+	modelCount := len(m.models)
+	m.mu.RUnlock()
+
+	// 如果内存中没有模型，自动触发一次扫描
+	if modelCount == 0 {
+		fmt.Printf("[INFO] ListModels: 内存中没有模型，触发自动扫描\n")
+		// 使用 background context 进行自动扫描
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		// 在 goroutine 中执行扫描，避免阻塞当前调用
+		done := make(chan bool, 1)
+		go func() {
+			if _, err := m.Scan(ctx); err != nil {
+				fmt.Printf("[WARN] ListModels: 自动扫描失败: %v\n", err)
+			}
+			done <- true
+		}()
+
+		// 等待扫描完成，最多等待 10 秒
+		select {
+		case <-done:
+			fmt.Printf("[INFO] ListModels: 自动扫描完成\n")
+		case <-time.After(10 * time.Second):
+			fmt.Printf("[WARN] ListModels: 自动扫描超时，返回当前模型列表\n")
+		}
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -962,7 +991,34 @@ func (m *Manager) CleanInvalidModels() int {
 }
 
 // SearchModels searches and filters models based on criteria
+// 如果内存中没有模型，会自动触发一次扫描
 func (m *Manager) SearchModels(filter *ModelFilter, sort *ModelSort) *ModelSearchResult {
+	m.mu.RLock()
+	modelCount := len(m.models)
+	m.mu.RUnlock()
+
+	// 如果内存中没有模型，自动触发一次扫描
+	if modelCount == 0 {
+		fmt.Printf("[INFO] SearchModels: 内存中没有模型，触发自动扫描\n")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		done := make(chan bool, 1)
+		go func() {
+			if _, err := m.Scan(ctx); err != nil {
+				fmt.Printf("[WARN] SearchModels: 自动扫描失败: %v\n", err)
+			}
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			fmt.Printf("[INFO] SearchModels: 自动扫描完成\n")
+		case <-time.After(10 * time.Second):
+			fmt.Printf("[WARN] SearchModels: 自动扫描超时\n")
+		}
+	}
+
 	m.mu.RLock()
 	allModels := make([]*Model, 0, len(m.models))
 	for _, model := range m.models {

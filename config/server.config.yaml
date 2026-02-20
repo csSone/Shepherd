@@ -45,7 +45,7 @@ security:
 compatibility:
     ollama:
         enabled: false
-        port: 11436
+        port: 11435
     lmstudio:
         enabled: false
         port: 1234
