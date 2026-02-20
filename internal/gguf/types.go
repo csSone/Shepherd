@@ -5,6 +5,7 @@ package gguf
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -173,9 +174,10 @@ func (r *Reader) ReadString() (string, error) {
 		return "", nil
 	}
 	// Limit string size to prevent excessive memory allocation
-	const maxStringSize = 10 * 1024 * 1024 // 10MB
+	// 增加限制到 100MB，支持新的 GGUF v3 格式和大型元数据
+	const maxStringSize = 100 * 1024 * 1024 // 100MB
 	if length > maxStringSize {
-		return "", errors.New("string size exceeds maximum allowed size")
+		return "", fmt.Errorf("string size %d exceeds maximum allowed size %d", length, maxStringSize)
 	}
 
 	data := make([]byte, length)

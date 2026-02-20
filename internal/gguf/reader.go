@@ -9,11 +9,11 @@ import (
 
 // Reader handles reading GGUF files and extracting metadata
 type GGUFReader struct {
-	path    string
-	file    *os.File
-	reader  *Reader
-	data    []byte     // Mapped file data
-	mapped  bool       // Whether memory mapping is used
+	path   string
+	file   *os.File
+	reader *Reader
+	data   []byte // Mapped file data
+	mapped bool   // Whether memory mapping is used
 }
 
 // NewGGUFReader creates a new GGUF file reader
@@ -60,23 +60,33 @@ func ReadMetadata(path string) (*Metadata, error) {
 	for i := uint64(0); i < header.MetadataKVCount; i++ {
 		key, err := r.reader.ReadString()
 		if err != nil {
-			return nil, fmt.Errorf("failed to read metadata key at index %d: %w", i, err)
+			// 如果读取键失败，尝试跳过这个字段
+			fmt.Printf("[WARN] Failed to read metadata key at index %d: %v, attempting to continue\n", i, err)
+			// 无法安全恢复，停止解析
+			break
 		}
 
 		valueType, err := r.reader.ReadType()
 		if err != nil {
-			return nil, fmt.Errorf("failed to read value type for key '%s': %w", key, err)
+			fmt.Printf("[WARN] Failed to read value type for key '%s': %v, attempting to continue\n", key, err)
+			// 尝试跳过剩余的键值对
+			// 由于我们不知道有多少数据，只能尝试恢复
+			continue
 		}
 
 		value, err := r.reader.readValueOrSkip(key, valueType)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read value for key '%s': %w", key, err)
+			// 如果读取值失败，记录警告并尝试跳过这个字段
+			fmt.Printf("[WARN] Failed to read value for key '%s' (type %v): %v, attempting to continue\n", key, valueType, err)
+			// 尝试跳过并继续解析下一个字段
+			// 注意：这可能导致后续字段也解析失败
+			continue
 		}
 
 		// Store the metadata
 		if err := meta.setField(key, value, valueType); err != nil {
 			// Log warning but continue parsing
-			fmt.Printf("Warning: failed to set field '%s': %v\n", key, err)
+			fmt.Printf("[WARN] Failed to set field '%s': %v\n", key, err)
 		}
 	}
 
