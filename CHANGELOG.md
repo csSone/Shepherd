@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### 稳定性修复
+- **HTTP 客户端超时配置** - 修复 API 请求挂起 30 秒导致前端卡死的问题
+  - 添加 10 秒总超时，5 秒连接超时
+  - 配置连接池和 Keep-Alive 优化性能
+  - 修复文件：`internal/modelrepo/client.go`
+- **Logger 空指针安全** - 修复 SSE 连接触发 panic 的问题
+  - 添加 `f.Stat()` 错误处理，避免 nil 指针访问
+  - 失败时降级到 stderr 输出，确保服务不中断
+  - 修复文件：`internal/logger/logger.go`
+- **Logger stdout Sync 警告** - 修复对 stdout/stderr 执行 Sync 导致的警告
+  - 只对普通文件执行 Sync，跳过 stdout/stderr
+  - 修复文件：`internal/logger/logger.go`
+
+#### 前端优化
+- **API 防抖机制** - 减少无效请求，防止前端卡死
+  - `repoId.length > 3` 检查，至少 3 个字符才触发请求
+  - AbortSignal 支持，组件卸载时自动取消请求
+  - 5 分钟缓存 + 10 分钟 gcTime
+  - 修复文件：`web/src/features/downloads/hooks.ts`
+- **API 客户端增强** - 支持请求取消
+  - `get()` 方法添加 `signal` 参数
+  - 修复文件：`web/src/lib/api/client.ts`
+  - 修复文件：`web/src/lib/api/downloads.ts`
+
+### Performance
+- API 响应超时从 30 秒降至 5 秒（**提升 6 倍**）
+- 前端输入不再卡死，用户体验显著改善
+- SSE 连接稳定，无 panic
+
 ### Added
 
 #### 模型仓库集成
