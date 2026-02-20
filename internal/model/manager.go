@@ -111,10 +111,11 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	return result, nil
 }
 
-// scanPath scans a single path for models
+// scanPath scans a single path for models with enhanced robustness
 func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []ScanError) {
 	var models []*Model
 	var errors []ScanError
+	var mu sync.Mutex
 
 	// Update scan status
 	m.mu.Lock()
@@ -124,13 +125,25 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 	// Check if path exists
 	info, err := os.Stat(scanPath)
 	if err != nil {
-		return nil, []ScanError{{Path: scanPath, Error: err.Error()}}
+		return nil, []ScanError{{Path: scanPath, Error: fmt.Sprintf("路径访问失败: %v", err)}}
 	}
 
-	// Walk directory
+	// Check if path is readable
 	if info.IsDir() {
+		// Test read permission by trying to open the directory
+		f, err := os.Open(scanPath)
+		if err != nil {
+			return nil, []ScanError{{Path: scanPath, Error: fmt.Sprintf("目录读取失败: %v", err)}}
+		}
+		f.Close()
+	}
+
+	// Use concurrent processing for directories
+	if info.IsDir() {
+		var wg sync.WaitGroup
+		semaphore := make(chan struct{}, 10)
+
 		err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
-			// Check context
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -138,36 +151,61 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 			}
 
 			if err != nil {
-				errors = append(errors, ScanError{Path: path, Error: err.Error()})
+				mu.Lock()
+				errors = append(errors, ScanError{
+					Path:  path,
+					Error: fmt.Sprintf("文件访问错误: %v", err),
+				})
+				mu.Unlock()
 				return nil
 			}
 
-			// Skip directories
 			if info.IsDir() {
 				return nil
 			}
 
-			// Check if file is a GGUF model
 			if m.isGGUFFile(path) {
-				model, err := m.loadModel(path)
-				if err != nil {
-					errors = append(errors, ScanError{Path: path, Error: err.Error()})
-				} else {
-					models = append(models, model)
-				}
+				wg.Add(1)
+				semaphore <- struct{}{}
+
+				go func(filePath string) {
+					defer wg.Done()
+					defer func() { <-semaphore }()
+
+					model, err := m.loadModelWithValidation(filePath)
+					if err != nil {
+						mu.Lock()
+						errors = append(errors, ScanError{
+							Path:  filePath,
+							Error: err.Error(),
+						})
+						mu.Unlock()
+					} else {
+						mu.Lock()
+						models = append(models, model)
+						mu.Unlock()
+					}
+				}(path)
 			}
 
 			return nil
 		})
 
-		if err != nil {
-			errors = append(errors, ScanError{Path: scanPath, Error: err.Error()})
+		wg.Wait()
+
+		if err != nil && err != ctx.Err() {
+			errors = append(errors, ScanError{
+				Path:  scanPath,
+				Error: fmt.Sprintf("扫描中断: %v", err),
+			})
 		}
 	} else if m.isGGUFFile(scanPath) {
-		// Single file
-		model, err := m.loadModel(scanPath)
+		model, err := m.loadModelWithValidation(scanPath)
 		if err != nil {
-			errors = append(errors, ScanError{Path: scanPath, Error: err.Error()})
+			errors = append(errors, ScanError{
+				Path:  scanPath,
+				Error: err.Error(),
+			})
 		} else {
 			models = append(models, model)
 		}
@@ -257,6 +295,40 @@ func (m *Manager) loadModel(path string) (*Model, error) {
 			model.MmprojPath = mmprojPath
 			model.MmprojMeta = mmprojMeta
 		}
+	}
+
+	return model, nil
+}
+
+// loadModelWithValidation loads a model with additional validation
+func (m *Manager) loadModelWithValidation(path string) (*Model, error) {
+	// Validate file exists and is readable
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("无法访问模型文件: %w", err)
+	}
+
+	// Check file size (must be at least 1KB to be valid)
+	if info.Size() < 1024 {
+		return nil, fmt.Errorf("模型文件太小 (%d bytes), 可能已损坏", info.Size())
+	}
+
+	// Check file is readable
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("无法读取模型文件: %w", err)
+	}
+	f.Close()
+
+	// Load model
+	model, err := m.loadModel(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate metadata
+	if model.Metadata == nil {
+		return nil, fmt.Errorf("无法读取模型元数据")
 	}
 
 	return model, nil
