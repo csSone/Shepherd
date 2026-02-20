@@ -21,8 +21,8 @@ const allNavItems = [
   { path: '/', icon: LayoutDashboard, label: '仪表盘', feature: 'dashboard' },
   { path: '/models', icon: Package, label: '模型管理', feature: 'models' },
   { path: '/downloads', icon: Download, label: '下载管理', feature: 'downloads' },
-  {path: '/chat', icon: MessageSquare, label: '聊天', feature: 'chat' },
   { path: '/cluster', icon: Network, label: '集群管理', feature: 'cluster' },
+  {path: '/chat', icon: MessageSquare, label: '聊天', feature: 'chat' },
   { path: '/logs', icon: ScrollText, label: '日志', feature: 'logs' },
   { path: '/settings', icon: Settings, label: '设置', feature: 'settings' },
 ];

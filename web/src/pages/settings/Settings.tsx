@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Settings as SettingsIcon,
   Zap,
@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PathConfigPanel } from '@/components/settings/PathConfigPanel';
+import { ApiConfigCard, type ApiConfig } from '@/components/settings/ApiConfigCard';
+import { compatibilityApi } from '@/lib/api/compatibility';
+import { useToast } from '@/hooks/useToast';
 
 /**
  * 设置标签类型
@@ -94,24 +97,176 @@ export function SettingsPage() {
  * 通用设置面板
  */
 function GeneralSettingsPanel() {
-  const [ollamaEnabled, setOllamaEnabled] = useState(false);
-  const [ollamaPort, setOllamaPort] = useState('11434');
-  const [lmstudioEnabled, setLmstudioEnabled] = useState(false);
-  const [lmstudioPort, setLmstudioPort] = useState('1234');
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const toast = useToast();
 
-  const handleSave = async () => {
-    setSaveStatus('saving');
+  // 使用原始状态避免对象引用问题
+  const [ollamaEnabled, setOllamaEnabled] = useState(false);
+  const [ollamaPort, setOllamaPort] = useState(11434);
+  const [lmstudioEnabled, setLmstudioEnabled] = useState(false);
+  const [lmstudioPort, setLmstudioPort] = useState(1234);
+
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 加载配置 - 只在组件挂载时执行
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await compatibilityApi.get();
+        if (response.success && response.data) {
+          setOllamaEnabled(response.data.ollama.enabled);
+          setOllamaPort(response.data.ollama.port);
+          setLmstudioEnabled(response.data.lmstudio.enabled);
+          setLmstudioPort(response.data.lmstudio.port);
+        }
+      } catch (error) {
+        console.error('加载兼容性配置失败:', error);
+        toast.error('加载失败', '无法加载兼容性配置');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 标记有未保存的更改
+  const markChanged = useCallback(() => {
+    setHasChanges(true);
+  }, []);
+
+  // 自动保存逻辑 (防抖 2 秒)
+  useEffect(() => {
+    if (isLoading || !hasChanges) return;
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        const response = await compatibilityApi.update({
+          ollama: { enabled: ollamaEnabled, port: ollamaPort },
+          lmstudio: { enabled: lmstudioEnabled, port: lmstudioPort },
+        });
+
+        if (response.success) {
+          setSaveStatus('success');
+          setHasChanges(false);
+        } else {
+          // 处理后端返回的失败
+          setSaveStatus('error');
+          const errorMsg = response.error || '未知错误';
+          const serviceName = response.service === 'ollama' ? 'Ollama API' : 'LM Studio API';
+
+          toast.error(`${serviceName} 启动失败`, errorMsg);
+
+          // 如果后端自动禁用了服务，回退状态
+          if (response.autoDisabled && response.data) {
+            if (response.service === 'ollama') {
+              setOllamaEnabled(response.data.ollama.enabled);
+            } else if (response.service === 'lmstudio') {
+              setLmstudioEnabled(response.data.lmstudio.enabled);
+            }
+          }
+        }
+
+        successTimeoutRef.current = setTimeout(() => {
+          setSaveStatus('idle');
+        }, 3000);
+      } catch (error) {
+        console.error('保存兼容性配置失败:', error);
+        setSaveStatus('error');
+        toast.error('保存失败', '无法保存兼容性配置，请检查网络连接');
+
+        successTimeoutRef.current = setTimeout(() => {
+          setSaveStatus('idle');
+        }, 3000);
+      }
+    }, 2000);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
+  }, [ollamaEnabled, ollamaPort, lmstudioEnabled, lmstudioPort, isLoading, hasChanges, toast]);
+
+  // 处理配置变化
+  const handleOllamaChange = useCallback((config: ApiConfig) => {
+    setOllamaEnabled(config.enabled);
+    setOllamaPort(config.port);
+    markChanged();
+  }, [markChanged]);
+
+  const handleLmstudioChange = useCallback((config: ApiConfig) => {
+    setLmstudioEnabled(config.enabled);
+    setLmstudioPort(config.port);
+    markChanged();
+  }, [markChanged]);
+
+  // 测试端口连接
+  const handleTestConnection = async (port: number, type: 'ollama' | 'lmstudio'): Promise<boolean> => {
     try {
-      // TODO: 调用 API 保存配置
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setSaveStatus('success');
-      setTimeout(() => setSaveStatus('idle'), 2000);
+      const response = await compatibilityApi.testConnection(port, type);
+      return response.valid;
     } catch {
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 2000);
+      return false;
     }
   };
+
+  // 处理连接失败 - 自动禁用服务
+  const handleConnectionFailed = useCallback(async (type: 'ollama' | 'lmstudio', port: number) => {
+    const serviceName = type === 'ollama' ? 'Ollama API' : 'LM Studio API';
+    toast.error(
+      `${serviceName} 连接失败`,
+      `端口 ${port} 无响应，服务将自动禁用`
+    );
+
+    try {
+      // 立即禁用服务
+      const response = await compatibilityApi.update({
+        ollama: {
+          enabled: type === 'ollama' ? false : ollamaEnabled,
+          port: ollamaPort,
+        },
+        lmstudio: {
+          enabled: type === 'lmstudio' ? false : lmstudioEnabled,
+          port: lmstudioPort,
+        },
+      });
+
+      if (response.success) {
+        // 更新本地状态
+        if (type === 'ollama') {
+          setOllamaEnabled(false);
+        } else {
+          setLmstudioEnabled(false);
+        }
+        toast.success(`${serviceName} 已禁用`, '配置已自动还原');
+      } else {
+        toast.error(`${serviceName} 禁用失败`, response.error || '未知错误');
+      }
+    } catch (error) {
+      console.error('自动禁用服务失败:', error);
+      toast.error('自动禁用失败', '请手动禁用服务');
+    }
+  }, [ollamaEnabled, ollamaPort, lmstudioEnabled, lmstudioPort, toast]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+          <p className="text-sm text-muted-foreground mt-3">加载配置中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -122,103 +277,31 @@ function GeneralSettingsPanel() {
         </p>
       </div>
 
-      {/* Ollama 配置 */}
-      <div className="rounded-lg border bg-card p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Plug size={16} className="text-primary" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold">Ollama API</h3>
-              <p className="text-xs text-muted-foreground">
-                启用 Ollama 兼容的 API 端点
-              </p>
-            </div>
-          </div>
-          <label className="relative inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={ollamaEnabled}
-              onChange={(e) => setOllamaEnabled(e.target.checked)}
-              className="peer sr-only"
-            />
-            <div className="h-5 w-9 rounded-full bg-muted peer-checked:bg-primary transition-colors duration-200 after:content-[''] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-background after:transition-transform after:duration-200 peer-checked:after:translate-x-full" />
-            <span className="text-xs text-muted-foreground">启用</span>
-          </label>
-        </div>
+      {/* Ollama 配置卡片 */}
+      <ApiConfigCard
+        type="ollama"
+        config={{ enabled: ollamaEnabled, port: ollamaPort }}
+        onConfigChange={handleOllamaChange}
+        saveStatus={saveStatus}
+        onTestConnection={handleTestConnection}
+        onConnectionFailed={handleConnectionFailed}
+      />
 
-        {ollamaEnabled && (
-          <div className="mt-3">
-            <label className="block text-xs font-medium mb-1.5">端口</label>
-            <input
-              type="number"
-              min="1"
-              max="65535"
-              value={ollamaPort}
-              onChange={(e) => setOllamaPort(e.target.value)}
-              className="w-full max-w-[160px] rounded-md border bg-background px-2.5 py-1.5 text-xs"
-              placeholder="11434"
-            />
-          </div>
-        )}
-      </div>
+      {/* LM Studio 配置卡片 */}
+      <ApiConfigCard
+        type="lmstudio"
+        config={{ enabled: lmstudioEnabled, port: lmstudioPort }}
+        onConfigChange={handleLmstudioChange}
+        saveStatus={saveStatus}
+        onTestConnection={handleTestConnection}
+        onConnectionFailed={handleConnectionFailed}
+      />
 
-      {/* LM Studio 配置 */}
-      <div className="rounded-lg border bg-card p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Plug size={16} className="text-primary" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold">LM Studio API</h3>
-              <p className="text-xs text-muted-foreground">
-                启用 LM Studio 兼容的 API 端点
-              </p>
-            </div>
-          </div>
-          <label className="relative inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={lmstudioEnabled}
-              onChange={(e) => setLmstudioEnabled(e.target.checked)}
-              className="peer sr-only"
-            />
-            <div className="h-5 w-9 rounded-full bg-muted peer-checked:bg-primary transition-colors duration-200 after:content-[''] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-background after:transition-transform after:duration-200 peer-checked:after:translate-x-full" />
-            <span className="text-xs text-muted-foreground">启用</span>
-          </label>
-        </div>
-
-        {lmstudioEnabled && (
-          <div className="mt-3">
-            <label className="block text-xs font-medium mb-1.5">端口</label>
-            <input
-              type="number"
-              min="1"
-              max="65535"
-              value={lmstudioPort}
-              onChange={(e) => setLmstudioPort(e.target.value)}
-              className="w-full max-w-[160px] rounded-md border bg-background px-2.5 py-1.5 text-xs"
-              placeholder="1234"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* 保存按钮 */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleSave}
-          disabled={saveStatus === 'saving'}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save size={14} />
-          {saveStatus === 'saving' ? '保存中...' :
-           saveStatus === 'success' ? '已保存 ✓' :
-           saveStatus === 'error' ? '保存失败' :
-           '保存设置'}
-        </button>
+      {/* 自动保存提示 */}
+      <div className="flex items-center justify-center py-2">
+        <p className="text-xs text-muted-foreground">
+          配置将自动保存
+        </p>
       </div>
     </div>
   );

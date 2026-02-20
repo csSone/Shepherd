@@ -11,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
+	compatibilityapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/compatibility"
+	filesystemapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/filesystem"
 	api "github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
@@ -18,6 +20,7 @@ import (
 	storageapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
+	modelrepoclient "github.com/shepherd-project/shepherd/Shepherd/internal/modelrepo"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
@@ -49,6 +52,7 @@ type Server struct {
 	storageMgr   *storage.Manager
 	downloadMgr  *DownloadManager // 下载管理器
 	nodeAdapter  *api.NodeAdapter // Node API 适配器
+	repoClient   *modelrepoclient.Client // 模型仓库客户端
 
 	mu     sync.RWMutex
 	ctx    context.Context
@@ -74,11 +78,13 @@ type Config struct {
 
 // Handlers contains handler instances
 type Handlers struct {
-	OpenAI    *openai.Handler
-	Ollama    *ollama.Handler
-	Anthropic *anthropic.Handler
-	Paths     *paths.Handler
-	Storage   *storageapi.Handler
+	OpenAI        *openai.Handler
+	Ollama        *ollama.Handler
+	Anthropic     *anthropic.Handler
+	Paths         *paths.Handler
+	Storage       *storageapi.Handler
+	Compatibility *compatibilityapi.Handler
+	Filesystem    *filesystemapi.Handler
 }
 
 // NewServer creates a new HTTP server
@@ -107,12 +113,20 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 	// Create WebSocket manager
 	s.wsMgr = websocket.NewManager(modelMgr)
 
+	// Create model repository client
+
+	// Create compatibility server manager
+	compatServerManager := compatibilityapi.NewServerManager(modelMgr)
+	s.repoClient = modelrepoclient.NewClient()
+
 	// Create API handlers
 	s.handlers.OpenAI = openai.NewHandler(modelMgr)
 	s.handlers.Ollama = ollama.NewHandler(modelMgr)
 	s.handlers.Anthropic = anthropic.NewHandler(modelMgr)
 	s.handlers.Paths = paths.NewHandler(config.ConfigMgr)
 	s.handlers.Storage = storageapi.NewHandler(config.ConfigMgr, storageMgr)
+	s.handlers.Compatibility = compatibilityapi.NewHandler(config.ConfigMgr, compatServerManager)
+	s.handlers.Filesystem = filesystemapi.NewHandler()
 
 	// Setup Gin engine
 	if config.WebUIPath == "" {
@@ -179,6 +193,14 @@ func (s *Server) setupRoutes() {
 				storage.PUT("", s.handlers.Storage.UpdateStorageConfig)
 				storage.GET("/stats", s.handlers.Storage.GetStats)
 			}
+
+			// Compatibility configuration
+			compatibility := config.Group("/compatibility")
+			{
+				compatibility.GET("", s.handlers.Compatibility.GetCompatibility)
+				compatibility.PUT("", s.handlers.Compatibility.UpdateCompatibility)
+				compatibility.POST("/test", s.handlers.Compatibility.TestConnection)
+			}
 		}
 
 		// Chat/Conversation routes
@@ -218,6 +240,14 @@ func (s *Server) setupRoutes() {
 			downloads.DELETE("/:id", s.handleDeleteDownload)
 		}
 
+		// Model repository routes (远程模型仓库文件浏览)
+		// 路由格式: /api/repo/files?source=huggingface&repoId=Qwen/Qwen2-7B-Instruct
+		// 使用查询参数以支持 repoId 中包含斜杠
+		repo := api.Group("/repo")
+		{
+			repo.GET("/files", s.handleListModelFiles)
+		}
+
 		// Process routes
 		processes := api.Group("/processes")
 		{
@@ -231,6 +261,13 @@ func (s *Server) setupRoutes() {
 		{
 			logs.GET("/stream", s.handleLogStream)
 			logs.GET("/entries", s.handleLogEntries)
+		}
+
+		// System routes
+		system := api.Group("/system")
+		{
+			system.GET("/filesystem", s.handlers.Filesystem.ListDirectory)
+			system.POST("/filesystem/validate", s.handlers.Filesystem.ValidatePath)
 		}
 	}
 
@@ -741,22 +778,64 @@ func (s *Server) handleListDownloads(c *gin.Context) {
 }
 
 func (s *Server) handleCreateDownload(c *gin.Context) {
+	// 支持两种请求格式:
+	// 1. 新格式: { source, repoId, fileName, path } - 用于从模型仓库下载
+	// 2. 旧格式: { url, target_path } - 直接URL下载(向后兼容)
+
 	var req struct {
-		URL        string `json:"url" binding:"required"`
-		TargetPath string `json:"target_path" binding:"required"`
+		Source    modelrepoclient.Source `json:"source"`
+		RepoID    string               `json:"repoId"`
+		FileName  string               `json:"fileName"`
+		Path      string               `json:"path"`
+
+		// 旧格式参数(向后兼容)
+		URL        string `json:"url"`
+		TargetPath string `json:"target_path"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
 			"error":   "无效的请求格式",
 			"message": err.Error(),
 		})
 		return
 	}
 
-	task, err := s.downloadMgr.CreateDownload(req.URL, req.TargetPath)
+	var downloadURL string
+	var targetPath string
+
+	// 使用新格式(source + repoId)
+	if req.Source != "" && req.RepoID != "" {
+		// 生成下载 URL
+		url, err := s.repoClient.GenerateDownloadURL(req.Source, req.RepoID, req.FileName)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "生成下载URL失败",
+				"message": err.Error(),
+			})
+			return
+		}
+		downloadURL = url
+		targetPath = req.Path
+	} else if req.URL != "" {
+		// 使用旧格式(直接URL)
+		downloadURL = req.URL
+		targetPath = req.TargetPath
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "缺少必要参数",
+			"message": "请提供 source/repoId 或 url",
+		})
+		return
+	}
+
+	task, err := s.downloadMgr.CreateDownload(downloadURL, targetPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
 			"error":   "创建下载失败",
 			"message": err.Error(),
 		})
@@ -764,8 +843,9 @@ func (s *Server) handleCreateDownload(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
 		"message": "下载任务已创建",
-		"task":    task,
+		"data":    task,
 	})
 }
 
@@ -828,6 +908,45 @@ func (s *Server) handleDeleteDownload(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "下载任务已删除"})
+}
+
+// handleListModelFiles handles requests to list model files from a repository
+func (s *Server) handleListModelFiles(c *gin.Context) {
+	// 使用查询参数而不是路径参数，以支持 repoId 中包含斜杠
+	source := c.Query("source")
+	repoID := c.Query("repoId")
+
+	if source == "" || repoID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "缺少必要参数: 需要 source 和 repoId 查询参数",
+		})
+		return
+	}
+
+	// 目前只支持 HuggingFace
+	if source != "huggingface" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "目前只支持 HuggingFace 源",
+		})
+		return
+	}
+
+	files, err := s.repoClient.ListGGUFFiles(repoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "获取文件列表失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    files,
+	})
 }
 
 func (s *Server) handleListProcesses(c *gin.Context) {

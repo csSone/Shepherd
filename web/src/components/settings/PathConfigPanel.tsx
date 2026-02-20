@@ -5,12 +5,17 @@ import { PathItem } from './PathItem';
 import { PathEditDialog } from './PathEditDialog';
 import { llamacppPathsApi, modelPathsApi } from '@/lib/api/paths';
 import type { LlamaCppPathConfig, ModelPathConfig } from '@/lib/configTypes';
+import { useToast } from '@/hooks/useToast';
+import { useAlertDialog } from '@/hooks/useAlertDialog';
 
 interface PathConfigPanelProps {
   type: 'llamacpp' | 'models';
 }
 
 export function PathConfigPanel({ type }: PathConfigPanelProps) {
+  const toast = useToast();
+  const alertDialog = useAlertDialog();
+
   const [paths, setPaths] = useState<(LlamaCppPathConfig | ModelPathConfig)[]>(
     []
   );
@@ -82,9 +87,13 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
 
   // 删除路径
   const handleRemove = async (path: LlamaCppPathConfig | ModelPathConfig) => {
-    if (!confirm(`确定要删除路径 "${path.name || path.path}" 吗？`)) {
-      return;
-    }
+    const confirmed = await alertDialog.confirm({
+      title: '删除路径',
+      description: `确定要删除路径 "${path.name || path.path}" 吗？`,
+      variant: 'destructive',
+    });
+
+    if (!confirmed) return;
 
     try {
       const response =
@@ -94,12 +103,14 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
 
       if (response.success) {
         await loadPaths();
+        toast.success('删除成功', '路径已成功删除');
       } else {
         throw new Error(response.error || '删除失败');
       }
     } catch (error) {
       console.error('删除路径失败:', error);
-      alert(error instanceof Error ? error.message : '删除失败');
+      const message = error instanceof Error ? error.message : '删除失败';
+      toast.error('删除失败', message);
     }
   };
 
@@ -111,13 +122,13 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
       const response = await llamacppPathsApi.test(path.path);
 
       if (response.valid) {
-        alert('路径测试成功！');
+        toast.success('测试成功', 'llama.cpp 路径测试通过');
       } else {
-        alert(`路径测试失败: ${response.error || '未知错误'}`);
+        toast.error('测试失败', response.error || '未知错误');
       }
     } catch (error) {
       console.error('测试路径失败:', error);
-      alert('测试路径时发生错误');
+      toast.error('测试错误', '测试路径时发生错误');
     }
   };
 

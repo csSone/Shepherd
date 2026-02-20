@@ -3,13 +3,16 @@ import { Search, RefreshCw, Filter, Grid3X3, List } from 'lucide-react';
 import { useModels, useLoadModel, useUnloadModel, useSetModelFavourite, useScanModels, useFilteredModels } from '@/features/models/hooks';
 import { ModelCard } from '@/components/models/ModelCard';
 import { LoadModelDialog } from '@/components/models/LoadModelDialog';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Model, ModelStatus } from '@/types';
+import { useAlertDialog } from '@/hooks/useAlertDialog';
 
 /**
  * 模型管理页面
  */
 export function ModelsPage() {
+  const alertDialog = useAlertDialog();
   const { data: models, isLoading } = useModels();
   const loadModel = useLoadModel();
   const unloadModel = useUnloadModel();
@@ -46,8 +49,12 @@ export function ModelsPage() {
   };
 
   // 处理卸载模型
-  const handleUnloadClick = (modelId: string) => {
-    if (confirm('确定要卸载此模型吗？')) {
+  const handleUnloadClick = async (modelId: string) => {
+    const confirmed = await alertDialog.confirm({
+      title: '卸载模型',
+      description: '确定要卸载此模型吗？',
+    });
+    if (confirmed) {
       unloadModel.mutate(modelId);
     }
   };
@@ -74,14 +81,15 @@ export function ModelsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={handleScan}
             disabled={scanModels.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors disabled:opacity-50"
+            variant="default"
+            size="sm"
           >
             <RefreshCw className={cn('w-4 h-4', scanModels.isPending && 'animate-spin')} />
             扫描模型
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -114,43 +122,36 @@ export function ModelsPage() {
         </select>
 
         {/* 收藏过滤 */}
-        <button
+        <Button
           onClick={() => setFavouriteFilter(!favouriteFilter)}
+          variant={favouriteFilter ? 'default' : 'outline'}
+          size="sm"
           className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors',
-            favouriteFilter
-              ? 'border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
-              : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            favouriteFilter && 'border-yellow-500 bg-yellow-500 text-white hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700 dark:border-yellow-700'
           )}
         >
           <Filter className="w-4 h-4" />
           只看收藏
-        </button>
+        </Button>
 
         {/* 视图切换 */}
-        <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-          <button
+        <div className="flex items-center rounded-lg overflow-hidden border border-border/50">
+          <Button
             onClick={() => setViewMode('grid')}
-            className={cn(
-              'p-2 transition-colors',
-              viewMode === 'grid'
-                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-500 hover:text-gray-700'
-            )}
+            variant={viewMode === 'grid' ? 'default' : 'ghost'}
+            size="sm"
+            className="rounded-none border-0"
           >
             <Grid3X3 className="w-4 h-4" />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setViewMode('list')}
-            className={cn(
-              'p-2 transition-colors',
-              viewMode === 'list'
-                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-500 hover:text-gray-700'
-            )}
+            variant={viewMode === 'list' ? 'default' : 'ghost'}
+            size="sm"
+            className="rounded-none border-0"
           >
             <List className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
 

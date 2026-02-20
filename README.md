@@ -84,9 +84,13 @@ Shepherd 现在支持统一的 **Node 架构**，每个节点可以灵活地扮�
 - **SSE 支持** - 服务器推送事件实时更新
 
 ### 📥 下载管理
-- HuggingFace / ModelScope 模型下载
-- 断点续传，并发下载（最多 4 任务）
-- 实时进度监控
+- **模型仓库集成** - 支持 HuggingFace 和 ModelScope 模型仓库
+  - 浏览仓库中的 GGUF 文件列表
+  - 查看文件大小和详细信息
+  - 一键下载选定的模型文件
+- **智能下载** - 断点续传，并发下载（最多 4 任务）
+- **实时进度** - 下载速度、ETA、分块进度显示
+- **动态刷新** - 优化轮询策略，仅活跃任务时刷新
 
 ### 🎨 Web 前端
 - **React + TypeScript** - 现代化前端技术栈
@@ -623,6 +627,7 @@ Shepherd/
 │   ├── download/          # 下载管理器
 │   ├── gguf/              # GGUF 模型解析
 │   ├── logger/            # 日志系统 (按模式分类)
+│   ├── modelrepo/         # 模型仓库客户端 (HuggingFace/ModelScope)
 │   ├── model/             # 模型管理器
 │   ├── process/           # 进程管理
 │   ├── server/            # HTTP 服务器 (优雅关闭)
@@ -640,7 +645,14 @@ Shepherd/
 │   ├── src/               # React + TypeScript 源码
 │   │   └── lib/
 │   │       ├── configLoader.ts  # 配置加载器
-│   │       └── api/client.ts    # API 客户端
+│   │       ├── api/
+│   │       │   └── downloads.ts  # 下载 API 客户端
+│   │       └── features/
+│   │           └── downloads/    # 下载功能
+│   │               └── hooks.ts  # 下载 hooks（动态轮询）
+│   ├── components/
+│   │   └── downloads/
+│   │       └── CreateDownloadDialog.tsx  # 文件浏览器 UI
 │   ├── DEPLOYMENT.md          # 部署指南
 │   ├── DEVELOPMENT.md         # 开发文档
 │   └── [开发工具配置]         # TypeScript/Vite/ESLint 等

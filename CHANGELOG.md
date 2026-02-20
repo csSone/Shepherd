@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### 模型仓库集成
+- **HuggingFace/ModelScope 集成** - 新增模型仓库客户端 (`internal/modelrepo/client.go`)
+  - 支持从 HuggingFace 和 ModelScope 获取模型文件列表
+  - 自动生成下载 URL
+  - GGUF 文件过滤和识别
+- **API 端点** - `GET /api/repo/files?source=huggingface&repoId=owner/model`
+  - 支持包含斜杠的仓库 ID（使用查询参数避免路径冲突）
+  - 返回 GGUF 文件列表（名称、大小、下载 URL）
+
+#### 前端增强
+- **下载对话框文件浏览器** - 新增模型文件浏览和选择功能
+  - 实时加载 HuggingFace 仓库的 GGUF 文件列表
+  - 文件大小格式化显示（GB/MB/KB）
+  - 点击选择文件，视觉反馈（高亮、对勾图标）
+- **动态轮询优化** - 修复下载页面频繁刷新问题
+  - 无任务时不刷新（之前固定 2 秒轮询）
+  - 有活跃任务时每秒刷新（preparing、downloading、merging、verifying 状态）
+- **API 客户端重构** - 统一的下载管理 API 客户端 (`web/src/lib/api/downloads.ts`)
+  - 所有下载相关 API 集中管理
+  - TypeScript 类型安全
+  - 支持新格式（source + repoId）和旧格式（直接 URL）
+
+#### 测试
+- **模型仓库单元测试** - `internal/modelrepo/client_test.go`
+  - URL 生成测试（HuggingFace/ModelScope）
+  - 仓库 ID 解析测试
+  - GGUF 文件识别测试
+  - 100% 测试覆盖率
+
+### Changed
+- **下载 API 双格式支持** - 向后兼容旧的直接 URL 格式
+  - 新格式: `{source, repoId, fileName, path}` - 从模型仓库下载
+  - 旧格式: `{url, target_path}` - 直接 URL 下载
+- **前端轮询策略** - 从固定 2 秒改为动态调整
+  - 减少无效请求，节省服务器资源
+  - 优化用户体验
+
+### Fixed
+- **路由冲突** - 解决 `/api/models/:id` 与 `/api/repo/:source/:repoId/files` 的冲突
+  - 使用查询参数替代路径参数
+  - 前端使用 `encodeURIComponent()` 正确编码仓库 ID
+- **前端类型错误** - 修复 `refetchInterval` 回调函数的 TypeScript 类型
+  - 使用 `query.state.data` 访问数据而非直接访问 `data` 参数
+- **网络超时处理** - 改进 HuggingFace API 调用的错误处理
+
+### Technical Details
+
+#### 新增文件
+- `internal/modelrepo/client.go` - 模型仓库客户端（~140 行）
+- `internal/modelrepo/client_test.go` - 单元测试（~200 行）
+- `web/src/lib/api/downloads.ts` - API 客户端（~84 行）
+
+#### 修改文件
+- `internal/server/server.go` - 添加 `/api/repo/files` 路由和处理函数
+- `web/src/features/downloads/hooks.ts` - 动态轮询、useModelFiles hook
+- `web/src/components/downloads/CreateDownloadDialog.tsx` - 文件浏览器 UI
+
 ### Changed
 - **脚本重组** - 所有脚本按操作系统分类到 `linux/`, `macos/`, `windows/` 子目录
 - **macOS 支持** - 新增 macOS 专用脚本，支持 Intel 和 Apple Silicon

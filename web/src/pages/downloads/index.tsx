@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, Filter, CloudDownload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   useDownloads,
   useCreateDownload,
@@ -14,11 +15,13 @@ import {
 import { DownloadCard } from '@/components/downloads/DownloadCard';
 import { CreateDownloadDialog } from '@/components/downloads/CreateDownloadDialog';
 import type { DownloadState, DownloadSource } from '@/types';
+import { useAlertDialog } from '@/hooks/useAlertDialog';
 
 /**
  * 下载管理页面
  */
 export function DownloadsPage() {
+  const alertDialog = useAlertDialog();
   const { data: downloads, isLoading } = useDownloads();
   const createDownload = useCreateDownload();
   const pauseDownload = usePauseDownload();
@@ -53,8 +56,12 @@ export function DownloadsPage() {
   };
 
   // 处理清理已完成
-  const handleClearCompleted = () => {
-    if (confirm('确定要清理所有已完成的下载任务吗？')) {
+  const handleClearCompleted = async () => {
+    const confirmed = await alertDialog.confirm({
+      title: '清理已完成',
+      description: '确定要清理所有已完成的下载任务吗？',
+    });
+    if (confirmed) {
       clearCompleted.mutate();
     }
   };
@@ -72,21 +79,23 @@ export function DownloadsPage() {
 
         <div className="flex items-center gap-2">
           {stats.completed > 0 && (
-            <button
+            <Button
               onClick={handleClearCompleted}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              variant="ghost"
+              size="sm"
             >
               <Trash2 className="w-4 h-4" />
               清理已完成
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={() => setDialogOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
+            variant="default"
+            size="sm"
           >
             <Plus className="w-4 h-4" />
             新建下载
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -164,13 +173,14 @@ export function DownloadsPage() {
           <CloudDownload className="w-12 h-12 mb-4" />
           <p className="text-lg mb-2">暂无下载任务</p>
           <p className="text-sm mb-4">创建新任务开始下载模型</p>
-          <button
+          <Button
             onClick={() => setDialogOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
+            variant="default"
+            size="sm"
           >
             <Plus className="w-4 h-4" />
             新建下载
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-3">

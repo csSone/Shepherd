@@ -286,5 +286,41 @@
   {
     "modelId": "test-model-9223ac7dbaa6d432",
     "favourite": true
+  },
+  {
+    "modelId": "test-model-f3834642025e1a26",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-f89d8497f3040632",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-1e7eb75fd47f38ed",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-36afd9008e52d81a",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-d0d6611845de3ac6",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-7226ecfe4f4b567d",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-833acb466560c852",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-f7bd51879576360d",
+    "favourite": true
   }
 ]

@@ -44,8 +44,8 @@ security:
         - '*'
 compatibility:
     ollama:
-        enabled: true
-        port: 11434
+        enabled: false
+        port: 11436
     lmstudio:
         enabled: false
         port: 1234
@@ -59,15 +59,56 @@ log:
     max_age: 7
     compress: true
 storage:
-    type: sqlite  # memory|sqlite|postgresql
+    type: sqlite
     sqlite:
         path: ./data/shepherd.db
-        enable_wal: true
         pragmas:
             cache_size: "-64000"
-            synchronous: "NORMAL"
+            synchronous: NORMAL
+        enable_wal: true
+    postgresql: null
 mode: standalone
+master:
+    enabled: false
+    client_config_dir: ""
+    network_scan:
+        enabled: false
+        subnets: []
+        port_range: ""
+        timeout: 0
+        auto_discover: false
+        interval: 0
+    scheduler:
+        strategy: ""
+        max_queue_size: 0
+        task_timeout: 0
+        retry_on_failure: false
+        max_retries: 0
+    log_aggregation:
+        enabled: false
+        max_buffer_size: 0
+        flush_interval: 0
+client:
+    enabled: false
+    master_address: ""
+    client_info:
+        id: ""
+        name: ""
+        tags: []
+        metadata: {}
+    heartbeat:
+        interval: 0
+        timeout: 0
+    conda_env:
+        enabled: false
+        conda_path: ""
+        environments: {}
+    register_retry: 0
+    heartbeat_interval: 0
+    heartbeat_timeout: 0
 node:
+    id: ""
+    name: ""
     role: standalone
     master_role:
         enabled: false
@@ -80,13 +121,16 @@ node:
     client_role:
         enabled: false
         master_address: ""
+        register_retry: 0
         heartbeat_interval: 5
-        reconnect_interval: 10
+        heartbeat_timeout: 0
     resources:
         monitor_interval: 5
         report_gpu: true
+        report_temperature: false
+        gpu_backend: ""
     executor:
         max_concurrent: 4
-        allowed_commands: []
         task_timeout: 300
-        max_retries: 3
+        allow_remote_stop: false
+        allowed_commands: []

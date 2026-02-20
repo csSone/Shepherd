@@ -4,11 +4,16 @@ import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { useStreamingChat, getLoadedModels, createChatSession, saveChatHistory, loadChatHistory, deleteChatSession } from '@/features/chat/hooks';
 import type { ChatMessage as ChatMessageType } from '@/features/chat';
+import { useToast } from '@/hooks/useToast';
+import { useAlertDialog } from '@/hooks/useAlertDialog';
 
 /**
  * 聊天页面
  */
 export function ChatPage() {
+  const toast = useToast();
+  const alertDialog = useAlertDialog();
+
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
@@ -42,7 +47,7 @@ export function ChatPage() {
   // 处理发送消息
   const handleSend = (content: string) => {
     if (!selectedModel) {
-      alert('请先选择一个已加载的模型');
+      toast.warning('请先选择模型', '请从下拉列表中选择一个已加载的模型');
       return;
     }
 
@@ -97,17 +102,26 @@ export function ChatPage() {
   };
 
   // 处理新建对话
-  const handleNewChat = () => {
-    if (messages.length > 0 && !confirm('确定要开始新对话吗？当前对话将被清空。')) {
-      return;
+  const handleNewChat = async () => {
+    if (messages.length > 0) {
+      const confirmed = await alertDialog.confirm({
+        title: '新建对话',
+        description: '确定要开始新对话吗？当前对话将被清空。',
+      });
+      if (!confirmed) return;
     }
     setMessages([]);
     setCurrentResponse('');
   };
 
   // 处理清空对话
-  const handleClearHistory = () => {
-    if (confirm('确定要清空对话历史吗？')) {
+  const handleClearHistory = async () => {
+    const confirmed = await alertDialog.confirm({
+      title: '清空对话',
+      description: '确定要清空对话历史吗？此操作不可撤销。',
+      variant: 'destructive',
+    });
+    if (confirmed) {
       setMessages([]);
       setCurrentResponse('');
     }

@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { X, Cloud, Database } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Cloud, Database, Loader2, File, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useModelFiles } from '@/features/downloads/hooks';
 import type { DownloadSource, CreateDownloadParams } from '@/types';
+import type { ModelFileInfo } from '@/lib/api/downloads';
 
 interface CreateDownloadDialogProps {
   isOpen: boolean;
@@ -22,6 +25,27 @@ export function CreateDownloadDialog({
   const [path, setPath] = useState('');
   const [maxRetries, setMaxRetries] = useState('3');
   const [chunkSize, setChunkSize] = useState('');
+
+  // 文件列表状态
+  const [availableFiles, setAvailableFiles] = useState<ModelFileInfo[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+
+  // 使用 hook 获取模型文件列表
+  const { data: files, isLoading: loadingFiles, error: filesError } = useModelFiles(
+    source,
+    repoId
+  );
+
+  // 当仓库ID变化时更新可用文件列表
+  useEffect(() => {
+    if (files) {
+      setAvailableFiles(files);
+    } else {
+      setAvailableFiles([]);
+    }
+    setIsLoadingFiles(loadingFiles);
+  }, [files, loadingFiles]);
 
   if (!isOpen) return null;
 
@@ -44,11 +68,30 @@ export function CreateDownloadDialog({
     setSource(src);
     setRepoId(exampleRepo);
     setFileName(exampleFile || '');
+    setAvailableFiles([]); // 清空文件列表
+  };
+
+  const handleSelectFile = (file: ModelFileInfo) => {
+    setFileName(file.name);
+    setShowFileBrowser(false);
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+
+    return `${size.toFixed(2)} ${units[unitIndex]}`;
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* 标题栏 */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -103,7 +146,7 @@ export function CreateDownloadDialog({
           {/* 仓库 ID */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              仓库 ID
+              仓库 ID <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -118,21 +161,76 @@ export function CreateDownloadDialog({
             </p>
           </div>
 
-          {/* 文件名（可选） */}
+          {/* 文件选择 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              文件名（可选）
+              文件名
             </label>
-            <input
-              type="text"
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              placeholder="qwen2-7b-instruct-q4_k_m.gguf"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              留空则下载所有文件
-            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={fileName}
+                onChange={(e) => setFileName(e.target.value)}
+                placeholder="选择或输入 GGUF 文件名"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFileBrowser(!showFileBrowser)}
+                disabled={!repoId || isLoadingFiles}
+                className="whitespace-nowrap"
+              >
+                {showFileBrowser ? '隐藏' : '浏览文件'}
+              </Button>
+            </div>
+
+            {/* 文件浏览器 */}
+            {showFileBrowser && (
+              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto">
+                {isLoadingFiles ? (
+                  <div className="flex items-center justify-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    加载中...
+                  </div>
+                ) : filesError ? (
+                  <div className="text-sm text-red-600 dark:text-red-400 py-2">
+                    加载失败: {filesError.message}
+                  </div>
+                ) : availableFiles.length === 0 ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                    {repoId ? '该仓库没有 GGUF 文件' : '请先输入仓库 ID'}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      找到 {availableFiles.length} 个 GGUF 文件:
+                    </p>
+                    {availableFiles.map((file) => (
+                      <div
+                        key={file.name}
+                        onClick={() => handleSelectFile(file)}
+                        className={cn(
+                          'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
+                          'hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-transparent hover:border-blue-300',
+                          fileName === file.name && 'bg-blue-100 dark:bg-blue-900/30 border-blue-500'
+                        )}
+                      >
+                        <File className="w-4 h-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                        <span className="flex-1 text-sm truncate">{file.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatFileSize(file.size)}
+                        </span>
+                        {fileName === file.name && (
+                          <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 保存路径 */}
@@ -195,24 +293,21 @@ export function CreateDownloadDialog({
 
           {/* 按钮 */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50"
             >
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={isLoading || !repoId.trim()}
-              className={cn(
-                'px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors',
-                (!repoId.trim() || isLoading) && 'opacity-50 cursor-not-allowed'
-              )}
+              variant="default"
             >
               {isLoading ? '创建中...' : '创建任务'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

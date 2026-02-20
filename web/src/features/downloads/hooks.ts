@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import { downloadsApi } from '@/lib/api/downloads';
 import type {
   DownloadTask,
   DownloadListResponse,
   CreateDownloadParams,
   DownloadState,
 } from '@/types';
+import type { ModelFileInfo } from '@/lib/api/downloads';
 
 /**
  * 下载任务列表 Hook
@@ -14,11 +15,18 @@ export function useDownloads() {
   return useQuery({
     queryKey: ['downloads'],
     queryFn: async () => {
-      const response = await apiClient.get<DownloadListResponse>('/downloads');
+      const response = await downloadsApi.list();
       return response.tasks;
     },
     staleTime: 5 * 1000, // 5 秒
-    refetchInterval: 2000, // 每 2 秒自动刷新（获取进度）
+    // ✅ 动态调整刷新频率: 只在有活跃任务时轮询
+    refetchInterval: (query) => {
+      const data = query.state.data as DownloadTask[] | undefined;
+      if (!data || data.length === 0) return false; // 无任务时不刷新
+      const activeStates: DownloadState[] = ['preparing', 'downloading', 'merging', 'verifying'];
+      const hasActiveTasks = data.some(task => activeStates.includes(task.state));
+      return hasActiveTasks ? 1000 : false; // 活跃任务 1 秒刷新,否则不刷新
+    },
   });
 }
 
@@ -29,13 +37,12 @@ export function useDownload(taskId: string) {
   return useQuery({
     queryKey: ['downloads', taskId],
     queryFn: async () => {
-      const response = await apiClient.get<{ task: DownloadTask }>(`/downloads/${taskId}`);
-      return response.task;
+      return await downloadsApi.get(taskId);
     },
     enabled: !!taskId,
     refetchInterval: (query) => {
       // 如果任务进行中，每秒刷新；否则不刷新
-      const data = query.state.data;
+      const data = query.state.data as DownloadTask | undefined;
       const activeStates: DownloadState[] = ['preparing', 'downloading', 'merging', 'verifying'];
       return data && activeStates.includes(data.state) ? 1000 : false;
     },
@@ -50,8 +57,11 @@ export function useCreateDownload() {
 
   return useMutation({
     mutationFn: async (params: CreateDownloadParams) => {
-      const response = await apiClient.post<{ task: DownloadTask }>('/downloads', params);
-      return response.task;
+      const response = await downloadsApi.create(params);
+      if (!response.success) {
+        throw new Error(response.error || '创建下载失败');
+      }
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
@@ -67,8 +77,7 @@ export function usePauseDownload() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await apiClient.post<{ success: boolean }>(`/downloads/${taskId}/pause`);
-      return response;
+      return await downloadsApi.pause(taskId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
@@ -84,8 +93,7 @@ export function useResumeDownload() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await apiClient.post<{ success: boolean }>(`/downloads/${taskId}/resume`);
-      return response;
+      return await downloadsApi.resume(taskId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
@@ -101,8 +109,7 @@ export function useCancelDownload() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await apiClient.delete<{ success: boolean }>(`/downloads/${taskId}`);
-      return response;
+      return await downloadsApi.cancel(taskId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
@@ -118,8 +125,7 @@ export function useRetryDownload() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await apiClient.post<{ success: boolean }>(`/downloads/${taskId}/retry`);
-      return response;
+      return await downloadsApi.retry(taskId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
@@ -135,8 +141,7 @@ export function useClearCompletedDownloads() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await apiClient.delete<{ success: boolean }>('/downloads/completed');
-      return response;
+      return await downloadsApi.clearCompleted();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
@@ -206,4 +211,22 @@ export function useDownloadStats(downloads: DownloadTask[] | undefined) {
     totalBytes,
     downloadedBytes,
   };
+}
+
+/**
+ * 获取模型文件列表 Hook
+ */
+export function useModelFiles(source: 'huggingface' | 'modelscope', repoId: string) {
+  return useQuery({
+    queryKey: ['model-files', source, repoId],
+    queryFn: async () => {
+      const response = await downloadsApi.listModelFiles(source, repoId);
+      if (!response.success) {
+        throw new Error(response.error || '获取文件列表失败');
+      }
+      return response.data;
+    },
+    enabled: !!source && !!repoId,
+    staleTime: 5 * 60 * 1000, // 5 分钟缓存
+  });
 }

@@ -1,4 +1,5 @@
 import { Pause, Play, X, RotateCcw, CloudDownload, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { DownloadTask, DownloadState } from '@/types';
 
@@ -184,43 +185,49 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
       {/* 操作按钮 */}
       <div className="flex items-center gap-2">
         {canPause && (
-          <button
+          <Button
             onClick={onPause}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50 rounded transition-colors"
+            variant="secondary"
+            size="sm"
+            className="border-yellow-500/50 text-yellow-700 hover:bg-yellow-200 hover:border-yellow-500 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
           >
             <Pause className="w-4 h-4" />
             暂停
-          </button>
+          </Button>
         )}
 
         {canResume && (
-          <button
+          <Button
             onClick={onResume}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded transition-colors"
+            variant="default"
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
             <Play className="w-4 h-4" />
             继续
-          </button>
+          </Button>
         )}
 
         {canCancel && (
-          <button
+          <Button
             onClick={onCancel}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 rounded transition-colors"
+            variant="destructive"
+            size="sm"
           >
             <X className="w-4 h-4" />
             取消
-          </button>
+          </Button>
         )}
 
         {canRetry && (
-          <button
+          <Button
             onClick={onRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
+            variant="outline"
+            size="sm"
           >
             <RotateCcw className="w-4 h-4" />
             重试
-          </button>
+          </Button>
         )}
 
         {/* 创建时间 */}

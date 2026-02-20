@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Square } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
@@ -78,31 +79,25 @@ export function ChatInput({
 
         {/* 发送/停止按钮 */}
         {isStreaming ? (
-          <button
+          <Button
             type="button"
             onClick={onStop}
-            className={cn(
-              'flex items-center justify-center w-12 h-12 rounded-lg transition-colors',
-              'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
-            )}
+            variant="destructive"
+            size="icon"
             title="停止生成"
           >
             <Square className="w-5 h-5" />
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="submit"
             disabled={!content.trim() || disabled}
-            className={cn(
-              'flex items-center justify-center w-12 h-12 rounded-lg transition-colors',
-              !content.trim() || disabled
-                ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-            )}
+            variant="default"
+            size="icon"
             title="发送 (Enter)"
           >
             <Send className="w-5 h-5" />
-          </button>
+          </Button>
         )}
       </div>
 

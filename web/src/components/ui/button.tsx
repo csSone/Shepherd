@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
  * Button 组件
  */
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'icon-button' | 'toggle' | 'submit';
+  size?: 'default' | 'sm' | 'lg' | 'icon' | 'xs';
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -14,20 +14,50 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          // Base styles
+          'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-200 ease-in-out',
+          // Enhanced focus styles - dual focus ring (ring + border)
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border focus-visible:border-ring/50',
+          // Disabled styles
+          'disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed',
+          // Active styles with shadow
+          'active:scale-95 active:shadow-sm',
+          // Shadow for depth
+          'shadow-sm hover:shadow-md transition-shadow',
           {
-            'bg-primary text-primary-foreground hover:bg-primary/90': variant === 'default',
-            'bg-destructive text-destructive-foreground hover:bg-destructive/90': variant === 'destructive',
-            'border border-input bg-background hover:bg-accent hover:text-accent-foreground': variant === 'outline',
-            'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
-            'hover:bg-accent hover:text-accent-foreground': variant === 'ghost',
-            'text-primary underline-offset-4 hover:underline': variant === 'link',
+            // Default variant - 主要操作,细微边框
+            'bg-primary text-primary-foreground border border-primary/20 hover:bg-primary/90 hover:border-primary/30 active:bg-primary/80': variant === 'default',
+
+            // Destructive variant - 危险操作,细微边框
+            'bg-destructive text-destructive-foreground border border-destructive/20 hover:bg-destructive/90 hover:border-destructive/30 active:bg-destructive/80': variant === 'destructive',
+
+            // Outline variant - 次要操作,明显边框 (2px)
+            'border-2 border-input bg-background hover:bg-accent hover:text-accent-foreground hover:border-border/70 active:bg-accent/80': variant === 'outline',
+
+            // Secondary variant - 辅助操作,细微边框
+            'bg-secondary text-secondary-foreground border border-secondary/50 hover:bg-secondary/80 hover:border-secondary/60 active:bg-secondary/70': variant === 'secondary',
+
+            // Ghost variant - 低权重操作,无边框
+            'hover:bg-accent/80 hover:text-accent-foreground active:bg-accent/60': variant === 'ghost',
+
+            // Link variant - 文字链接,无边框
+            'text-primary underline-offset-4 hover:underline active:text-primary/80': variant === 'link',
+
+            // Icon Button variant - 图标操作,明显边框 (2px)
+            'border-2 border-border/50 bg-transparent hover:bg-accent/80 hover:border-border hover:shadow-sm active:bg-accent/70': variant === 'icon-button',
+
+            // Toggle variant - 开关按钮,状态驱动
+            'border-2 border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-background data-[state=off]:text-foreground hover:bg-accent/80': variant === 'toggle',
+
+            // Submit variant - 表单提交,强调样式
+            'bg-primary text-primary-foreground border-2 border-primary/30 hover:bg-primary/90 hover:border-primary/40 active:bg-primary/80 shadow-md hover:shadow-lg': variant === 'submit',
           },
           {
             'h-10 px-4 py-2': size === 'default',
-            'h-9 rounded-md px-3': size === 'sm',
-            'h-11 rounded-md px-8': size === 'lg',
+            'h-9 rounded-md px-3 text-xs': size === 'sm',
+            'h-11 rounded-md px-8 text-base': size === 'lg',
             'h-10 w-10': size === 'icon',
+            'h-7 px-2 text-xs': size === 'xs',
           },
           className
         )}

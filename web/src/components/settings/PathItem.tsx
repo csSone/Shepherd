@@ -43,36 +43,36 @@ export function PathItem({
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
         {onTest && (
           <Button
-            variant="ghost"
+            variant="icon-button"
             size="icon"
             onClick={handleTest}
             disabled={isTesting}
             title="测试路径"
-            className="h-7 w-7"
+            className="h-8 w-8"
           >
-            <TestTube size={14} />
+            <TestTube size={16} />
           </Button>
         )}
         <Button
-          variant="ghost"
+          variant="icon-button"
           size="icon"
           onClick={onEdit}
           title="编辑"
-          className="h-7 w-7"
+          className="h-8 w-8"
         >
-          <Edit size={14} />
+          <Edit size={16} />
         </Button>
         <Button
-          variant="ghost"
+          variant="icon-button"
           size="icon"
           onClick={onRemove}
-          className="text-destructive hover:text-destructive h-7 w-7"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
           title="删除"
         >
-          <Trash2 size={14} />
+          <Trash2 size={16} />
         </Button>
       </div>
     </div>

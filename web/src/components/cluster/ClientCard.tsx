@@ -1,4 +1,5 @@
 import { Server, Cpu, HardDrive, Wifi, WifiOff, AlertCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Client, ClientStatus } from '@/types';
 
@@ -255,12 +256,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
         <div className="flex items-center gap-2">
           {actions}
           {onDisconnect && isConnected && (
-            <button
+            <Button
               onClick={onDisconnect}
-              className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 rounded transition-colors"
+              variant="destructive"
+              size="xs"
             >
               断开
-            </button>
+            </Button>
           )}
         </div>
       </div>

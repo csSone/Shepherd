@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, RefreshCw, Radar, Server, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   useClients,
   useClusterTasks,
@@ -11,11 +12,13 @@ import {
 import { ClientCard } from '@/components/cluster/ClientCard';
 import { cn } from '@/lib/utils';
 import type { ClientStatus, TaskStatus } from '@/types';
+import { useAlertDialog } from '@/hooks/useAlertDialog';
 
 /**
  * 集群管理页面
  */
 export function ClusterPage() {
+  const alertDialog = useAlertDialog();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: tasks, isLoading: tasksLoading } = useClusterTasks();
   const { data: overview } = useClusterOverview();
@@ -33,8 +36,12 @@ export function ClusterPage() {
   });
 
   // 处理网络扫描
-  const handleScan = () => {
-    if (confirm('确定要扫描网络中的客户端吗？')) {
+  const handleScan = async () => {
+    const confirmed = await alertDialog.confirm({
+      title: '扫描网络',
+      description: '确定要扫描网络中的客户端吗？',
+    });
+    if (confirmed) {
       networkScan.mutate({});
     }
   };
@@ -50,14 +57,15 @@ export function ClusterPage() {
           </p>
         </div>
 
-        <button
+        <Button
           onClick={handleScan}
           disabled={networkScan.isPending}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors disabled:opacity-50"
+          variant="default"
+          size="sm"
         >
           <Radar className={cn('w-4 h-4', networkScan.isPending && 'animate-spin')} />
           扫描网络
-        </button>
+        </Button>
       </div>
 
       {/* 统计卡片 */}
@@ -122,28 +130,32 @@ export function ClusterPage() {
       {/* 标签切换 */}
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-6">
-          <button
+          <Button
             onClick={() => setActiveTab('clients')}
+            variant={activeTab === 'clients' ? 'default' : 'ghost'}
+            size="sm"
             className={cn(
-              'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+              'rounded-t-lg rounded-b-none border-b-2',
               activeTab === 'clients'
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ? 'border-primary'
+                : 'border-transparent hover:border-transparent'
             )}
           >
             客户端 ({clients?.length || 0})
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab('tasks')}
+            variant={activeTab === 'tasks' ? 'default' : 'ghost'}
+            size="sm"
             className={cn(
-              'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+              'rounded-t-lg rounded-b-none border-b-2',
               activeTab === 'tasks'
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ? 'border-primary'
+                : 'border-transparent hover:border-transparent'
             )}
           >
             任务 ({tasks?.length || 0})
-          </button>
+          </Button>
         </nav>
       </div>
 

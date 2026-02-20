@@ -10,6 +10,8 @@ import { ClusterPage } from './pages/cluster';
 import { LogsPage } from './pages/logs';
 import { SettingsPage } from './pages/settings';
 import { useSSE } from './hooks/useSSE';
+import { AlertDialogProvider, AlertDialog } from './components/ui/alert-dialog';
+import { Toaster } from './components/ui/toaster';
 
 // 导入代码高亮样式
 import 'highlight.js/styles/github-dark.css';
@@ -49,7 +51,11 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent />
+      <AlertDialogProvider>
+        <AppContent />
+        <AlertDialog />
+        <Toaster />
+      </AlertDialogProvider>
     </QueryClientProvider>
   );
 }

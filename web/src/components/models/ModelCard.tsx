@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { Brain, Cpu, HardDrive, Star, Loader2, Play, Square, ToggleLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Model, ModelStatus } from '@/types';
 
@@ -75,21 +76,17 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
   return (
     <div className="group relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-all duration-200">
       {/* 收藏按钮 */}
-      <button
+      <Button
         onClick={onToggleFavourite}
+        variant="ghost"
+        size="icon"
         className={cn(
-          'absolute top-3 right-3 p-1.5 rounded-full transition-colors',
-          model.favourite
-            ? 'text-yellow-500 hover:text-yellow-600'
-            : 'text-gray-400 hover:text-yellow-500'
+          'absolute top-3 right-3 h-8 w-8 rounded-full',
+          model.favourite && 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
         )}
       >
-        {model.favourite ? (
-          <Star className="w-5 h-5 fill-current" />
-        ) : (
-          <Star className="w-5 h-5" />
-        )}
-      </button>
+        <Star className={cn('w-5 h-5', model.favourite && 'fill-current')} />
+      </Button>
 
       {/* 模型图标和名称 */}
       <div className="flex items-start gap-3 mb-3">
@@ -188,15 +185,11 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
       {/* 操作按钮 */}
       <div className="flex items-center gap-2">
         {!isLoaded ? (
-          <button
+          <Button
             onClick={onLoad}
             disabled={isLoading}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-              isLoading
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
-            )}
+            variant="default"
+            className="flex-1"
           >
             {isLoading ? (
               <>
@@ -209,12 +202,13 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
                 加载模型
               </>
             )}
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             onClick={onUnload}
             disabled={model.status === 'unloading'}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors"
+            variant="destructive"
+            className="flex-1"
           >
             {model.status === 'unloading' ? (
               <>
@@ -227,7 +221,7 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
                 卸载模型
               </>
             )}
-          </button>
+          </Button>
         )}
 
         {actions}

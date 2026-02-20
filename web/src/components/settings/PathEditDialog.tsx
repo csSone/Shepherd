@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { DirectoryBrowser } from '@/components/settings/DirectoryBrowser';
+import { cn } from '@/lib/utils';
 import type { LlamaCppPathConfig, ModelPathConfig } from '@/lib/configTypes';
 
 interface PathEditDialogProps {
@@ -34,6 +36,12 @@ export function PathEditDialog({
     description: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
+  const [pathValidation, setPathValidation] = useState<{
+    valid: boolean;
+    checking: boolean;
+    message?: string;
+  }>({ valid: false, checking: false });
 
   // 当 path 变化时更新表单数据
   useEffect(() => {
@@ -51,6 +59,36 @@ export function PathEditDialog({
       });
     }
   }, [path, open]);
+
+  // 路径验证
+  useEffect(() => {
+    if (!formData.path) {
+      setPathValidation({ valid: false, checking: false });
+      return;
+    }
+
+    const validatePath = async () => {
+      setPathValidation({ valid: false, checking: true });
+      // 简单验证:检查路径是否为绝对路径
+      const isUnixPath = formData.path.startsWith('/');
+      const isWindowsPath = /^[a-zA-Z]:\\/.test(formData.path);
+      const isValid = isUnixPath || isWindowsPath;
+
+      setPathValidation({
+        valid: isValid,
+        checking: false,
+        message: isValid ? '路径格式有效' : '请输入绝对路径',
+      });
+    };
+
+    const timeoutId = setTimeout(validatePath, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.path]);
+
+  // 处理目录选择
+  const handleDirectorySelect = (selectedPath: string) => {
+    setFormData({ ...formData, path: selectedPath });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,22 +132,62 @@ export function PathEditDialog({
                 <FolderOpen size={12} className="text-muted-foreground" />
                 路径 <span className="text-destructive">*</span>
               </label>
-              <input
-                id="path"
-                type="text"
-                value={formData.path}
-                onChange={(e) =>
-                  setFormData({ ...formData, path: e.target.value })
-                }
-                placeholder={type === 'llamacpp' ? '/usr/local/bin/llama.cpp' : '~/.cache/huggingface/hub'}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                required
-              />
-              <p className="text-[11px] text-muted-foreground">
-                {type === 'llamacpp'
-                  ? 'llama.cpp 可执行文件所在目录的绝对路径'
-                  : '包含 GGUF 模型文件的目录绝对路径'}
-              </p>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <input
+                    id="path"
+                    type="text"
+                    value={formData.path}
+                    onChange={(e) =>
+                      setFormData({ ...formData, path: e.target.value })
+                    }
+                    placeholder={type === 'llamacpp' ? '/usr/local/bin/llama.cpp' : '~/.cache/huggingface/hub'}
+                    className={cn(
+                      "w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm",
+                      "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all",
+                      pathValidation.checking && "opacity-50"
+                    )}
+                    required
+                  />
+                  {/* 验证状态图标 */}
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    {pathValidation.checking ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    ) : formData.path && (
+                      pathValidation.valid ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-500" />
+                      )
+                    )}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsBrowserOpen(true)}
+                  className="h-9 px-3"
+                >
+                  <FolderOpen className="w-4 h-4 mr-1" />
+                  浏览
+                </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-muted-foreground">
+                  {type === 'llamacpp'
+                    ? 'llama.cpp 可执行文件所在目录的绝对路径'
+                    : '包含 GGUF 模型文件的目录绝对路径'}
+                </p>
+                {pathValidation.message && (
+                  <p className={cn(
+                    "text-[11px]",
+                    pathValidation.valid ? "text-green-600" : "text-red-600"
+                  )}>
+                    {pathValidation.message}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* 名称输入（可选） */}
@@ -150,6 +228,14 @@ export function PathEditDialog({
               />
             </div>
           </div>
+
+          {/* 目录浏览器 */}
+          <DirectoryBrowser
+            open={isBrowserOpen}
+            initialPath={formData.path}
+            onSelect={handleDirectorySelect}
+            onClose={() => setIsBrowserOpen(false)}
+          />
 
           <DialogFooter>
             <Button
