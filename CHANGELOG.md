@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### 前端架构优化
+- **国际化 (i18n) 支持** - 完整的多语言国际化实现
+  - 集成 i18next + react-i18next + i18next-browser-languagedetector
+  - 支持中文 (zh-CN) 和英文 (en-US) 语言切换
+  - 语言设置持久化到 localStorage
+  - 新增 `LanguageToggle` 组件，集成到 Header
+  - 翻译文件结构：`web/src/locales/zh-CN.json`, `web/src/locales/en-US.json`
+  - 类型安全的翻译键定义
+
+- **WebSocket 实时通信** - 完整的 WebSocket 客户端实现
+  - 新增 `WebSocketClient` 类，支持自动重连和心跳检测
+  - 自动重连机制：指数退避 (1s → 2s → 4s → 8s → 16s)，最多 5 次
+  - 心跳检测：30 秒间隔 ping/pong，10 秒超时检测
+  - `useWebSocket` Hook 和 `WebSocketContext` 全局状态管理
+  - `WebSocketStatus` 组件：可视化连接状态指示器
+  - 完整的 TypeScript 类型定义和内存泄漏防护
+
+- **YAML 配置解析升级** - 从自定义解析器升级为标准 js-yaml
+  - 使用 `js-yaml` 库替代简易正则解析器
+  - 完整的错误处理和回退机制（YAML 格式错误时 toast 提示并使用默认配置）
+  - 支持复杂 YAML 结构（嵌套对象、数组等）
+  - 向后兼容，保持现有 `config.yaml` 格式不变
+  - 新增 `DEFAULT_CONFIG` 作为解析失败时的安全回退
+
+- **单元测试基础架构** - 完整的 Vitest 测试框架
+  - 配置 Vitest + React Testing Library + jsdom
+  - 覆盖率报告配置（c8 provider）
+  - 测试工具函数：`renderWithProviders` 包装器
+  - 示例测试用例：ConfigLoader (2个) + ApiClient (2个)
+  - 测试脚本：`npm test`, `npm run test:coverage`
+  - 测试文档：`web/TESTING.md`
+
+#### 版本文档统一
+- **版本信息标准化** - 创建 `VERSIONS.md` 作为版本权威来源
+  - 统一前端版本信息：React 19.2.0, Vite 7.x, TypeScript 5.x, Tailwind CSS 4.x
+  - 统一后端版本信息：Go 1.25.7
+  - 版本历史记录和变更追溯
+  - 消除 README 与 VERSIONS.md 之间的版本信息不一致
+
 ### Fixed
 
 #### 稳定性修复
