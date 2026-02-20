@@ -109,11 +109,22 @@ Shepherd 现在支持统一的 **Node 架构**，每个节点可以灵活地扮�
 git clone https://github.com/shepherd-project/shepherd.git
 cd shepherd
 
-# 编译 (支持 Linux/macOS/Windows)
+# 编译 (根据操作系统选择对应脚本)
+
+# Linux
+./scripts/linux/build.sh
+
+# macOS
+./scripts/macos/build.sh
+
+# Windows
+scripts\windows\build.bat
+
+# 或使用 Makefile
 make build
-# 或
-./scripts/build.sh
 ```
+
+**更多脚本信息请查看：** [scripts/README.md](scripts/README.md)
 
 </details>
 
@@ -264,40 +275,61 @@ DELETE /api/config/models/paths            # 删除路径
 <details>
 <summary><b>使用运行脚本</b></summary>
 
-**Linux/macOS:**
+**Linux:**
 
 ```bash
 # 单机模式
-./scripts/run.sh standalone
+./scripts/linux/run.sh standalone
 
 # Master 模式
-./scripts/run.sh master --port 9190 --scan
+./scripts/linux/run.sh master
 
 # Client 模式
-./scripts/run.sh client --master http://192.168.1.100:9190 --name client-1
+./scripts/linux/run.sh client --master http://192.168.1.100:9190 --name client-1
 
 # 运行前先编译
-./scripts/run.sh master -b
+./scripts/linux/run.sh standalone -b
 
 # 查看帮助
-./scripts/run.sh --help
+./scripts/linux/run.sh --help
+```
+
+**macOS:**
+
+```bash
+# 单机模式
+./scripts/macos/run.sh standalone
+
+# Master 模式
+./scripts/macos/run.sh master
+
+# Client 模式
+./scripts/macos/run.sh client --master http://192.168.1.100:9190 --name client-1
+
+# 运行前先编译
+./scripts/macos/run.sh standalone -b
+
+# 跳过 Gatekeeper 验证
+./scripts/macos/run.sh standalone --no-gatekeeper
 ```
 
 **Windows:**
 
 ```batch
 REM 单机模式
-scripts\run.bat standalone
+scripts\windows\run.bat standalone
 
 REM Master 模式
-scripts\run.bat master --port 9190 --scan
+scripts\windows\run.bat master
 
 REM Client 模式
-scripts\run.bat client --master http://192.168.1.100:9190 --name client-1
+scripts\windows\run.bat client --master http://192.168.1.100:9190 --name client-1
 
 REM 运行前先编译
-scripts\run.bat master -b
+scripts\windows\run.bat standalone -b
 ```
+
+**详细文档:** [scripts/README.md](scripts/README.md)
 
 </details>
 
@@ -331,8 +363,16 @@ kill -INT <pid>
 cd web
 npm run dev
 
-# 或使用脚本
-./scripts/web.sh dev
+# 或使用脚本 (根据操作系统选择)
+
+# Linux
+./scripts/linux/web.sh dev
+
+# macOS
+./scripts/macos/web.sh dev
+
+# Windows
+scripts\windows\web.bat dev
 
 # 前端会从 web/config.yaml 读取后端配置
 # 可连接到任意后端服务器
@@ -774,9 +814,9 @@ make clean
 - [x] v0.1.0-alpha - 核心功能 (M1-M9)
 - [x] v0.1.1 - Master-Client 分布式管理
 - [x] v0.1.2 - Web UI 前端独立架构
-- [x] v0.1.3 - 配置/下载/进程管理 API 完整实现
-- [ ] MCP (Model Context Protocol) 支持
-- [ ] 系统托盘
+- [x] v0.1.3 - 配置/下载/进程管理 API + 脚本重组
+- [ ] v0.2.0 - MCP (Model Context Protocol) 支持
+- [ ] v0.3.0 - 系统托盘和桌面应用
 - [ ] v1.0.0 - 生产就绪
 
 ---

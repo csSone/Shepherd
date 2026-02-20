@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shepherd 运行脚本
+# Shepherd macOS 运行脚本
 # 支持 standalone, master, client 三种模式
 
 set -e
@@ -13,9 +13,9 @@ NC='\033[0m' # No Color
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 BUILD_DIR="${PROJECT_DIR}/build"
-BINARY_NAME="shepherd"
+BINARY_NAME="shepherd-darwin-$(uname -m)"
 
 # 打印带颜色的消息
 print_info() {
@@ -37,7 +37,7 @@ print_error() {
 # 显示帮助信息
 show_help() {
     cat << EOF
-🐏 Shepherd 运行脚本
+🐏 Shepherd 运行脚本 (macOS)
 
 用法: $0 [模式] [选项]
 
@@ -56,6 +56,9 @@ Client 模式选项:
     --name NAME    Client 名称 (可选)
     --tags TAGS    Client 标签，逗号分隔 (可选)
 
+macOS 特定选项:
+    --no-gatekeeper   跳过 Gatekeeper 验证（解决隔离问题）
+
 示例:
     # 单机模式
     $0 standalone
@@ -68,6 +71,9 @@ Client 模式选项:
 
     # 运行前先编译
     $0 standalone -b
+
+    # 跳过 Gatekeeper 验证
+    $0 standalone --no-gatekeeper
 
 EOF
 }
@@ -84,6 +90,15 @@ check_binary() {
             print_error "无法继续，请先编译项目"
             exit 1
         fi
+    fi
+}
+
+# 修复 Gatekeeper 隔离问题
+fix_gatekeeper() {
+    if [ -f "${BUILD_DIR}/${BINARY_NAME}" ]; then
+        print_info "修复 Gatekeeper 隔离..."
+        xattr -cr "${BUILD_DIR}/${BINARY_NAME}"
+        print_success "修复完成"
     fi
 }
 
@@ -105,6 +120,7 @@ main() {
     local MASTER_ADDR=""
     local CLIENT_NAME=""
     local CLIENT_TAGS=""
+    local FIX_GATEKEEPER=false
 
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -136,6 +152,10 @@ main() {
                 CLIENT_TAGS="$2"
                 shift 2
                 ;;
+            --no-gatekeeper)
+                FIX_GATEKEEPER=true
+                shift
+                ;;
             *)
                 print_error "未知参数: $1"
                 show_help
@@ -158,6 +178,11 @@ main() {
 
     # 检查二进制文件
     check_binary
+
+    # 修复 Gatekeeper（如果需要）
+    if [ "$FIX_GATEKEEPER" = true ]; then
+        fix_gatekeeper
+    fi
 
     case "$MODE" in
         master)

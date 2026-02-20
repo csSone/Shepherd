@@ -1,12 +1,12 @@
 #!/bin/bash
-# Shepherd Linux/macOS 编译脚本
-# 用法: ./scripts/build.sh [version]
+# Shepherd Linux 编译脚本
+# 用法: ./scripts/linux/build.sh [version]
 
 set -e
 
 # 获取脚本所在目录并切换到项目根目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$(dirname "$SCRIPT_DIR")"
+cd "$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -26,7 +26,7 @@ GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GO_VERSION=$(go version | awk '{print $3}')
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  Shepherd Build Script (Linux/macOS)${NC}"
+echo -e "${GREEN}  Shepherd Build Script (Linux)${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "版本: ${VERSION}"
@@ -45,20 +45,8 @@ LDFLAGS="${LDFLAGS} -X main.BuildTime=${BUILD_TIME}"
 LDFLAGS="${LDFLAGS} -X main.GitCommit=${GIT_COMMIT}"
 LDFLAGS="${LDFLAGS} -s -w"  # 去除调试信息，减小二进制大小
 
-# 检测操作系统
-OS=$(uname -s)
-case "${OS}" in
-    Linux*)
-        TARGET_OS="linux"
-        ;;
-    Darwin*)
-        TARGET_OS="darwin"
-        ;;
-    *)
-        echo -e "${RED}未知操作系统: ${OS}${NC}"
-        exit 1
-        ;;
-esac
+# Linux 系统
+TARGET_OS="linux"
 
 # 检测架构
 ARCH=$(uname -m)
@@ -68,6 +56,9 @@ case "${ARCH}" in
         ;;
     aarch64|arm64)
         TARGET_ARCH="arm64"
+        ;;
+    riscv64)
+        TARGET_ARCH="riscv64"
         ;;
     *)
         echo -e "${RED}未知架构: ${ARCH}${NC}"

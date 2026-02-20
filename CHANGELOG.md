@@ -7,10 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned
-- 集群管理功能实现
-- 日志查看功能实现
-- 性能优化和测试改进
+### Changed
+- **脚本重组** - 所有脚本按操作系统分类到 `linux/`, `macos/`, `windows/` 子目录
+- **macOS 支持** - 新增 macOS 专用脚本，支持 Intel 和 Apple Silicon
+- **文档增强** - 每个平台都有详细的 README.md 文档
+
+### Added
+- **Linux 脚本** - `scripts/linux/` 目录，包含 build.sh, run.sh, web.sh 等
+- **macOS 脚本** - `scripts/macos/` 目录，支持 Universal Binary 和代码签名
+- **Windows 脚本** - `scripts/windows/` 目录，包含 build.bat, run.bat, web.bat
+- **脚本总览** - `scripts/README.md` 提供跨平台脚本对比和快速开始指南
+- **迁移指南** - `scripts/MIGRATION.md` 帮助从旧脚本路径迁移
+
+### Removed
+- **旧脚本文件** - 删除 `scripts/` 根目录下的重复脚本：
+  - `build.sh`, `run.sh`, `web.sh` → 已迁移到 `linux/` 和 `macos/`
+  - `build.bat`, `run.bat`, `web.bat` → 已迁移到 `windows/`
+  - `sync-web-config.sh`, `watch-sync-config.sh` → 已迁移到 `linux/`
+- **保留脚本** - `build-all.sh` 和 `release.sh` 保留在根目录用于跨平台编译
+
+### Fixed
+- **脚本路径计算** - 修复所有脚本的路径计算，使用统一的 `$(cd "$SCRIPT_DIR/../.." && pwd)` 向上两级到项目根目录
+- **配置同步脚本** - 修复 `sync-web-config.sh` 和 `watch-sync-config.sh` 的路径问题
+- **Web 脚本** - 修复 Linux 和 macOS 版 `web.sh` 的路径计算错误
 
 ## [0.1.3] - 2025-02-20
 

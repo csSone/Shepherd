@@ -12,7 +12,8 @@ NC='\033[0m' # No Color
 
 # 获取项目根目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# 从 linux/ 子目录向上两级到达项目根目录
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 WEB_DIR="${PROJECT_DIR}/web"
 
 # 打印带颜色的消息
