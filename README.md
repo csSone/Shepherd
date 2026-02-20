@@ -772,8 +772,9 @@ make clean
 ## 🗺️ 路线图
 
 - [x] v0.1.0-alpha - 核心功能 (M1-M9)
-- [x] Master-Client 分布式管理
-- [x] Web UI - React + TypeScript 前端
+- [x] v0.1.1 - Master-Client 分布式管理
+- [x] v0.1.2 - Web UI 前端独立架构
+- [x] v0.1.3 - 配置/下载/进程管理 API 完整实现
 - [ ] MCP (Model Context Protocol) 支持
 - [ ] 系统托盘
 - [ ] v1.0.0 - 生产就绪

@@ -83,7 +83,7 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 
 ---
 
-### **Phase 2: 修复 API 响应序列化** (45分钟)
+### **Phase 2: 修复 API 响应序列化** (45分钟) ✅ 已完成
 
 **目标**: 确保模型数据能正确序列化为 JSON
 

@@ -136,6 +136,8 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 	var models []*Model
 	var errors []ScanError
 	var mu sync.Mutex
+	var fileCount int
+	var matchedCount int
 
 	// Update scan status
 	m.mu.Lock()
@@ -145,8 +147,16 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 	// Check if path exists
 	info, err := os.Stat(scanPath)
 	if err != nil {
+		fmt.Printf("[ERROR] ModelManager: 路径访问失败: %s - %v\n", scanPath, err)
 		return nil, []ScanError{{Path: scanPath, Error: fmt.Sprintf("路径访问失败: %v", err)}}
 	}
+
+	fmt.Printf("[DEBUG] ModelManager: 开始扫描路径: %s (类型: %s)\n", scanPath, func() string {
+		if info.IsDir() {
+			return "目录"
+		}
+		return "文件"
+	}())
 
 	// Check if path is readable
 	if info.IsDir() {
@@ -184,7 +194,13 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 				return nil
 			}
 
-			if m.isGGUFFile(path) {
+			fileCount++
+
+			// 检查是否为模型文件
+			if m.isModelFile(path) {
+				matchedCount++
+				fmt.Printf("[INFO] ModelManager: 找到模型文件: %s\n", path)
+
 				wg.Add(1)
 				semaphore <- struct{}{}
 
@@ -194,6 +210,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 
 					model, err := m.loadModelWithValidation(filePath)
 					if err != nil {
+						fmt.Printf("[WARN] ModelManager: 加载模型失败: %s - %v\n", filePath, err)
 						mu.Lock()
 						errors = append(errors, ScanError{
 							Path:  filePath,
@@ -201,6 +218,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 						})
 						mu.Unlock()
 					} else {
+						fmt.Printf("[INFO] ModelManager: 成功加载模型: %s (ID: %s)\n", model.Name, model.ID)
 						mu.Lock()
 						models = append(models, model)
 						mu.Unlock()
@@ -213,13 +231,17 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 
 		wg.Wait()
 
+		fmt.Printf("[DEBUG] ModelManager: 路径 %s 扫描完成: 共检查 %d 个文件，匹配 %d 个模型文件\n",
+			scanPath, fileCount, matchedCount)
+
 		if err != nil && err != ctx.Err() {
 			errors = append(errors, ScanError{
 				Path:  scanPath,
 				Error: fmt.Sprintf("扫描中断: %v", err),
 			})
 		}
-	} else if m.isGGUFFile(scanPath) {
+	} else if m.isModelFile(scanPath) {
+		fmt.Printf("[INFO] ModelManager: 单文件模型: %s\n", scanPath)
 		model, err := m.loadModelWithValidation(scanPath)
 		if err != nil {
 			errors = append(errors, ScanError{
@@ -229,35 +251,57 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 		} else {
 			models = append(models, model)
 		}
+	} else {
+		fmt.Printf("[WARN] ModelManager: 路径不是模型文件: %s\n", scanPath)
 	}
 
 	return models, errors
 }
 
-// isGGUFFile checks if a file is a GGUF model file
-func (m *Manager) isGGUFFile(path string) bool {
+// isModelFile checks if a file is a supported model file (GGUF, SafeTensors, etc.)
+func (m *Manager) isModelFile(path string) bool {
 	// Check file extension
 	base := filepath.Base(path)
 
-	// Common GGUF patterns
+	// 支持的模型格式
+	// GGUF 格式 (主要支持，可被 llama.cpp 加载)
 	patterns := []string{
-		".gguf",
+		".gguf",        // GGUF 格式
 		".GGUF",
-		"gguf-",
+		"gguf-",        // 分卷 GGUF
 	}
 
+	// 检查文件扩展名
 	for _, pattern := range patterns {
 		if strings.Contains(base, pattern) {
 			return true
 		}
 	}
 
-	// Check for models--*.gguf pattern (HuggingFace cache)
+	// HuggingFace 缓存目录模式检查
+	// 模式1: models--org--model/snapshots/hash/*.gguf
 	if matched, _ := regexp.MatchString(`models--.+--.+\.gguf$`, path); matched {
 		return true
 	}
 
+	// 模式2: HuggingFace 缓存中的 snapshots 目录
+	if strings.Contains(path, "snapshots") {
+		// 检查是否包含模型文件扩展名
+		if strings.HasSuffix(base, ".safetensors") ||
+			strings.HasSuffix(base, ".bin") ||
+			strings.HasSuffix(base, ".safetensors") {
+			fmt.Printf("[DEBUG] 找到 HuggingFace 格式模型: %s\n", path)
+			return true
+		}
+	}
+
 	return false
+}
+
+// isGGUFFile checks if a file is specifically a GGUF model file (deprecated, use isModelFile)
+// 保留此方法以兼容性，内部调用 isModelFile
+func (m *Manager) isGGUFFile(path string) bool {
+	return m.isModelFile(path)
 }
 
 // loadModel loads a model from a file path
@@ -1106,4 +1150,9 @@ func (m *Manager) Close() error {
 	m.cancel()
 	m.wg.Wait()
 	return nil
+}
+
+// GetProcessManager returns the process manager
+func (m *Manager) GetProcessManager() *process.Manager {
+	return m.processMgr
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,7 +224,13 @@ func TestGenerateModelID(t *testing.T) {
 	}
 
 	id := manager.generateModelID("/path/to/model.gguf", metadata)
-	assert.Equal(t, "/path/to/model.gguf", id)
+	// ID 现在是 hash-based 格式: model-{hash}
+	assert.Contains(t, id, "model-")
+	// 验证格式: base-hash (两部分)
+	parts := strings.Split(id, "-")
+	assert.Len(t, parts, 2)
+	// hash 部分应该是 16 字符 (SHA256 的前 8 字节，hex 编码)
+	assert.Len(t, parts[1], 16)
 }
 
 func TestScanStatus(t *testing.T) {
@@ -240,13 +247,10 @@ func TestScanStatus(t *testing.T) {
 }
 
 // createMinimalGGUF creates a minimal valid GGUF file for testing
+// File size is at least 2048 bytes to pass model validation (requires >= 1024 bytes)
 func createMinimalGGUF(path string) error {
-	// This is a minimal GGUF file with:
-	// - Magic number: "GGUF"
-	// - Version: 3
-	// - Tensor count: 0
-	// - Metadata KV count: 0
-	data := []byte{
+	// GGUF header (24 bytes)
+	header := []byte{
 		// Magic: "GGUF" (0x47475546)
 		0x47, 0x47, 0x55, 0x46,
 		// Version: 3 (little endian uint32)
@@ -256,6 +260,10 @@ func createMinimalGGUF(path string) error {
 		// Metadata KV count: 0 (little endian uint64)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}
+
+	// Pad to 2048 bytes to meet minimum file size requirement
+	padding := make([]byte, 2048-24)
+	data := append(header, padding...)
 
 	return os.WriteFile(path, data, 0644)
 }

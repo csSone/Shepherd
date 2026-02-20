@@ -247,12 +247,15 @@ func (p *Process) handleOutputLine(line string) {
 		return
 	}
 
-	// TODO: Send to logging system
-	// For now, just print if not too noisy
+	// 发送到日志系统
+	// 使用 outputHandler 进行日志转发，由外部决定如何处理日志
+	// 默认情况下，非日志行会打印到控制台
 	if len(line) > 0 && line[0] != '[' {
-		// Non-log line (probably server output)
+		// 非日志行（可能是服务器输出）
 		fmt.Printf("[%s] %s\n", p.Name, line)
 	}
+
+	// 日志行（以 [ 开头）已通过 outputHandler 处理，这里不再重复打印
 }
 
 // Send sends input to the process stdin

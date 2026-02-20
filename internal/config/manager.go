@@ -21,6 +21,16 @@ func (m *Manager) Load() (*Config, error) {
 		return nil, err
 	}
 
+	// 检查是否需要迁移旧配置
+	migrator := NewMigrator(true) // verbose mode
+	if NeedsMigration(m.configPath) {
+		// 尝试自动迁移旧配置
+		if err := migrator.AutoMigrate(m.configPath, m.mode); err != nil {
+			// 迁移失败，但记录警告而不是返回错误
+			fmt.Printf("[Config] 配置迁移失败: %v (将使用默认配置)\n", err)
+		}
+	}
+
 	// Try to read config file
 	data, err := os.ReadFile(m.configPath)
 	if err != nil {

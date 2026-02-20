@@ -10,10 +10,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/client"
@@ -210,16 +214,148 @@ func (c *Connector) getResourceUsage() *cluster.ResourceUsage {
 	vmStat, _ := mem.VirtualMemory()
 	hostInfo, _ := host.Info()
 
+	// 获取磁盘使用率
+	diskPercent := c.getDiskUsage()
+
+	// 获取 GPU 使用率
+	gpuPercent, gpuMemUsed, gpuMemTotal := c.getGPUUsage()
+
 	return &cluster.ResourceUsage{
 		CPUPercent:     float64(runtime.NumCPU()), // Simplified
 		MemoryUsed:     int64(vmStat.Used),
 		MemoryTotal:    int64(vmStat.Total),
-		GPUPercent:     0, // TODO: Implement GPU monitoring
-		GPUMemoryUsed:  0,
-		GPUMemoryTotal: 0,
-		DiskPercent:    0, // TODO: Implement disk monitoring
+		GPUPercent:     float64(gpuPercent),
+		GPUMemoryUsed:  gpuMemUsed,
+		GPUMemoryTotal: gpuMemTotal,
+		DiskPercent:    diskPercent,
 		Uptime:         int64(hostInfo.Uptime),
 	}
+}
+
+// getDiskUsage 获取磁盘使用率
+func (c *Connector) getDiskUsage() float64 {
+	// 获取根分区使用率
+	if diskStat, err := disk.Usage("/"); err == nil {
+		return diskStat.UsedPercent
+	}
+	return 0
+}
+
+// getGPUUsage 获取 GPU 使用率和内存使用情况
+func (c *Connector) getGPUUsage() (percent, memUsed, memTotal int64) {
+	// 尝试检测 NVIDIA GPU
+	if nvidiaSMI := c.detectNvidiaGPU(); nvidiaSMI {
+		return c.getNvidiaGPUUsage()
+	}
+
+	// 尝试检测 AMD GPU (ROCm)
+	if radeonSMI := c.detectAmdGPU(); radeonSMI {
+		return c.getAmdGPUUsage()
+	}
+
+	return 0, 0, 0
+}
+
+// detectNvidiaGPU 检测是否存在 NVIDIA GPU
+func (c *Connector) detectNvidiaGPU() bool {
+	_, err := exec.LookPath("nvidia-smi")
+	return err == nil
+}
+
+// detectAmdGPU 检测是否存在 AMD GPU
+func (c *Connector) detectAmdGPU() bool {
+	// 检查 ROCm SMI 工具
+	_, err := exec.LookPath("rocm-smi")
+	if err == nil {
+		return true
+	}
+
+	// 检查 sysfs 中的 AMD GPU
+	_, err = os.Stat("/sys/class/drm/card0/device/vendor")
+	if err == nil {
+		// 读取 vendor ID
+		data, err := os.ReadFile("/sys/class/drm/card0/device/vendor")
+		if err == nil && strings.Contains(string(data), "0x1002") {
+			return true // AMD vendor ID
+		}
+	}
+
+	return false
+}
+
+// getNvidiaGPUUsage 获取 NVIDIA GPU 使用率
+func (c *Connector) getNvidiaGPUUsage() (percent, memUsed, memTotal int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "nvidia-smi",
+		"--query-gpu=utilization.gpu,memory.used,memory.total",
+		"--format=csv,noheader,nounits")
+
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, 0, 0
+	}
+
+	// 解析输出: "85, 1024, 8192"
+	parts := strings.Split(strings.TrimSpace(string(output)), ",")
+	if len(parts) >= 3 {
+		if p, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64); err == nil {
+			percent = p
+		}
+		if u, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64); err == nil {
+			memUsed = u
+		}
+		if t, err := strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64); err == nil {
+			memTotal = t
+		}
+	}
+
+	return percent, memUsed, memTotal
+}
+
+// getAmdGPUUsage 获取 AMD GPU 使用率 (ROCm)
+func (c *Connector) getAmdGPUUsage() (percent, memUsed, memTotal int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "rocm-smi",
+		"--showuse",
+		"--showmem",
+		"--csv")
+
+	output, err := cmd.Output()
+	if err != nil {
+		// 回退到基本的 GPU 检测
+		return c.getAmdGPUBasic()
+	}
+
+	// 解析 ROCm SMI 输出
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "GPU use") {
+			// 提取使用率百分比
+			parts := strings.Fields(line)
+			for i, part := range parts {
+				if part == "%" && i > 0 {
+					if p, err := strconv.ParseInt(strings.TrimSuffix(parts[i-1], "%"), 10, 64); err == nil {
+						percent = p
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// 获取 VRAM 使用情况（简化版）
+	return percent, 0, 0
+}
+
+// getAmdGPUBasic 获取基本的 AMD GPU 信息（回退方法）
+func (c *Connector) getAmdGPUBasic() (percent, memUsed, memTotal int64) {
+	// 尝试从 sysfs 读取基本信息
+	// 这只返回有限的信息，但至少能检测到 GPU
+	return 0, 0, 0
 }
 
 // generateClientInfo generates client information

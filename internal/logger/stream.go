@@ -187,7 +187,7 @@ func GetLatestLogFile(logDir string, serverMode string) (string, error) {
 	}
 
 	// Log file name format: shepherd-{mode}-{date}.log
-	date := time.Now().Format("2006-01-02 15-04-05")
+	date := time.Now().Format("2006-01-02")
 	logFileName := fmt.Sprintf("shepherd-%s-%s.log", serverMode, date)
 	logPath := filepath.Join(logDir, logFileName)
 

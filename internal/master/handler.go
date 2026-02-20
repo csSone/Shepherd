@@ -1,4 +1,8 @@
 // Package master provides HTTP handlers for master node management.
+//
+// Deprecated: This package is part of the old distributed architecture.
+// New code should use github.com/shepherd-project/shepherd/Shepherd/internal/api.NodeAdapter instead.
+// This package will be removed in a future release.
 package master
 
 import (
@@ -12,6 +16,8 @@ import (
 )
 
 // MasterHandler provides HTTP handlers for master node operations
+//
+// Deprecated: Use api.NodeAdapter instead. This type will be removed in a future release.
 type MasterHandler struct {
 	nodeManager *NodeManager
 	log         *logger.Logger

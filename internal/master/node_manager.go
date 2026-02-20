@@ -1,4 +1,8 @@
 // Package master provides node management for the master node in distributed architecture.
+//
+// Deprecated: This package is part of the old distributed architecture.
+// New code should use github.com/shepherd-project/shepherd/Shepherd/internal/node.Node with Master role instead.
+// This package will be removed in a future release.
 package master
 
 import (
@@ -12,6 +16,8 @@ import (
 )
 
 // NodeManager 管理连接到 Master 的 Client 节点
+//
+// Deprecated: Use node.Node with Master role instead. This type will be removed in a future release.
 type NodeManager struct {
 	nodes  map[string]*node.NodeInfo
 	mu     sync.RWMutex

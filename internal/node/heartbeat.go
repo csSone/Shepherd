@@ -227,8 +227,8 @@ func (hm *HeartbeatManager) sendHeartbeatWithRetry() {
 		lastErr = err
 	}
 
-	// 更新状态
 	hm.mu.Lock()
+	wasConnected := hm.connected
 	if success {
 		hm.connected = true
 		hm.lastSuccess = time.Now()
@@ -250,11 +250,11 @@ func (hm *HeartbeatManager) sendHeartbeatWithRetry() {
 	}
 
 	if success {
-		if hm.onConnect != nil && !hm.wasConnected() {
+		if hm.onConnect != nil && !wasConnected {
 			hm.onConnect()
 		}
 	} else {
-		if hm.onDisconnect != nil && hm.wasConnected() {
+		if hm.onDisconnect != nil && wasConnected {
 			hm.onDisconnect(lastErr)
 		}
 	}

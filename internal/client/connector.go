@@ -1,4 +1,8 @@
 // Package client provides client-side functionality for connecting to master nodes.
+//
+// Deprecated: This package is part of the old distributed architecture.
+// New code should use github.com/shepherd-project/shepherd/Shepherd/internal/node.Node instead.
+// This package will be removed in a future release.
 package client
 
 import (
@@ -16,6 +20,8 @@ import (
 )
 
 // MasterConnector 管理 Client 到 Master 的连接，包括注册、心跳和命令处理
+//
+// Deprecated: Use node.Node with Client role instead. This type will be removed in a future release.
 type MasterConnector struct {
 	// 节点标识
 	nodeID     string

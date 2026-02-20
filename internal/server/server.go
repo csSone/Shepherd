@@ -11,13 +11,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
+	api "github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/openai"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/paths"
 	storageapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
-	"github.com/shepherd-project/shepherd/Shepherd/internal/master"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
@@ -40,13 +40,15 @@ type ModelDTO struct {
 
 // Server represents the HTTP server
 type Server struct {
-	engine     *gin.Engine
-	httpServer *http.Server
-	config     *Config
-	handlers   *Handlers
-	wsMgr      *websocket.Manager
-	modelMgr   *model.Manager
-	storageMgr *storage.Manager
+	engine       *gin.Engine
+	httpServer   *http.Server
+	config       *Config
+	handlers     *Handlers
+	wsMgr        *websocket.Manager
+	modelMgr     *model.Manager
+	storageMgr   *storage.Manager
+	downloadMgr  *DownloadManager // 下载管理器
+	nodeAdapter  *api.NodeAdapter // Node API 适配器
 
 	mu     sync.RWMutex
 	ctx    context.Context
@@ -98,6 +100,9 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 		return nil, fmt.Errorf("failed to initialize storage manager: %w", err)
 	}
 	s.storageMgr = storageMgr
+
+	// Create download manager
+	s.downloadMgr = NewDownloadManager(3) // 最多3个并发下载
 
 	// Create WebSocket manager
 	s.wsMgr = websocket.NewManager(modelMgr)
@@ -331,6 +336,13 @@ func (s *Server) Stop() error {
 	s.wsMgr.Stop()
 	logger.Info("WebSocket 管理器已停止")
 
+	// Step 4.5: Stop download manager
+	logger.Info("停止下载管理器...")
+	if s.downloadMgr != nil {
+		s.downloadMgr.Stop()
+		logger.Info("下载管理器已停止")
+	}
+
 	// Step 5: Close storage manager
 	logger.Info("关闭存储管理器...")
 	if s.storageMgr != nil {
@@ -391,10 +403,20 @@ func (s *Server) GetWebSocketManager() *websocket.Manager {
 	return s.wsMgr
 }
 
-func (s *Server) RegisterMasterHandler(handler *master.MasterHandler) {
+// RegisterMasterHandler 注册 Master Handler（已废弃）
+// Deprecated: 请使用 RegisterNodeAdapter 代替
+func (s *Server) RegisterMasterHandler(handler interface{}) {
+	logger.Warn("RegisterMasterHandler 已废弃，请使用 RegisterNodeAdapter 代替")
+}
+
+// RegisterNodeAdapter 注册 Node API 适配器
+func (s *Server) RegisterNodeAdapter(nodeAdapter *api.NodeAdapter) {
+	s.nodeAdapter = nodeAdapter
+
+	// 注册 Node API 路由
 	api := s.engine.Group("/api")
-	handler.RegisterRoutes(api)
-	logger.Info("Master API routes registered")
+	nodeAdapter.RegisterRoutes(api)
+	logger.Info("Node API 适配器路由已注册")
 }
 
 // Middleware
@@ -464,13 +486,89 @@ func (s *Server) handleServerInfo(c *gin.Context) {
 	})
 }
 
-// Placeholder handlers (to be implemented)
+// handleGetConfig 返回当前配置（不包含敏感信息）
 func (s *Server) handleGetConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	if s.config == nil || s.config.ServerCfg == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "配置未初始化",
+		})
+		return
+	}
+
+	cfg := s.config.ServerCfg
+
+	c.JSON(http.StatusOK, gin.H{
+		"mode": s.config.Mode,
+		"server": gin.H{
+			"host":           s.config.Host,
+			"web_port":       s.config.WebPort,
+			"anthropic_port": s.config.AnthropicPort,
+			"ollama_port":    s.config.OllamaPort,
+			"lm_studio_port": s.config.LMStudioPort,
+		},
+		"storage": gin.H{
+			"type":   cfg.Storage.Type,
+			"sqlite": cfg.Storage.SQLite,
+		},
+		"models": gin.H{
+			"paths":     cfg.Model.Paths,
+			"auto_scan": cfg.Model.AutoScan,
+		},
+		"node": gin.H{
+			"role": cfg.Node.Role,
+			"id":   cfg.Node.ID,
+			"name": cfg.Node.Name,
+		},
+		"llamacpp": gin.H{
+			"paths": cfg.Llamacpp.Paths,
+		},
+	})
 }
 
+// handleUpdateConfig 更新配置
 func (s *Server) handleUpdateConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	var req struct {
+		Mode      string   `json:"mode"`
+		WebPort   int      `json:"web_port"`
+		AutoScan  bool     `json:"auto_scan"`
+		ScanPaths []string `json:"scan_paths"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "无效的请求格式",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	restartRequired := false
+
+	// 更新模式
+	if req.Mode != "" {
+		s.config.Mode = req.Mode
+	}
+
+	// 更新端口（需要重启）
+	if req.WebPort > 0 && req.WebPort != s.config.WebPort {
+		s.config.WebPort = req.WebPort
+		restartRequired = true
+	}
+
+	// 更新扫描路径
+	if req.ScanPaths != nil && len(req.ScanPaths) > 0 {
+		s.config.ServerCfg.Model.Paths = req.ScanPaths
+
+		// 触发重新扫描
+		if req.AutoScan {
+			go s.modelMgr.Scan(c.Request.Context())
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":          "配置更新成功",
+		"restart_required": restartRequired,
+	})
 }
 
 func (s *Server) handleListModels(c *gin.Context) {
@@ -635,39 +733,218 @@ func (s *Server) handleGetScanStatus(c *gin.Context) {
 }
 
 func (s *Server) handleListDownloads(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"downloads": []interface{}{}})
+	downloads := s.downloadMgr.ListDownloads()
+	c.JSON(http.StatusOK, gin.H{
+		"downloads": downloads,
+		"total":     len(downloads),
+	})
 }
 
 func (s *Server) handleCreateDownload(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	var req struct {
+		URL        string `json:"url" binding:"required"`
+		TargetPath string `json:"target_path" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "无效的请求格式",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	task, err := s.downloadMgr.CreateDownload(req.URL, req.TargetPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "创建下载失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "下载任务已创建",
+		"task":    task,
+	})
 }
 
 func (s *Server) handleGetDownload(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		return
+	}
+
+	task, exists := s.downloadMgr.GetDownload(id)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "下载任务不存在"})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
 }
 
 func (s *Server) handlePauseDownload(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		return
+	}
+
+	if err := s.downloadMgr.PauseDownload(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "下载已暂停"})
 }
 
 func (s *Server) handleResumeDownload(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		return
+	}
+
+	if err := s.downloadMgr.ResumeDownload(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "下载已恢复"})
 }
 
 func (s *Server) handleDeleteDownload(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		return
+	}
+
+	if err := s.downloadMgr.DeleteDownload(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "下载任务已删除"})
 }
 
 func (s *Server) handleListProcesses(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"processes": []interface{}{}})
+	processMgr := s.modelMgr.GetProcessManager()
+	if processMgr == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "进程管理器未初始化"})
+		return
+	}
+
+	running, loading := processMgr.ListAll()
+
+	// 转换为切片格式
+	type ProcessInfo struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		PID      int    `json:"pid"`
+		Port     int    `json:"port"`
+		CtxSize  int    `json:"ctx_size"`
+		Running  bool   `json:"running"`
+		Loading  bool   `json:"loading"`
+	}
+
+	var processes []ProcessInfo
+	for _, p := range running {
+		processes = append(processes, ProcessInfo{
+			ID:      p.ID,
+			Name:    p.Name,
+			PID:     p.GetPID(),
+			Port:    p.GetPort(),
+			CtxSize: p.GetCtxSize(),
+			Running: p.IsRunning(),
+			Loading: false,
+		})
+	}
+	for _, p := range loading {
+		processes = append(processes, ProcessInfo{
+			ID:      p.ID,
+			Name:    p.Name,
+			PID:     p.GetPID(),
+			Port:    p.GetPort(),
+			CtxSize: p.GetCtxSize(),
+			Running: p.IsRunning(),
+			Loading: true,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"processes": processes,
+		"stats": gin.H{
+			"running": len(running),
+			"loading": len(loading),
+			"total":   len(running) + len(loading),
+		},
+	})
 }
 
 func (s *Server) handleGetProcess(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "进程ID不能为空"})
+		return
+	}
+
+	processMgr := s.modelMgr.GetProcessManager()
+	if processMgr == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "进程管理器未初始化"})
+		return
+	}
+
+	proc, exists := processMgr.Get(id)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "进程不存在",
+			"process": nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"process": gin.H{
+			"id":       proc.ID,
+			"name":     proc.Name,
+			"cmd":      proc.Cmd,
+			"bin_path": proc.BinPath,
+			"pid":      proc.GetPID(),
+			"port":     proc.GetPort(),
+			"ctx_size": proc.GetCtxSize(),
+			"running":  proc.IsRunning(),
+		},
+	})
 }
 
 func (s *Server) handleStopProcess(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "TODO: implement"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "进程ID不能为空"})
+		return
+	}
+
+	processMgr := s.modelMgr.GetProcessManager()
+	if processMgr == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "进程管理器未初始化"})
+		return
+	}
+
+	if err := processMgr.Stop(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "停止进程失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "进程已停止",
+		"id":      id,
+	})
 }
 
 // handleLogStream streams log entries using Server-Sent Events

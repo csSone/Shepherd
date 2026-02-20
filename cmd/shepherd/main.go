@@ -9,10 +9,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/shepherd-project/shepherd/Shepherd/internal/client"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
-	"github.com/shepherd-project/shepherd/Shepherd/internal/master"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/process"
@@ -38,10 +37,8 @@ type App struct {
 	srv         *server.Server
 
 	// 分布式节点组件
-	node            *node.Node
-	nodeManager     *master.NodeManager
-	masterHandler   *master.MasterHandler
-	masterConnector *client.MasterConnector
+	node        *node.Node      // 统一节点实例
+	nodeAdapter *api.NodeAdapter // Node API 适配器
 
 	// 运行模式
 	role string
@@ -143,7 +140,7 @@ func (app *App) Initialize(runMode, masterAddr string) error {
 		cfg.Node.ClientRole.MasterAddress = masterAddr
 	}
 
-	// 确定节点角色（新架构优先使用 cfg.Node.Role）
+	// 确定节点角色
 	app.role = app.determineRole(runMode)
 
 	// 初始化日志系统
@@ -193,8 +190,8 @@ func (app *App) Initialize(runMode, masterAddr string) error {
 
 	// 注册 Master API 路由（如果是 master 或 hybrid 模式）
 	if app.role == "master" || app.role == "hybrid" {
-		if app.masterHandler != nil {
-			app.srv.RegisterMasterHandler(app.masterHandler)
+		if app.nodeAdapter != nil {
+			app.srv.RegisterNodeAdapter(app.nodeAdapter)
 		}
 	}
 
@@ -209,29 +206,24 @@ func (app *App) Initialize(runMode, masterAddr string) error {
 
 // determineRole 根据运行模式和配置确定节点角色
 func (app *App) determineRole(runMode string) string {
-	// 如果配置了 Node.Role，优先使用（新架构）
+	// 如果配置了 Node.Role，优先使用
 	if app.cfg.Node.Role != "" && app.cfg.Node.Role != "standalone" {
 		return app.cfg.Node.Role
 	}
 
-	// 否则根据运行模式映射（向后兼容）
+	// 否则根据运行模式映射
 	switch runMode {
 	case "master":
-		// 如果 master 角色被显式启用，返回 master
 		if app.cfg.Node.MasterRole.Enabled {
 			return "master"
 		}
-		// 否则使用旧架构的 master 模式
 		return "master"
 	case "client":
-		// 如果 client 角色被显式启用，返回 client
 		if app.cfg.Node.ClientRole.Enabled {
 			return "client"
 		}
-		// 否则使用旧架构的 client 模式
 		return "client"
 	default:
-		// 默认 standalone 模式
 		return "standalone"
 	}
 }
@@ -242,39 +234,33 @@ func (app *App) initDistributedComponents() error {
 
 	switch app.role {
 	case "standalone":
-		// Standalone 模式：创建本地 Node（可选）
+		// Standalone 模式：创建本地 Node
 		if err := app.initStandaloneNode(); err != nil {
 			logger.Warnf("初始化 standalone 节点失败: %v", err)
 		}
 
 	case "master":
-		// Master 模式：创建 Node + NodeManager
+		// Master 模式：创建 Node + NodeAdapter
 		if err := app.initMasterNode(); err != nil {
 			return fmt.Errorf("初始化 master 节点失败: %w", err)
 		}
-		if err := app.initNodeManager(); err != nil {
-			return fmt.Errorf("初始化节点管理器失败: %w", err)
+		if err := app.initNodeAdapter(); err != nil {
+			return fmt.Errorf("初始化 Node API 适配器失败: %w", err)
 		}
 
 	case "client":
-		// Client 模式：创建 Node + MasterConnector
+		// Client 模式：创建 Node
 		if err := app.initClientNode(); err != nil {
 			return fmt.Errorf("初始化 client 节点失败: %w", err)
 		}
-		if err := app.initMasterConnector(); err != nil {
-			return fmt.Errorf("初始化 Master 连接器失败: %w", err)
-		}
 
 	case "hybrid":
-		// Hybrid 模式：创建 Node + NodeManager + MasterConnector
+		// Hybrid 模式：创建 Node + NodeAdapter
 		if err := app.initHybridNode(); err != nil {
 			return fmt.Errorf("初始化 hybrid 节点失败: %w", err)
 		}
-		if err := app.initNodeManager(); err != nil {
-			return fmt.Errorf("初始化节点管理器失败: %w", err)
-		}
-		if err := app.initMasterConnector(); err != nil {
-			return fmt.Errorf("初始化 Master 连接器失败: %w", err)
+		if err := app.initNodeAdapter(); err != nil {
+			return fmt.Errorf("初始化 Node API 适配器失败: %w", err)
 		}
 
 	default:
@@ -380,74 +366,25 @@ func (app *App) buildNodeConfig() *node.NodeConfig {
 	}
 }
 
-// initNodeManager 初始化 NodeManager
-func (app *App) initNodeManager() error {
-	app.nodeManager = master.NewNodeManager(nil) // 使用默认日志
-	logger.Info("节点管理器已创建")
-	return nil
+// initNodeAdapter 初始化 Node API 适配器
+func (app *App) initNodeAdapter() error {
+	if app.node != nil {
+		app.nodeAdapter = api.NewNodeAdapter(app.node, logger.GetLogger())
+		logger.Info("Node API 适配器已创建")
+		return nil
+	}
+	return fmt.Errorf("节点未初始化，无法创建 API 适配器")
 }
 
-// initMasterConnector 初始化 MasterConnector
+// initMasterConnector 初始化 Master 连接
+// Client 节点会自动处理与 Master 的连接
 func (app *App) initMasterConnector() error {
+	// Client Node 会自动处理 Master 连接
+	// 这个方法保留为空以保持接口兼容性
 	if app.node == nil {
 		return fmt.Errorf("节点未初始化")
 	}
-
-	masterAddr := app.cfg.Node.ClientRole.MasterAddress
-	if masterAddr == "" {
-		return fmt.Errorf("Master 地址未配置")
-	}
-
-	// 创建资源监控器
-	resourceMonitor := node.NewResourceMonitor(
-		&node.ResourceMonitorConfig{
-			Interval: time.Duration(app.cfg.Node.Resources.MonitorInterval) * time.Second,
-		})
-
-	// 创建心跳管理器
-	heartbeatMgr := node.NewHeartbeatManager(
-		&node.HeartbeatConfig{
-			NodeID:          app.node.GetID(),
-			MasterAddr:      masterAddr,
-			Interval:        time.Duration(app.cfg.Node.ClientRole.HeartbeatInterval) * time.Second,
-			Timeout:         time.Duration(app.cfg.Node.ClientRole.HeartbeatTimeout) * time.Second,
-			MaxRetries:      app.cfg.Node.ClientRole.RegisterRetry,
-			ResourceMonitor: resourceMonitor,
-			OnConnect: func() {
-				logger.Info("已连接到 Master")
-			},
-			OnDisconnect: func(err error) {
-				logger.Warnf("与 Master 断开连接: %v", err)
-			},
-		})
-
-	// 创建命令执行器
-	executor := node.NewCommandExecutor(
-		&node.CommandExecutorConfig{
-			MaxConcurrent:   app.cfg.Node.Executor.MaxConcurrent,
-			Timeout:         time.Duration(app.cfg.Node.Executor.TaskTimeout) * time.Second,
-			AllowedCommands: []node.CommandType{}, // 使用默认值
-		})
-
-	// 创建 MasterConnector
-	connectorCfg := &client.MasterConnectorConfig{
-		NodeID:               app.node.GetID(),
-		MasterAddr:           masterAddr,
-		NodeInfo:             app.node.ToInfo(),
-		HeartbeatMgr:         heartbeatMgr,
-		Executor:             executor,
-		ResourceMonitor:      resourceMonitor,
-		MaxReconnectAttempts: app.cfg.Node.ClientRole.RegisterRetry,
-		CommandPollInterval:  2 * time.Second,
-	}
-
-	connector, err := client.NewMasterConnector(connectorCfg)
-	if err != nil {
-		return err
-	}
-
-	app.masterConnector = connector
-	logger.Infof("Master 连接器已创建，目标: %s", masterAddr)
+	logger.Info("Client 节点将自动处理与 Master 的连接")
 	return nil
 }
 
@@ -461,29 +398,14 @@ func (app *App) registerShutdownHooks() {
 		return nil
 	}, shutdown.PriorityCritical)
 
-	// 2. 优先级高：停止 MasterConnector（如果是 client 或 hybrid 模式）
-	if app.masterConnector != nil {
-		app.shutdownMgr.Register("master-connector", func(ctx context.Context) error {
-			return app.masterConnector.Disconnect()
-		}, shutdown.PriorityCritical)
-	}
-
-	// 3. 优先级高：停止 NodeManager（如果是 master 或 hybrid 模式）
-	if app.nodeManager != nil {
-		app.shutdownMgr.Register("node-manager", func(ctx context.Context) error {
-			app.nodeManager.Stop()
-			return nil
-		}, shutdown.PriorityHigh)
-	}
-
-	// 4. 优先级高：停止 Node
+	// 2. 优先级高：停止 Node（统一处理所有角色的 Node）
 	if app.node != nil {
 		app.shutdownMgr.Register("node", func(ctx context.Context) error {
 			return app.node.Stop()
 		}, shutdown.PriorityHigh)
 	}
 
-	// 5. 优先级高：停止所有模型加载和处理
+	// 3. 优先级高：停止所有模型加载和处理
 	if app.modelMgr != nil {
 		app.shutdownMgr.Register("models", func(ctx context.Context) error {
 			app.modelMgr.Close()
@@ -491,7 +413,7 @@ func (app *App) registerShutdownHooks() {
 		}, shutdown.PriorityHigh)
 	}
 
-	// 6. 优先级中：停止所有进程
+	// 4. 优先级中：停止所有进程
 	if app.procMgr != nil {
 		app.shutdownMgr.Register("processes", func(ctx context.Context) error {
 			app.procMgr.StopAll()
@@ -499,7 +421,7 @@ func (app *App) registerShutdownHooks() {
 		}, shutdown.PriorityNormal)
 	}
 
-	// 7. 优先级低：关闭日志系统
+	// 5. 优先级低：关闭日志系统
 	app.shutdownMgr.Register("logger", func(ctx context.Context) error {
 		logger.Info("日志系统已关闭")
 		return nil
@@ -514,34 +436,6 @@ func (app *App) Start() error {
 			return fmt.Errorf("启动节点失败: %w", err)
 		}
 		logger.Info("节点已启动")
-	}
-
-	// 启动 NodeManager（如果是 master 或 hybrid 模式）
-	if app.nodeManager != nil {
-		app.nodeManager.Start()
-		logger.Info("节点管理器已启动")
-	}
-
-	// 启动 MasterHandler（如果是 master 或 hybrid 模式）
-	if app.role == "master" || app.role == "hybrid" {
-		if app.nodeManager != nil {
-			app.masterHandler = master.NewMasterHandler(app.nodeManager, nil)
-			logger.Info("Master 处理器已创建")
-		}
-	}
-
-	// 启动 MasterConnector（如果是 client 或 hybrid 模式）
-	if app.masterConnector != nil {
-		if err := app.masterConnector.Connect(); err != nil {
-			// Client 模式连接失败是致命错误
-			if app.role == "client" {
-				return fmt.Errorf("连接到 Master 失败: %w", err)
-			}
-			// Hybrid 模式记录警告但继续运行
-			logger.Warnf("连接到 Master 失败: %v", err)
-		} else {
-			logger.Info("已连接到 Master")
-		}
 	}
 
 	// 启动 HTTP 服务器
@@ -575,8 +469,12 @@ func (app *App) printStartupInfo() {
 		fmt.Printf("✓ Master API: http://localhost:%d/api/master\n", app.cfg.Server.WebPort)
 	}
 
-	if app.role == "client" && app.masterConnector != nil {
-		fmt.Printf("✓ 连接到 Master: %s\n", app.masterConnector.GetMasterAddr())
+	if app.role == "client" && app.node != nil {
+		// 从 Node 获取 Master 地址
+		masterAddr := app.cfg.Node.ClientRole.MasterAddress
+		if masterAddr != "" {
+			fmt.Printf("✓ 连接到 Master: %s\n", masterAddr)
+		}
 	}
 
 	fmt.Println("\n按 Ctrl+C 停止服务器...")

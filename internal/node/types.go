@@ -180,6 +180,7 @@ type NodeInfo struct {
 	CreatedAt    time.Time         `json:"createdAt"`
 	UpdatedAt    time.Time         `json:"updatedAt"`
 	LastSeen     time.Time         `json:"lastSeen"`
+	RegisteredAt time.Time         `json:"registeredAt"` // 注册时间（客户端）
 }
 
 // NodeConfig contains configuration for a node

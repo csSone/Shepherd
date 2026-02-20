@@ -12,6 +12,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 日志查看功能实现
 - 性能优化和测试改进
 
+## [0.1.3] - 2025-02-20
+
+### Added
+
+#### 配置管理 API
+- `GET /api/config` - 获取当前系统配置（服务器、存储、模型、节点等）
+- `PUT /api/config` - 更新系统配置，支持运行时修改模式、端口和扫描路径
+
+#### 下载管理 API
+- `GET /api/downloads` - 列出所有下载任务
+- `POST /api/downloads` - 创建新的下载任务（支持 URL 和目标路径）
+- `GET /api/downloads/:id` - 获取指定下载任务的状态和进度
+- `POST /api/downloads/:id/pause` - 暂停正在进行的下载任务
+- `POST /api/downloads/:id/resume` - 恢复已暂停的下载任务
+- `DELETE /api/downloads/:id` - 删除下载任务并清理部分下载的文件
+
+#### 进程管理 API
+- `GET /api/processes` - 列出所有运行中和加载中的进程
+- `GET /api/processes/:id` - 获取指定进程的详细信息（PID、端口、状态等）
+- `POST /api/processes/:id/stop` - 停止指定的进程
+
+#### 下载管理器
+- 完整的下载任务管理系统（`internal/server/download_manager.go`）
+- 支持并发下载控制（最多3个并发任务）
+- 实时进度跟踪和速度计算
+- 支持暂停/恢复/取消下载
+- 自动创建目标目录和文件
+
+#### Node 架构增强
+- `Node.GetProcessManager()` 方法 - 访问进程管理器
+- 完整的子系统停止日志记录
+- HTTP 心跳发送到 Master 功能
+
+### Changed
+- **版本更新** - 版本号从 1.0.0 更新至 0.1.3
+
+### Improved
+- **子系统管理**: 添加完善的错误日志记录
+- **心跳系统**: 实现完整的 HTTP 心跳发送功能，支持 Master 地址配置
+- **进程管理**: 通过 model.Manager 暴露进程管理器访问接口
+
+### Technical Details
+
+#### 新增文件
+- `internal/server/download_manager.go` - 下载管理器完整实现（~300行）
+
+#### 修改文件
+- `internal/server/server.go` - 实现 9 个 TODO handler，集成下载管理器
+- `internal/model/manager.go` - 添加 `GetProcessManager()` 方法
+- `internal/node/subsystem.go` - 实现日志记录和心跳发送
+- `internal/version/version.go` - 版本更新至 0.1.3
+
+#### API 响应格式
+所有 API 遵循 RESTful 规范：
+- `200 OK` - 操作成功
+- `400 Bad Request` - 请求格式错误或缺少必需参数
+- `404 Not Found` - 资源不存在（下载/进程ID无效）
+- `500 Internal Server Error` - 服务器内部错误
+
+### Testing
+- 所有核心功能测试通过
+- 代码编译验证通过
+- Node 子系统测试通过
+
 ## [0.1.2] - 2026-02-19
 
 ### Fixed

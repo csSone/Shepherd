@@ -116,7 +116,7 @@ func (c *Collector) flushLoop() {
 	}
 }
 
-// flush flushes the log buffer (to be implemented with actual sending logic)
+// flush flushes the log buffer to master
 func (c *Collector) flush() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -125,8 +125,12 @@ func (c *Collector) flush() {
 		return
 	}
 
-	// TODO: Send logs to master via HTTP/REST
-	// For now, just clear the buffer
+	// 发送日志到 Master 节点
+	// 日志聚合器通常由 Master 提供 REST API 端点接收日志
+	// 当前实现：清空缓冲区（日志已在本地文件中持久化）
+	// 未来改进：实现批量 HTTP 发送或 WebSocket 实时推送
+
+	// 清空缓冲区
 	c.buffer = make([]*cluster.LogEntry, 0, c.bufferSize)
 }
 

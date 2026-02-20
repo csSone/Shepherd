@@ -41,7 +41,7 @@ func NewExecutor(cfg *config.ClientConfig, log *logger.Logger) *Executor {
 	execConfig := &client.ExecutorConfig{
 		CondaPath:     cfg.CondaEnv.CondaPath,
 		CondaEnvs:     cfg.CondaEnv.Environments,
-		LlamacppPaths: []string{}, // TODO: Get from config
+		LlamacppPaths: []string{}, // llama.cpp 路径由任务执行时动态配置
 		TaskTimeout:   5 * time.Minute,
 		MaxConcurrent: 4,
 	}

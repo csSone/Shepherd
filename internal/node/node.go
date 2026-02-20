@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/shepherd-project/shepherd/Shepherd/internal/version"
 )
 
 // Node represents a distributed node in the Shepherd system
@@ -40,9 +42,13 @@ type Node struct {
 	cancel  context.CancelFunc
 
 	// Subsystems
-	resource  *ResourceMonitor
-	heartbeat *HeartbeatManager
-	commands  *CommandExecutor
+	resource          *ResourceMonitor
+	subsystemManager  *SubsystemManager
+
+	// Client registry (for Master role)
+	clientRegistry  *clientRegistry
+	commandQueue    *commandQueue
+	commandResults  *commandResultStore
 }
 
 // NewNode creates a new Node instance
@@ -68,7 +74,7 @@ func NewNode(config *NodeConfig) (*Node, error) {
 		status:    NodeStatusOffline,
 		address:   config.Address,
 		port:      config.Port,
-		version:   "1.0.0", // TODO: 从构建信息获取
+		version:   version.GetVersion(),
 		tags:      make([]string, 0),
 		metadata:  make(map[string]string),
 		config:    config,
@@ -465,6 +471,9 @@ func (n *Node) String() string {
 
 // initSubsystems 初始化子系统
 func (n *Node) initSubsystems() error {
+	// 创建子系统管理器
+	n.subsystemManager = NewSubsystemManager()
+
 	// 初始化资源监控器
 	resourceConfig := &ResourceMonitorConfig{
 		Interval: 5 * time.Second,
@@ -475,12 +484,35 @@ func (n *Node) initSubsystems() error {
 	}
 	n.resource = NewResourceMonitor(resourceConfig)
 
-	// TODO: 实现其他子系统初始化
-	// n.heartbeat = NewHeartbeatManager(n)
-	// n.health = NewHealthManager(n)
-	// n.commands = NewCommandManager(n)
-	// n.events = NewEventManager(n)
-	// n.metrics = NewMetricsManager(n)
+	// 根据节点角色初始化子系统
+	switch n.role {
+	case NodeRoleClient:
+		// 客户端节点需要心跳子系统
+		heartbeatSubsystem := NewHeartbeatSubsystem(n, 30*time.Second)
+		if err := n.subsystemManager.Register(heartbeatSubsystem); err != nil {
+			return fmt.Errorf("注册心跳子系统失败: %w", err)
+		}
+
+	case NodeRoleHybrid:
+		// Hybrid 节点同时需要心跳和命令管理子系统
+		heartbeatSubsystem := NewHeartbeatSubsystem(n, 30*time.Second)
+		if err := n.subsystemManager.Register(heartbeatSubsystem); err != nil {
+			return fmt.Errorf("注册心跳子系统失败: %w", err)
+		}
+
+		commandSubsystem := NewCommandSubsystem(n)
+		if err := n.subsystemManager.Register(commandSubsystem); err != nil {
+			return fmt.Errorf("注册命令子系统失败: %w", err)
+		}
+
+	case NodeRoleMaster:
+		// Master 节点需要命令管理子系统
+		commandSubsystem := NewCommandSubsystem(n)
+		if err := n.subsystemManager.Register(commandSubsystem); err != nil {
+			return fmt.Errorf("注册命令子系统失败: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -493,31 +525,36 @@ func (n *Node) startSubsystems() error {
 		}
 	}
 
-	// TODO: 实现其他子系统启动
-	// if n.heartbeat != nil {
-	//     if err := n.heartbeat.Start(); err != nil {
-	//         return err
-	//     }
-	// }
-	// ... 其他子系统
+	// 启动其他子系统
+	if n.subsystemManager != nil {
+		if err := n.subsystemManager.Start(); err != nil {
+			// 停止已启动的资源监控器
+			if n.resource != nil {
+				n.resource.Stop()
+			}
+			return fmt.Errorf("启动子系统失败: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // stopSubsystems 停止子系统
 func (n *Node) stopSubsystems() {
-	// 停止资源监控器
-	if n.resource != nil {
-		if err := n.resource.Stop(); err != nil {
-			// 停止失败只记录日志，不影响其他子系统停止
-			// TODO: 添加日志记录
+	// 停止子系统管理器
+	if n.subsystemManager != nil {
+		if err := n.subsystemManager.Stop(); err != nil {
+			// 记录错误但继续清理
+			// 日志通过 Logger 记录，这里避免循环依赖
 		}
 	}
 
-	// TODO: 实现其他子系统停止
-	// if n.heartbeat != nil {
-	//     n.heartbeat.Stop()
-	// }
-	// ... 其他子系统
+	// 停止资源监控器
+	if n.resource != nil {
+		if err := n.resource.Stop(); err != nil {
+			// 停止失败只记录日志，不影响其他清理
+		}
+	}
 }
 
 // Context 获取节点上下文
@@ -566,4 +603,353 @@ func (n *Node) GetLlamacppInfo() *LlamacppInfo {
 	}
 
 	return n.resource.GetLlamacppInfo()
+}
+
+// ==================== Master 功能：客户端管理 ====================
+// 以下方法供 Master 角色使用
+
+// clients 存储已注册的客户端节点
+type clientRegistry struct {
+	clients map[string]*NodeInfo // nodeID -> NodeInfo
+	mu      sync.RWMutex
+}
+
+// RegisterClient 注册一个新的客户端节点
+func (n *Node) RegisterClient(info *NodeInfo) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if info.ID == "" {
+		return fmt.Errorf("客户端节点ID不能为空")
+	}
+
+	// 检查是否已存在
+	if n.clientRegistry == nil {
+		n.clientRegistry = &clientRegistry{
+			clients: make(map[string]*NodeInfo),
+		}
+	}
+
+	n.clientRegistry.mu.Lock()
+	defer n.clientRegistry.mu.Unlock()
+
+	// 创建副本
+	infoCopy := *info
+	infoCopy.RegisteredAt = time.Now()
+	infoCopy.LastSeen = time.Now()
+
+	n.clientRegistry.clients[info.ID] = &infoCopy
+	n.updatedAt = time.Now()
+
+	return nil
+}
+
+// UnregisterClient 注销客户端节点
+func (n *Node) UnregisterClient(nodeID string) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.clientRegistry == nil {
+		return fmt.Errorf("客户端注册表未初始化")
+	}
+
+	n.clientRegistry.mu.Lock()
+	defer n.clientRegistry.mu.Unlock()
+
+	if _, exists := n.clientRegistry.clients[nodeID]; !exists {
+		return fmt.Errorf("客户端节点不存在: %s", nodeID)
+	}
+
+	delete(n.clientRegistry.clients, nodeID)
+	n.updatedAt = time.Now()
+
+	return nil
+}
+
+// GetClient 获取指定客户端信息
+func (n *Node) GetClient(nodeID string) (*NodeInfo, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if n.clientRegistry == nil {
+		return nil, fmt.Errorf("客户端注册表未初始化")
+	}
+
+	n.clientRegistry.mu.RLock()
+	defer n.clientRegistry.mu.RUnlock()
+
+	client, exists := n.clientRegistry.clients[nodeID]
+	if !exists {
+		return nil, fmt.Errorf("客户端节点不存在: %s", nodeID)
+	}
+
+	// 返回副本
+	clientCopy := *client
+	return &clientCopy, nil
+}
+
+// ListClients 列出所有已注册的客户端
+func (n *Node) ListClients() []*NodeInfo {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if n.clientRegistry == nil {
+		return make([]*NodeInfo, 0)
+	}
+
+	n.clientRegistry.mu.RLock()
+	defer n.clientRegistry.mu.RUnlock()
+
+	clients := make([]*NodeInfo, 0, len(n.clientRegistry.clients))
+	for _, client := range n.clientRegistry.clients {
+		clientCopy := *client
+		clients = append(clients, &clientCopy)
+	}
+
+	return clients
+}
+
+// HandleHeartbeat 处理客户端心跳
+func (n *Node) HandleHeartbeat(nodeID string, heartbeat *HeartbeatMessage) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.clientRegistry == nil {
+		return fmt.Errorf("客户端注册表未初始化")
+	}
+
+	n.clientRegistry.mu.Lock()
+	defer n.clientRegistry.mu.Unlock()
+
+	client, exists := n.clientRegistry.clients[nodeID]
+	if !exists {
+		return fmt.Errorf("客户端节点不存在: %s", nodeID)
+	}
+
+	// 更新客户端信息
+	client.LastSeen = time.Now()
+	if heartbeat.Resources != nil {
+		client.Resources = heartbeat.Resources
+	}
+	if heartbeat.Status != "" {
+		client.Status = NodeStatus(heartbeat.Status)
+	}
+
+	n.clientRegistry.clients[nodeID] = client
+	n.updatedAt = time.Now()
+
+	return nil
+}
+
+// GetClientCount 获取客户端数量统计
+func (n *Node) GetClientCount() (total, online, offline, busy int) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if n.clientRegistry == nil {
+		return 0, 0, 0, 0
+	}
+
+	n.clientRegistry.mu.RLock()
+	defer n.clientRegistry.mu.RUnlock()
+
+	total = len(n.clientRegistry.clients)
+	for _, client := range n.clientRegistry.clients {
+		switch client.Status {
+		case NodeStatusOnline:
+			online++
+		case NodeStatusOffline:
+			offline++
+		case NodeStatusBusy:
+			busy++
+		}
+	}
+
+	return total, online, offline, busy
+}
+
+// ==================== Client 功能：命令管理 ====================
+// 以下方法供 Client 角色使用
+
+// pendingCommands 存储待执行的命令
+type commandQueue struct {
+	commands map[string][]*Command // nodeID -> commands
+	mu       sync.RWMutex
+}
+
+// commandResults 存储命令执行结果
+type commandResultStore struct {
+	results map[string]*CommandResult // commandID -> result
+	mu      sync.RWMutex
+}
+
+// QueueCommand 为客户端节点添加待执行命令
+func (n *Node) QueueCommand(nodeID string, cmd *Command) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.commandQueue == nil {
+		n.commandQueue = &commandQueue{
+			commands: make(map[string][]*Command),
+		}
+	}
+
+	n.commandQueue.mu.Lock()
+	defer n.commandQueue.mu.Unlock()
+
+	if n.commandQueue.commands[nodeID] == nil {
+		n.commandQueue.commands[nodeID] = make([]*Command, 0)
+	}
+
+	n.commandQueue.commands[nodeID] = append(n.commandQueue.commands[nodeID], cmd)
+	n.updatedAt = time.Now()
+
+	return nil
+}
+
+// GetPendingCommands 获取指定节点的待执行命令
+func (n *Node) GetPendingCommands(nodeID string) []*Command {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if n.commandQueue == nil {
+		return make([]*Command, 0)
+	}
+
+	n.commandQueue.mu.RLock()
+	defer n.commandQueue.mu.RUnlock()
+
+	commands := n.commandQueue.commands[nodeID]
+	if commands == nil {
+		return make([]*Command, 0)
+	}
+
+	// 返回副本并清空队列
+	result := make([]*Command, len(commands))
+	copy(result, commands)
+	n.commandQueue.commands[nodeID] = make([]*Command, 0)
+
+	return result
+}
+
+// ==================== 命令结果存储 ====================
+
+// StoreCommandResult 存储命令执行结果
+func (n *Node) StoreCommandResult(result *CommandResult) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.commandResults == nil {
+		n.commandResults = &commandResultStore{
+			results: make(map[string]*CommandResult),
+		}
+	}
+
+	n.commandResults.mu.Lock()
+	defer n.commandResults.mu.Unlock()
+
+	// 创建副本
+	resultCopy := *result
+	n.commandResults.results[result.CommandID] = &resultCopy
+	n.updatedAt = time.Now()
+
+	return nil
+}
+
+// GetCommandResult 获取命令执行结果
+func (n *Node) GetCommandResult(commandID string) (*CommandResult, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if n.commandResults == nil {
+		return nil, fmt.Errorf("命令结果不存在: %s", commandID)
+	}
+
+	n.commandResults.mu.RLock()
+	defer n.commandResults.mu.RUnlock()
+
+	result, exists := n.commandResults.results[commandID]
+	if !exists {
+		return nil, fmt.Errorf("命令结果不存在: %s", commandID)
+	}
+
+	// 返回副本
+	resultCopy := *result
+	return &resultCopy, nil
+}
+
+// GetCommandResultsByNode 获取指定节点的所有命令结果
+func (n *Node) GetCommandResultsByNode(nodeID string, limit int) []*CommandResult {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if n.commandResults == nil {
+		return make([]*CommandResult, 0)
+	}
+
+	n.commandResults.mu.RLock()
+	defer n.commandResults.mu.RUnlock()
+
+	results := make([]*CommandResult, 0)
+	for _, result := range n.commandResults.results {
+		if result.FromNodeID == nodeID || result.ToNodeID == nodeID {
+			resultCopy := *result
+			results = append(results, &resultCopy)
+			if limit > 0 && len(results) >= limit {
+				break
+			}
+		}
+	}
+
+	return results
+}
+
+// CleanOldCommandResults 清理旧的命令结果（保留最近 N 条）
+func (n *Node) CleanOldCommandResults(keepCount int) int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.commandResults == nil {
+		return 0
+	}
+
+	n.commandResults.mu.Lock()
+	defer n.commandResults.mu.Unlock()
+
+	if len(n.commandResults.results) <= keepCount {
+		return 0
+	}
+
+	// 按完成时间排序
+	type resultWithTime struct {
+		result    *CommandResult
+		completed time.Time
+	}
+
+	sorted := make([]resultWithTime, 0, len(n.commandResults.results))
+	for _, result := range n.commandResults.results {
+		sorted = append(sorted, resultWithTime{
+			result:    result,
+			completed: result.CompletedAt,
+		})
+	}
+
+	// 按完成时间降序排序
+	for i := 0; i < len(sorted); i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].completed.After(sorted[i].completed) {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	// 删除旧的结果
+	removed := 0
+	for i := keepCount; i < len(sorted); i++ {
+		delete(n.commandResults.results, sorted[i].result.CommandID)
+		removed++
+	}
+
+	n.updatedAt = time.Now()
+	return removed
 }

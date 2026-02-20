@@ -43,7 +43,7 @@ type Config struct {
 	Mode   string       `mapstructure:"mode" yaml:"mode" json:"mode"` // master|client|standalone
 	Master MasterConfig `mapstructure:"master" yaml:"master" json:"master"`
 	Client ClientConfig `mapstructure:"client" yaml:"client" json:"client"`
-	// Node 节点配置（新架构）
+	// Node 节点配置
 	Node NodeConfig `mapstructure:"node" yaml:"node" json:"node"`
 }
 
@@ -174,7 +174,7 @@ type ClientConfig struct {
 	ClientInfo    ClientInfoConfig `mapstructure:"client_info" yaml:"client_info" json:"clientInfo"`
 	Heartbeat     HeartbeatConfig  `mapstructure:"heartbeat" yaml:"heartbeat" json:"heartbeat"`
 	CondaEnv      CondaEnvConfig   `mapstructure:"conda_env" yaml:"conda_env" json:"condaEnv"`
-	// 新架构字段
+	// 注册和心跳配置
 	RegisterRetry     int `mapstructure:"register_retry" yaml:"register_retry" json:"registerRetry"`             // 注册重试次数
 	HeartbeatInterval int `mapstructure:"heartbeat_interval" yaml:"heartbeat_interval" json:"heartbeatInterval"` // 心跳间隔（秒）
 	HeartbeatTimeout  int `mapstructure:"heartbeat_timeout" yaml:"heartbeat_timeout" json:"heartbeatTimeout"`    // 心跳超时（秒）
@@ -421,12 +421,11 @@ func DefaultConfig() *Config {
 					"shepherd": "",
 				},
 			},
-			// 新架构字段默认值
 			RegisterRetry:     3,
 			HeartbeatInterval: 5,
 			HeartbeatTimeout:  15,
 		},
-		// Node 节点配置（新架构）
+		// Node 节点配置
 		Node: NodeConfig{
 			ID:   "auto",
 			Name: "",
@@ -568,7 +567,7 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// 验证 Node 配置（新架构）
+	// 验证 Node 配置
 	if err := c.validateNodeConfig(); err != nil {
 		return err
 	}

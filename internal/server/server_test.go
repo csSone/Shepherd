@@ -107,13 +107,13 @@ func TestServerRoutes(t *testing.T) {
 		{"Get config", "GET", "/api/config", http.StatusOK},
 		{"Update config", "PUT", "/api/config", http.StatusOK},
 
-		// Model routes
+		// Model routes - 注意：测试中没有预加载模型，所以 test-id 返回错误状态码是正确的
 		{"List models", "GET", "/api/models", http.StatusOK},
-		{"Get model", "GET", "/api/models/test-id", http.StatusOK},
-		{"Load model", "POST", "/api/models/test-id/load", http.StatusOK},
-		{"Unload model", "POST", "/api/models/test-id/unload", http.StatusOK},
-		{"Set alias", "PUT", "/api/models/test-id/alias", http.StatusOK},
-		{"Set favourite", "PUT", "/api/models/test-id/favourite", http.StatusOK},
+		{"Get model", "GET", "/api/models/test-id", http.StatusNotFound}, // 模型不存在
+		{"Load model", "POST", "/api/models/test-id/load", http.StatusInternalServerError}, // 模型不存在时加载失败
+		{"Unload model", "POST", "/api/models/test-id/unload", http.StatusInternalServerError}, // 模型不存在时卸载失败
+		{"Set alias", "PUT", "/api/models/test-id/alias", http.StatusBadRequest}, // 缺少请求体
+		{"Set favourite", "PUT", "/api/models/test-id/favourite", http.StatusBadRequest}, // 缺少请求体
 
 		// Scan routes
 		{"Scan models", "POST", "/api/scan", http.StatusOK},

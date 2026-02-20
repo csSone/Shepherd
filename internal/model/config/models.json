@@ -196,5 +196,95 @@
   {
     "modelId": "/tmp/TestManagerSetFavourite2126832917/001/test-model.gguf",
     "favourite": true
+  },
+  {
+    "modelId": "test-model-715da21e11b02150",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-cdd9168a1806fa5d",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-6089585072738b62",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-be5a62e273bef876",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-ca8ef44764597930",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-db72f03402831240",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-7644ef36cb35f5ef",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-e8d1701179ee084b",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-72d1bd0f16634bf1",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-359cc320aef53b26",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-b692bc722189772e",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-adc4912a6a50f7a0",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-a749601d54ffa0c8",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-3e4fbff13154a540",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-401d3b8f6b400058",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-28c8ddbcd2c46304",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-869b147c9973af51",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-f3841b803418f0f7",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-f222e3e8d9d72228",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-9223ac7dbaa6d432",
+    "favourite": true
   }
 ]

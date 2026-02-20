@@ -55,9 +55,11 @@ func TestNewLogger(t *testing.T) {
 		logger.Close()
 
 		// Check if log file was created
-		logFile := filepath.Join(tmpDir, "shepherd.log")
-		_, err = os.Stat(logFile)
-		assert.NoError(t, err)
+		// 日志文件名格式: shepherd-{mode}-{date}.log
+		// 由于 currentDate 包含时间，我们使用 Glob 查找匹配的文件
+		matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+		require.NoError(t, err)
+		assert.NotEmpty(t, matches, "应该创建日志文件")
 	})
 
 	t.Run("Initialize with both outputs", func(t *testing.T) {
@@ -120,8 +122,12 @@ func TestLogLevels(t *testing.T) {
 	logger.Close()
 
 	// Verify log file exists and has content
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "info message")
 	assert.Contains(t, string(content), "warn message")
@@ -150,8 +156,12 @@ func TestLogFormats(t *testing.T) {
 		logger.log(INFO, "test json message", nil)
 		logger.Close()
 
-		logFile := filepath.Join(jsonDir, "shepherd.log")
-		content, err := os.ReadFile(logFile)
+		// 日志文件名格式: shepherd-{mode}-{date}.log
+		matches, err := filepath.Glob(filepath.Join(jsonDir, "shepherd-standalone-*.log"))
+		require.NoError(t, err)
+		require.NotEmpty(t, matches, "应该创建日志文件")
+
+		content, err := os.ReadFile(matches[0])
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "\"level\":")
 		assert.Contains(t, string(content), "\"msg\":")
@@ -177,8 +187,12 @@ func TestLogFormats(t *testing.T) {
 		logger.log(INFO, "test text message", nil)
 		logger.Close()
 
-		logFile := filepath.Join(textDir, "shepherd.log")
-		content, err := os.ReadFile(logFile)
+		// 日志文件名格式: shepherd-{mode}-{date}.log
+		matches, err := filepath.Glob(filepath.Join(textDir, "shepherd-standalone-*.log"))
+		require.NoError(t, err)
+		require.NotEmpty(t, matches, "应该创建日志文件")
+
+		content, err := os.ReadFile(matches[0])
 		require.NoError(t, err)
 		logContent := string(content)
 		assert.Contains(t, logContent, "test text message")
@@ -209,14 +223,29 @@ func TestLogWithFields(t *testing.T) {
 
 	logger.Close()
 
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "key1")
 	assert.Contains(t, string(content), "value1")
 
-	// Test WithFields
-	logger2, _ := NewLogger(cfg, "standalone")
+	// Test WithFields - 新建一个目录避免冲突
+	tmpDir2 := t.TempDir()
+	cfg2 := &config.LogConfig{
+		Level:      "info",
+		Format:     "json",
+		Output:     "file",
+		Directory:  tmpDir2,
+		MaxSize:    1,
+		MaxBackups: 1,
+		MaxAge:     1,
+		Compress:   false,
+	}
+	logger2, _ := NewLogger(cfg2, "standalone")
 	fields2 := []Field{
 		{Key: "key2", Value: "value2"},
 		{Key: "key3", Value: 123},
@@ -226,10 +255,14 @@ func TestLogWithFields(t *testing.T) {
 
 	logger2.Close()
 
-	content, err = os.ReadFile(logFile)
+	matches2, err := filepath.Glob(filepath.Join(tmpDir2, "shepherd-standalone-*.log"))
 	require.NoError(t, err)
-	assert.Contains(t, string(content), "key2")
-	assert.Contains(t, string(content), "key3")
+	require.NotEmpty(t, matches2, "应该创建日志文件")
+
+	content2, err := os.ReadFile(matches2[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(content2), "key2")
+	assert.Contains(t, string(content2), "key3")
 }
 
 func TestLogWithError(t *testing.T) {
@@ -255,8 +288,12 @@ func TestLogWithError(t *testing.T) {
 
 	logger.Close()
 
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "error")
 	assert.Contains(t, string(content), "operation failed")
@@ -286,8 +323,12 @@ func TestFormattedLogging(t *testing.T) {
 
 	logger.Close()
 
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "john")
 	assert.Contains(t, string(content), "192.168.1.1")
@@ -388,8 +429,12 @@ func TestLogLevelFiltering(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	logger.Close()
 
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 
 	logContent := string(content)
@@ -426,8 +471,12 @@ func TestLogEntryChaining(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	logger.Close()
 
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 
 	logContent := string(content)
@@ -462,9 +511,10 @@ func TestLogRotationBySize(t *testing.T) {
 	logger.Close()
 
 	// Check that log file was created
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	_, err = os.Stat(logFile)
-	assert.NoError(t, err)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
 }
 
 func TestConcurrency(t *testing.T) {
@@ -501,8 +551,12 @@ func TestConcurrency(t *testing.T) {
 	logger.Close()
 
 	// Verify all messages were written
-	logFile := filepath.Join(tmpDir, "shepherd.log")
-	content, err := os.ReadFile(logFile)
+	// 日志文件名格式: shepherd-{mode}-{date}.log
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "shepherd-standalone-*.log"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "应该创建日志文件")
+
+	content, err := os.ReadFile(matches[0])
 	require.NoError(t, err)
 
 	logContent := string(content)
