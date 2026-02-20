@@ -91,7 +91,7 @@ func NewLogger(cfg *config.LogConfig, serverMode string) (*Logger, error) {
 		maxBackups:  cfg.MaxBackups,
 		maxAge:      cfg.MaxAge,
 		currentSize: 0,
-		currentDate: time.Now().Format("2006-01-02"),
+		currentDate: time.Now().Format("2006-01-02 15-04-05"),
 		serverMode:  serverMode,
 	}
 

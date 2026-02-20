@@ -23,6 +23,21 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
 )
 
+// ModelDTO represents a model for API responses
+type ModelDTO struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"displayName"`
+	Alias       string                 `json:"alias"`
+	Path        string                 `json:"path"`
+	PathPrefix  string                 `json:"pathPrefix"`
+	Size        int64                  `json:"size"`
+	Favourite   bool                   `json:"favourite"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Status      string                 `json:"status"`
+	IsLoaded    bool                   `json:"isLoaded"`
+}
+
 // Server represents the HTTP server
 type Server struct {
 	engine     *gin.Engine
@@ -460,7 +475,46 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 
 func (s *Server) handleListModels(c *gin.Context) {
 	models := s.modelMgr.ListModels()
-	c.JSON(http.StatusOK, gin.H{"models": models, "total": len(models)})
+	statuses := s.modelMgr.ListStatus()
+
+	var dtos []ModelDTO
+	for _, m := range models {
+		dto := ModelDTO{
+			ID:          m.ID,
+			Name:        m.Name,
+			DisplayName: m.DisplayName,
+			Alias:       m.Alias,
+			Path:        m.Path,
+			PathPrefix:  m.PathPrefix,
+			Size:        m.Size,
+			Favourite:   m.Favourite,
+			Status:      "stopped",
+			IsLoaded:    false,
+		}
+
+		// Convert metadata
+		if m.Metadata != nil {
+			dto.Metadata = map[string]interface{}{
+				"name":            m.Metadata.Name,
+				"architecture":    m.Metadata.Architecture,
+				"quantization":    m.Metadata.Quantization,
+				"contextLength":   m.Metadata.ContextLength,
+				"embeddingLength": m.Metadata.EmbeddingLength,
+				"layerCount":      m.Metadata.BlockSize,
+				"headCount":       m.Metadata.HeadCount,
+			}
+		}
+
+		// Add status info
+		if status, ok := statuses[m.ID]; ok {
+			dto.Status = status.State.String()
+			dto.IsLoaded = status.State == model.StateLoaded
+		}
+
+		dtos = append(dtos, dto)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"models": dtos, "total": len(dtos)})
 }
 
 func (s *Server) handleGetModel(c *gin.Context) {
