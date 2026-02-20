@@ -80,22 +80,23 @@ export interface NodeCapabilities {
 }
 
 /**
- * 分布式节点
+ * 分布式节点 - 匹配后端 internal/node/types.go NodeInfo
  */
 export interface DistributedNode {
   id: string;
   name: string;
-  role: NodeRole;
-  status: NodeStatus;
   address: string;
   port: number;
+  role: NodeRole;
+  status: NodeStatus;
   version: string;
-  capabilities: NodeCapabilities;
+  tags: string[];
+  capabilities?: NodeCapabilities;
   resources?: NodeResources;
   metadata: Record<string, string>;
-  lastHeartbeat?: string;
-  connectedTo?: string;
-  subNodes?: string[];
+  createdAt: string;
+  updatedAt: string;
+  lastSeen: string;
 }
 
 /**
@@ -156,14 +157,21 @@ export interface CommandResult {
 }
 
 /**
- * 节点列表响应
+ * 节点统计信息
  */
-export interface NodeListResponse {
-  nodes: DistributedNode[];
+export interface NodeStats {
   total: number;
   online: number;
   offline: number;
   busy: number;
+}
+
+/**
+ * 节点列表响应 - 匹配后端 GET /api/master/nodes 响应格式
+ */
+export interface NodeListResponse {
+  nodes: DistributedNode[];
+  stats: NodeStats;
 }
 
 /**

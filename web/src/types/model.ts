@@ -22,8 +22,10 @@ export interface ModelMetadata {
 export interface Model {
   id: string;
   name: string;
+  displayName: string;
   alias?: string;
   path: string;
+  pathPrefix: string;
   size: number;
   favourite: boolean;
   isLoaded: boolean;

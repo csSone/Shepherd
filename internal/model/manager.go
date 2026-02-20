@@ -2,6 +2,8 @@ package model
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,18 +19,18 @@ import (
 
 // Manager manages model scanning and loading
 type Manager struct {
-	config      *config.Config
-	configMgr   *config.Manager
-	processMgr  *process.Manager
+	config     *config.Config
+	configMgr  *config.Manager
+	processMgr *process.Manager
 
-	models      map[string]*Model
-	statuses    map[string]*ModelStatus
-	scanStatus  *ScanStatus
+	models     map[string]*Model
+	statuses   map[string]*ModelStatus
+	scanStatus *ScanStatus
 
-	mu          sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
+	mu     sync.RWMutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // ScanStatus represents the current scan status
@@ -217,20 +219,34 @@ func (m *Manager) loadModel(path string) (*Model, error) {
 	// Generate model ID
 	modelID := m.generateModelID(path, metadata)
 
-	// Create model
-	model := &Model{
-		ID:        modelID,
-		Name:      metadata.Name,
-		Path:      path,
-		Size:      info.Size(),
-		Metadata:  metadata,
-		ScannedAt: time.Now(),
-		SourcePath: filepath.Dir(path),
+	// Calculate path prefix for duplicate identification
+	pathPrefix := m.calculatePathPrefix(path)
+
+	// Get model name
+	modelName := metadata.Name
+	if modelName == "" {
+		modelName = filepath.Base(path)
+		modelName = strings.TrimSuffix(modelName, ".gguf")
+		modelName = strings.TrimSuffix(modelName, ".GGUF")
 	}
 
-	// Set default name if not available
-	if model.Name == "" {
-		model.Name = filepath.Base(path)
+	// Create display name with path prefix for duplicates
+	displayName := modelName
+	if pathPrefix != "" && pathPrefix != "models" {
+		displayName = fmt.Sprintf("%s [%s]", modelName, pathPrefix)
+	}
+
+	// Create model
+	model := &Model{
+		ID:          modelID,
+		Name:        modelName,
+		DisplayName: displayName,
+		Path:        path,
+		PathPrefix:  pathPrefix,
+		Size:        info.Size(),
+		Metadata:    metadata,
+		ScannedAt:   time.Now(),
+		SourcePath:  filepath.Dir(path),
 	}
 
 	// Check for mmproj
@@ -246,10 +262,18 @@ func (m *Manager) loadModel(path string) (*Model, error) {
 	return model, nil
 }
 
-// generateModelID generates a unique model ID
+// generateModelID generates a unique model ID using path hash
 func (m *Manager) generateModelID(path string, metadata *gguf.Metadata) string {
-	// Use file path as ID for uniqueness
-	return path
+	// Use hash of full path for uniqueness
+	hash := sha256.Sum256([]byte(path))
+	hashStr := hex.EncodeToString(hash[:8])
+
+	// Get base name without extension
+	base := filepath.Base(path)
+	base = strings.TrimSuffix(base, ".gguf")
+	base = strings.TrimSuffix(base, ".GGUF")
+
+	return fmt.Sprintf("%s-%s", base, hashStr)
 }
 
 // findMmproj looks for a multimodal projector file
@@ -276,6 +300,49 @@ func (m *Manager) findMmproj(modelPath string) string {
 	}
 
 	return ""
+}
+
+// calculatePathPrefix calculates a short path prefix for display
+func (m *Manager) calculatePathPrefix(path string) string {
+	// Get directory of the model file
+	dir := filepath.Dir(path)
+
+	// Check against configured scan paths
+	for _, scanPath := range m.config.Model.Paths {
+		// Clean paths for comparison
+		cleanScanPath := filepath.Clean(scanPath)
+		cleanDir := filepath.Clean(dir)
+
+		// Check if this path is under the scan path
+		if strings.HasPrefix(cleanDir, cleanScanPath) {
+			// Get relative path from scan root
+			rel, err := filepath.Rel(cleanScanPath, cleanDir)
+			if err != nil {
+				continue
+			}
+
+			// Get scan path base name as root
+			scanBase := filepath.Base(cleanScanPath)
+			if scanBase == "." || scanBase == "/" {
+				scanBase = "models"
+			}
+
+			// If relative path is "." (same dir), just return scan base
+			if rel == "." {
+				return scanBase
+			}
+
+			// Return scan base + first level subdir
+			parts := strings.Split(rel, string(filepath.Separator))
+			if len(parts) > 0 && parts[0] != "" {
+				return filepath.Join(scanBase, parts[0])
+			}
+			return scanBase
+		}
+	}
+
+	// Fallback: use parent directory name
+	return filepath.Base(dir)
 }
 
 // GetModel returns a model by ID
@@ -324,9 +391,9 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 
 	// Create status
 	status := &ModelStatus{
-		ID:     req.ModelID,
-		Name:   model.Name,
-		State:  StateLoading,
+		ID:    req.ModelID,
+		Name:  model.Name,
+		State: StateLoading,
 	}
 	m.statuses[req.ModelID] = status
 	m.mu.Unlock()

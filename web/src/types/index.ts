@@ -7,3 +7,4 @@ export * from './download';
 export * from './cluster';
 export * from './events';
 export * from './logs';
+export * from './node';

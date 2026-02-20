@@ -98,9 +98,13 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-            {model.alias || model.name}
+            {model.alias || model.displayName || model.name}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{model.name}</p>
+          {model.pathPrefix && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+              来自: {model.pathPrefix}
+            </p>
+          )}
         </div>
       </div>
 

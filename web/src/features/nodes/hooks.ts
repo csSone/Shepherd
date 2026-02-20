@@ -3,15 +3,13 @@ import { apiClient } from '@/lib/api/client';
 import type {
   DistributedNode,
   NodeListResponse,
+  NodeStats,
   NodeRegisterRequest,
   NodeRegisterResponse,
   SendCommandRequest,
   SendCommandResponse,
 } from '@/types/node';
 
-/**
- * 获取所有节点列表
- */
 export function useNodes() {
   return useQuery({
     queryKey: ['nodes'],
@@ -23,9 +21,6 @@ export function useNodes() {
   });
 }
 
-/**
- * 获取单个节点详情
- */
 export function useNode(nodeId: string) {
   return useQuery({
     queryKey: ['nodes', nodeId],
@@ -37,9 +32,28 @@ export function useNode(nodeId: string) {
   });
 }
 
-/**
- * 注册新节点
- */
+export function useNodeStats() {
+  return useQuery({
+    queryKey: ['nodes', 'stats'],
+    queryFn: async () => {
+      const response = await apiClient.get<NodeListResponse>('/master/nodes');
+      return response.stats;
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useNodesWithStats() {
+  return useQuery({
+    queryKey: ['nodes'],
+    queryFn: async () => {
+      const response = await apiClient.get<NodeListResponse>('/master/nodes');
+      return response;
+    },
+    refetchInterval: 5000,
+  });
+}
+
 export function useRegisterNode() {
   const queryClient = useQueryClient();
 
@@ -54,9 +68,6 @@ export function useRegisterNode() {
   });
 }
 
-/**
- * 注销节点
- */
 export function useUnregisterNode() {
   const queryClient = useQueryClient();
 
@@ -71,9 +82,6 @@ export function useUnregisterNode() {
   });
 }
 
-/**
- * 向节点发送命令
- */
 export function useSendCommand() {
   const queryClient = useQueryClient();
 
@@ -88,23 +96,6 @@ export function useSendCommand() {
   });
 }
 
-/**
- * 获取在线节点数
- */
-export function useOnlineNodeCount() {
-  return useQuery({
-    queryKey: ['nodes', 'count', 'online'],
-    queryFn: async () => {
-      const response = await apiClient.get<NodeListResponse>('/master/nodes');
-      return response.online;
-    },
-    refetchInterval: 5000,
-  });
-}
-
-/**
- * 按角色筛选节点
- */
 export function useNodesByRole(role: string) {
   return useQuery({
     queryKey: ['nodes', 'role', role],
@@ -116,9 +107,6 @@ export function useNodesByRole(role: string) {
   });
 }
 
-/**
- * 按状态筛选节点
- */
 export function useNodesByStatus(status: string) {
   return useQuery({
     queryKey: ['nodes', 'status', status],
@@ -127,5 +115,34 @@ export function useNodesByStatus(status: string) {
       return response.nodes.filter((node) => node.status === status);
     },
     enabled: !!status,
+  });
+}
+
+export function useFilteredNodes(
+  nodes: DistributedNode[] | undefined,
+  filters: {
+    search?: string;
+    status?: string;
+    role?: string;
+    hasTag?: string;
+  }
+) {
+  if (!nodes) return [];
+
+  return nodes.filter((node) => {
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      const matchName = node.name.toLowerCase().includes(search);
+      const matchAddress = node.address.toLowerCase().includes(search);
+      if (!matchName && !matchAddress) return false;
+    }
+
+    if (filters.status && node.status !== filters.status) return false;
+
+    if (filters.role && node.role !== filters.role) return false;
+
+    if (filters.hasTag && !node.tags.includes(filters.hasTag)) return false;
+
+    return true;
   });
 }

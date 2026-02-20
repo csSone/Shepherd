@@ -11,15 +11,17 @@ import (
 // Model represents a discovered GGUF model
 type Model struct {
 	// Basic information
-	ID         string   // Unique model ID (usually file path)
-	Name       string   // Model name
-	Alias      string   // Display alias
-	Path       string   // File path to the GGUF file
-	Size       int64    // File size in bytes
-	Favourite  bool     // User's favorite flag
+	ID          string // Unique model ID (path hash)
+	Name        string // Model name
+	DisplayName string // Display name for UI (handles duplicates)
+	Alias       string // Display alias
+	Path        string // File path to the GGUF file
+	PathPrefix  string // Path prefix for duplicate identification (e.g., "models/A", "cache/B")
+	Size        int64  // File size in bytes
+	Favourite   bool   // User's favorite flag
 
 	// GGUF metadata
-	Metadata   *gguf.Metadata
+	Metadata *gguf.Metadata
 
 	// Additional files (e.g., mmproj)
 	MmprojPath string
@@ -27,19 +29,19 @@ type Model struct {
 
 	// Scanning info
 	ScannedAt  time.Time
-	SourcePath string   // Original scan path
+	SourcePath string // Original scan path
 }
 
 // ModelStatus represents the loading status of a model
 type ModelStatus struct {
-	ID          string
-	Name        string
-	State       LoadState
-	ProcessID   string
-	Port        int
-	CtxSize     int
-	LoadedAt    time.Time
-	Error       error
+	ID        string
+	Name      string
+	State     LoadState
+	ProcessID string
+	Port      int
+	CtxSize   int
+	LoadedAt  time.Time
+	Error     error
 }
 
 // LoadState represents the loading state
@@ -82,11 +84,11 @@ type ScanConfig struct {
 
 // ScanResult represents the result of a scan operation
 type ScanResult struct {
-	Models      []*Model
-	Errors      []ScanError
-	ScannedAt   time.Time
-	Duration    time.Duration
-	TotalFiles  int
+	Models       []*Model
+	Errors       []ScanError
+	ScannedAt    time.Time
+	Duration     time.Duration
+	TotalFiles   int
 	MatchedFiles int
 }
 
@@ -98,25 +100,25 @@ type ScanError struct {
 
 // LoadRequest contains parameters for loading a model
 type LoadRequest struct {
-	ModelID      string
-	CtxSize     int
-	BatchSize   int
-	Threads     int
-	GPULayers   int
-	Temperature float64
-	TopP        float64
-	TopK        int
+	ModelID       string
+	CtxSize       int
+	BatchSize     int
+	Threads       int
+	GPULayers     int
+	Temperature   float64
+	TopP          float64
+	TopK          int
 	RepeatPenalty float64
-	Seed        int
-	NPredict    int
+	Seed          int
+	NPredict      int
 }
 
 // LoadResult represents the result of a load operation
 type LoadResult struct {
-	Success    bool
-	ModelID    string
-	Port       int
-	CtxSize    int
-	Error      error
-	Duration   time.Duration
+	Success  bool
+	ModelID  string
+	Port     int
+	CtxSize  int
+	Error    error
+	Duration time.Duration
 }
