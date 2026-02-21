@@ -234,13 +234,16 @@ main() {
     esac
 
     # 构建命令参数
+    # 注意：Go 的 flag 包要求所有标志必须在位置参数之前
     local ARGS=()
-    ARGS+=("${MODE}")
 
-    # 添加配置文件参数
+    # 先添加标志参数
     if [ -n "${CONFIG_PATH}" ]; then
-        ARGS+=("--config" "${CONFIG_PATH}")
+        ARGS+=("--config=${CONFIG_PATH}")
     fi
+
+    # 最后添加位置参数（运行模式）
+    ARGS+=("${MODE}")
 
     # 显示启动信息
     echo ""
