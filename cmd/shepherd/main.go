@@ -6,7 +6,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api"
@@ -339,18 +341,74 @@ func (app *App) initHybridNode() error {
 	return nil
 }
 
+// generateNodeID 基于设备信息生成稳定的节点ID
+// 优先使用 MAC 地址，其次使用主机名，确保每次启动生成相同的 ID
+func generateNodeID() string {
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "unknown"
+	}
+	hostname = strings.ToLower(hostname)
+
+	// 获取所有 MAC 地址，按字典序排序确保稳定性
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		var macAddrs []string
+		for _, iface := range interfaces {
+			// 跳过回环接口和虚拟接口
+			if iface.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+			if iface.Flags&net.FlagUp == 0 {
+				continue
+			}
+			hwAddr := iface.HardwareAddr
+			if hwAddr != nil && len(hwAddr) > 0 {
+				macAddrs = append(macAddrs, hwAddr.String())
+			}
+		}
+
+		if len(macAddrs) > 0 {
+			// 使用第一个可用的 MAC 地址生成 ID
+			// 格式: hostname-macshort (例如: myserver-a1b2c3d4)
+			mac := macAddrs[0]
+			macClean := strings.ReplaceAll(mac, ":", "")
+			macShort := macClean
+			if len(macClean) > 8 {
+				macShort = macClean[:8]
+			}
+			return fmt.Sprintf("%s-%s", hostname, macShort)
+		}
+	}
+
+	// 如果没有 MAC 地址可用，使用主机名 + 机器 ID（如果可用）
+	machineID := ""
+	if data, err := os.ReadFile("/etc/machine-id"); err == nil {
+		machineID = strings.TrimSpace(string(data))
+	} else if data, err := os.ReadFile("/var/lib/dbus/machine-id"); err == nil {
+		machineID = strings.TrimSpace(string(data))
+	}
+
+	if machineID != "" {
+		machineShort := machineID
+		if len(machineID) > 8 {
+			machineShort = machineID[:8]
+		}
+		return fmt.Sprintf("%s-%s", hostname, machineShort)
+	}
+
+	// 最后的回退：使用主机名（不推荐，可能重复）
+	return hostname
+}
+
 // buildNodeConfig 从应用配置构建 NodeConfig
 func (app *App) buildNodeConfig() *node.NodeConfig {
 	cfg := app.cfg
 
 	nodeID := cfg.Node.ID
 	if nodeID == "auto" || nodeID == "" {
-		// 生成默认节点 ID
-		hostname, _ := os.Hostname()
-		if hostname == "" {
-			hostname = "shepherd"
-		}
-		nodeID = fmt.Sprintf("%s-%d", hostname, time.Now().Unix())
+		// 基于设备信息生成稳定的节点 ID
+		nodeID = generateNodeID()
 	}
 
 	nodeName := cfg.Node.Name

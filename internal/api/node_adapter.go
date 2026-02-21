@@ -136,14 +136,14 @@ func convertNodeCapabilitiesToCluster(cap *node.NodeCapabilities) *cluster.Capab
 	}
 
 	return &cluster.Capabilities{
-		GPU:           cap.GPU,
-		GPUName:       "", // 简化实现
-		GPUMemory:     cap.Memory,
-		CPUCount:      cap.CPUCount,
-		Memory:        cap.Memory,
-		SupportsLlama: cap.SupportsLlama,
+		GPU:            cap.GPU,
+		GPUName:        "", // 简化实现
+		GPUMemory:      cap.Memory,
+		CPUCount:       cap.CPUCount,
+		Memory:         cap.Memory,
+		SupportsLlama:  cap.SupportsLlama,
 		SupportsPython: cap.SupportsPython,
-		CondaEnvs:     cap.CondaEnvs,
+		CondaEnvs:      cap.CondaEnvs,
 	}
 }
 
@@ -458,6 +458,9 @@ func (a *NodeAdapter) RegisterRoutes(router *gin.RouterGroup) {
 		// ========== 兼容性路由 ==========
 		// 为了向后兼容，将 /clients 映射到 /nodes
 
+		// POST /api/master/clients/register -> POST /api/master/nodes/register
+		master.POST("/clients/register", a.RegisterNode)
+
 		// GET /api/master/clients - 返回客户端列表（前端期望的格式）
 		master.GET("/clients", a.ListClients)
 
@@ -730,4 +733,3 @@ func (a *NodeAdapter) GetClusterOverview(c *gin.Context) {
 		},
 	})
 }
-
