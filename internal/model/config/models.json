@@ -83,5 +83,14 @@
   {
     "modelId": "test-model-6075d9af3c3e8c53",
     "favourite": true
+  },
+  {
+    "modelId": "test-model-e5a71eea6e009091",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-16715adc6216ad80",
+    "favourite": true
   }
 ]
