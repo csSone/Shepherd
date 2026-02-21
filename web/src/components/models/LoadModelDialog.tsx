@@ -308,7 +308,7 @@ export function LoadModelDialog({
             handleTooltipLeave();
           }}
           className="ml-1.5 w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600
-                     text-gray-600 dark:text-gray-300 text-xs font-medium flex items-center justify-center
+                     text-muted-foreground text-xs font-medium flex items-center justify-center
                      hover:from-blue-50 hover:to-blue-100 dark:hover:from-blue-900/40 dark:hover:to-blue-800/40
                      hover:text-blue-600 dark:hover:text-blue-400
                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
@@ -349,10 +349,10 @@ export function LoadModelDialog({
             `}</style>
             <div className="relative mb-1.5">
               {/* 提示框内容 */}
-              <div className="max-w-xs px-4 py-3 bg-gray-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10">
+              <div className="max-w-xs px-4 py-3 bg-background/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10">
                 <div className="flex items-start gap-3">
                   <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-gray-100 leading-relaxed">
+                  <p className="text-sm text-foreground leading-relaxed">
                     {helpText || '暂无说明'}
                   </p>
                 </div>
@@ -468,9 +468,9 @@ export function LoadModelDialog({
           className={cn(
             "w-full px-2 py-1.5 text-sm",
             "border-2 rounded-md",
-            error ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600",
-            "bg-white dark:bg-gray-700",
-            "text-gray-900 dark:text-white",
+            error ? "border-red-500 dark:border-red-500" : "border-border",
+            "bg-input",
+            "text-foreground",
             "focus:outline-none focus:ring-2",
             error ? "focus:ring-red-500 focus:border-red-500" : "focus:ring-blue-500 focus:border-blue-500",
             "disabled:opacity-50 disabled:cursor-not-allowed",
@@ -506,9 +506,9 @@ export function LoadModelDialog({
         disabled={disabled}
         className={cn(
           "w-full px-2 py-1.5 pr-8 text-sm",
-          "border-2 border-gray-300 dark:border-gray-600",
-          "rounded-md bg-white dark:bg-gray-700",
-          "text-gray-900 dark:text-white",
+          "border-2 border-border",
+          "rounded-md bg-input",
+          "text-foreground",
           "appearance-none cursor-pointer",
           "hover:border-blue-400 dark:hover:border-blue-500",
           "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
@@ -519,38 +519,38 @@ export function LoadModelDialog({
       >
         {children}
       </select>
-      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400 pointer-events-none" />
+      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
     </div>
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-card rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+          <h2 className="text-lg font-semibold text-foreground">
             加载模型配置
           </h2>
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+            className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* 预设配置按钮 */}
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
+        <div className="px-4 py-3 border-b border-border bg-muted flex-shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">预设配置:</span>
+            <span className="text-sm font-medium text-foreground">预设配置:</span>
             {Object.entries(PRESETS).map(([key, preset]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => applyPreset(preset.params)}
                 disabled={isLoading}
-                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+                className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
                 title={preset.description}
               >
                 {preset.name}
@@ -564,21 +564,21 @@ export function LoadModelDialog({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 左列：基础配置 */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-foreground pb-2 border-b border-border">
                 基础配置
               </h3>
 
               {/* 模型信息 */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     模型
                   </label>
-                  <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-900 dark:text-white text-sm">
+                  <div className="px-3 py-2 bg-muted rounded-md text-foreground text-sm">
                     {modelName}
                   </div>
                   {modelPath && (
-                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <div className="mt-1 text-xs text-muted-foreground truncate">
                       {modelPath}
                     </div>
                   )}
@@ -586,7 +586,7 @@ export function LoadModelDialog({
 
                 {/* Llama.cpp 版本选择 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Llama.cpp 版本
                   </label>
                   <SelectInput
@@ -622,56 +622,56 @@ export function LoadModelDialog({
 
                 {/* 能力开关 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     能力
                   </label>
-                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
+                  <div className="border border-border rounded-lg p-3 bg-card">
                     <div className="space-y-2">
                       {/* 聊天能力 */}
-                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">聊天能力</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">聊天能力</div>
                       {[
                         { key: 'thinking', label: '思考能力' },
                         {key: 'tools', label: '工具使用' },
                       ].map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
+                        <label key={key} className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent">
                           <input
                             type="checkbox"
                             checked={params.capabilities?.[key as keyof NonNullable<typeof params.capabilities>] || false}
                             onChange={(e) => handleCapabilityChange(key, e.target.checked)}
                             disabled={isLoading || (params.reranking || params.capabilities?.embedding)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                            className="rounded border-border text-blue-600 focus:ring-blue-500 w-4 h-4"
                           />
                           <span>{label}</span>
                         </label>
                       ))}
 
                       {/* 非聊天能力 */}
-                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 mt-2">非聊天能力</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1 mt-2">非聊天能力</div>
                       {[
                         {key: 'translation', label: '直译' },
                         {key: 'embedding', label: '嵌入' },
                       ].map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
+                        <label key={key} className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent">
                           <input
                             type="checkbox"
                             checked={params.capabilities?.[key as keyof NonNullable<typeof params.capabilities>] || false}
                             onChange={(e) => handleCapabilityChange(key, e.target.checked)}
                             disabled={isLoading || ((params.capabilities?.thinking || params.capabilities?.tools) && key === 'embedding')}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                            className="rounded border-border text-blue-600 focus:ring-blue-500 w-4 h-4"
                           />
                           <span>{label}</span>
                         </label>
                       ))}
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     选择模型支持的功能能力（互斥：思考/工具与嵌入）
                   </p>
                 </div>
 
                 {/* 主GPU选择 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     主GPU
                   </label>
                   <SelectInput
@@ -696,22 +696,22 @@ export function LoadModelDialog({
 
                 {/* 设备选择 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     设备
                   </label>
-                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
+                  <div className="border border-border rounded-lg p-3 bg-card">
                     {gpuDevices.length > 0 ? (
                       <div className="space-y-1">
                         {gpuDevices.map((device: string, index: number) => (
                           <label
                             key={index}
-                            className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded"
+                            className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent"
                           >
                             <input
                               type="checkbox"
                               checked={true}
                               disabled={true}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                              className="rounded border-border text-blue-600 focus:ring-blue-500 w-4 h-4"
                             />
                             <span>{device}</span>
                             <span className="ml-auto text-xs text-green-600 dark:text-green-400">就绪</span>
@@ -723,13 +723,13 @@ export function LoadModelDialog({
                         {gpus.map((gpu: GPUInfo) => (
                           <label
                             key={gpu.id}
-                            className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded"
+                            className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent"
                           >
                             <input
                               type="checkbox"
                               checked={gpu.available}
                               disabled={true}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                              className="rounded border-border text-blue-600 focus:ring-blue-500 w-4 h-4"
                             />
                             <span>
                               {gpu.name}
@@ -746,29 +746,29 @@ export function LoadModelDialog({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                      <div className="text-sm text-muted-foreground text-center py-2">
                         未检测到GPU设备
                       </div>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     选择用于模型加载的设备
                   </p>
                 </div>
 
                 {/* 设备状态 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     加载状态
                   </label>
-                  <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md min-h-[40px] text-sm">
+                  <div className="px-3 py-2 bg-muted rounded-md min-h-[40px] text-sm">
                     {isLoading && loadingStatus === '加载中...' ? (
                       <span className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         {loadingStatus}
                       </span>
                     ) : (
-                      <span className="text-gray-600 dark:text-gray-400">{loadingStatus}</span>
+                      <span className="text-muted-foreground">{loadingStatus}</span>
                     )}
                   </div>
                 </div>
@@ -777,18 +777,18 @@ export function LoadModelDialog({
 
             {/* 右列：高级参数 */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-foreground pb-2 border-b border-border">
                 高级参数
               </h3>
 
               {/* 上下文与加速 */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">
                   上下文与加速
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       上下文窗口
                       {renderHelpButton('ctxSize')}
                     </label>
@@ -804,7 +804,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       Flash Attention
                       {renderHelpButton('flashAttention')}
                     </label>
@@ -819,7 +819,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       禁用内存映射
                       {renderHelpButton('noMmap')}
                     </label>
@@ -834,7 +834,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       锁定物理内存
                       {renderHelpButton('lockMemory')}
                     </label>
@@ -849,7 +849,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       GPU层数
                       {renderHelpButton('gpuLayers')}
                     </label>
@@ -869,12 +869,12 @@ export function LoadModelDialog({
 
               {/* 采样参数 */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">
                   采样参数
                 </h4>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       温度
                       {renderHelpButton('temperature')}
                     </label>
@@ -890,7 +890,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       Top-P
                       {renderHelpButton('topP')}
                     </label>
@@ -906,7 +906,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       Top-K
                       {renderHelpButton('topK')}
                     </label>
@@ -922,7 +922,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       Min-P
                       {renderHelpButton('minP')}
                     </label>
@@ -938,7 +938,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       重复惩罚
                       {renderHelpButton('repeatPenalty')}
                     </label>
@@ -954,7 +954,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       存在惩罚
                       {renderHelpButton('presencePenalty')}
                     </label>
@@ -973,12 +973,12 @@ export function LoadModelDialog({
 
               {/* 批处理与并发 */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">
                   批处理与并发
                 </h4>
                 <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       批次大小
                       {renderHelpButton('batchSize')}
                     </label>
@@ -994,7 +994,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       微批大小
                       {renderHelpButton('uBatchSize')}
                     </label>
@@ -1010,7 +1010,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       并发槽位
                       {renderHelpButton('parallelSlots')}
                     </label>
@@ -1026,7 +1026,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       线程数
                       {renderHelpButton('threads')}
                     </label>
@@ -1046,12 +1046,12 @@ export function LoadModelDialog({
 
               {/* KV缓存 */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">
                   KV缓存
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       缓存大小
                       {renderHelpButton('kvCacheSize')}
                     </label>
@@ -1067,7 +1067,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="flex items-center text-xs font-medium text-foreground mb-1">
                       统一缓存
                       {renderHelpButton('kvCacheUnified')}
                     </label>
@@ -1082,7 +1082,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="text-xs font-medium text-foreground mb-1">
                       KV类型K
                     </label>
                     <SelectInput
@@ -1098,7 +1098,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="text-xs font-medium text-foreground mb-1">
                       KV类型V
                     </label>
                     <SelectInput
@@ -1117,12 +1117,12 @@ export function LoadModelDialog({
 
               {/* 其他参数 */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">
                   其他参数
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="text-xs font-medium text-foreground mb-1">
                       随机种子
                     </label>
                     <NumberInput
@@ -1138,7 +1138,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="text-xs font-medium text-foreground mb-1">
                       Max Tokens
                     </label>
                     <NumberInput
@@ -1154,7 +1154,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="text-xs font-medium text-foreground mb-1">
                       DirectIO
                     </label>
                     <SelectInput
@@ -1169,7 +1169,7 @@ export function LoadModelDialog({
                   </div>
 
                   <div className="col-span-2">
-                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="text-xs font-medium text-foreground mb-1">
                       额外参数
                     </label>
                     <textarea
@@ -1178,9 +1178,9 @@ export function LoadModelDialog({
                       disabled={isLoading}
                       rows={2}
                       placeholder="例如: --timeout 30 --grp-attn-n 8"
-                      className="w-full px-2 py-1.5 text-sm border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                      className="w-full px-2 py-1.5 text-sm border-2 border-border rounded-md bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       输入额外的命令行参数，用空格分隔
                     </p>
                   </div>
@@ -1190,12 +1190,12 @@ export function LoadModelDialog({
           </div>
 
           {/* 按钮区域 */}
-          <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4 flex-shrink-0">
+          <div className="flex justify-end items-center gap-3 pt-4 border-t border-border mt-4 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-foreground hover:bg-accent rounded transition-colors disabled:opacity-50"
             >
               取消
             </button>
@@ -1231,12 +1231,12 @@ export function LoadModelDialog({
                 }
               }}
               disabled={isLoading || estimateVRAM.isPending}
-              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
             >
               {estimateVRAM.isPending ? '计算中...' : '估算显存'}
             </button>
             {estimateResult && (
-              <span className="text-sm text-gray-600 dark:text-gray-400">{estimateResult}</span>
+              <span className="text-sm text-muted-foreground">{estimateResult}</span>
             )}
 
             <button

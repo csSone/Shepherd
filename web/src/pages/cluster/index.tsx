@@ -13,7 +13,7 @@ import { ClientCard } from '@/components/cluster/ClientCard';
 import { cn } from '@/lib/utils';
 import type { ClientStatus, TaskStatus } from '@/types';
 import { useAlertDialog } from '@/hooks/useAlertDialog';
-import { useConfig } from '@/features/config/hooks';
+import { useConfig } from '@/lib/config';
 
 /**
  * 集群管理页面
@@ -27,12 +27,12 @@ export function ClusterPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)]">
         <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">集群管理功能不可用</h2>
-        <p className="text-gray-600 dark:text-gray-400 text-center max-w-md">
-          集群管理功能仅在 <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">Master</span> 模式下可用。
+        <h2 className="text-2xl font-bold text-foreground mb-2">集群管理功能不可用</h2>
+        <p className="text-muted-foreground text-center max-w-md">
+          集群管理功能仅在 <span className="font-mono bg-muted px-2 py-0.5 rounded">Master</span> 模式下可用。
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 mt-4">
-          请在配置文件中将模式设置为 <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">master</code> 或 <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">client</code>。
+        <p className="text-sm text-muted-foreground mt-4">
+          请在配置文件中将模式设置为 <code className="font-mono bg-muted px-2 py-0.5 rounded">master</code> 或 <code className="font-mono bg-muted px-2 py-0.5 rounded">client</code>。
         </p>
       </div>
     );
@@ -70,8 +70,8 @@ export function ClusterPage() {
       {/* 标题和操作 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">集群管理</h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h1 className="text-2xl font-bold text-foreground">集群管理</h1>
+          <p className="text-muted-foreground">
             {overview?.totalClients || 0} 个客户端，{overview?.onlineClients || 0} 个在线
           </p>
         </div>
@@ -89,65 +89,65 @@ export function ClusterPage() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="p-4 bg-card rounded-lg border border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <Server className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {overview?.totalClients || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">总客户端</div>
+              <div className="text-sm text-muted-foreground">总客户端</div>
             </div>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="p-4 bg-card rounded-lg border border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {overview?.onlineClients || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">在线</div>
+              <div className="text-sm text-muted-foreground">在线</div>
             </div>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="p-4 bg-card rounded-lg border border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
               <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {overview?.busyClients || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">忙碌</div>
+              <div className="text-sm text-muted-foreground">忙碌</div>
             </div>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="p-4 bg-card rounded-lg border border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <XCircle className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {overview?.runningTasks || 0}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">运行中任务</div>
+              <div className="text-sm text-muted-foreground">运行中任务</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* 标签切换 */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-border">
         <nav className="flex gap-6">
           <Button
             onClick={() => setActiveTab('clients')}
@@ -180,22 +180,22 @@ export function ClusterPage() {
 
       {/* 搜索和过滤 */}
       {activeTab === 'clients' && (
-        <div className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-3 p-4 bg-card rounded-lg border border-border">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="搜索客户端名称或地址..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-input text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as ClientStatus | '')}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="px-3 py-2 border border-border rounded-lg bg-input text-foreground"
           >
             <option value="">所有状态</option>
             <option value="online">在线</option>
@@ -214,7 +214,7 @@ export function ClusterPage() {
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : filteredClients.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-300">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Server className="w-12 h-12 mb-4" />
               <p className="text-lg mb-2">暂无客户端</p>
               <p className="text-sm">点击"扫描网络"来发现局域网中的客户端</p>
@@ -237,7 +237,7 @@ export function ClusterPage() {
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : !tasks || tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-300">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Clock className="w-12 h-12 mb-4" />
               <p className="text-lg">暂无任务</p>
             </div>
@@ -246,12 +246,12 @@ export function ClusterPage() {
               {tasks.map((task) => (
                 <div
                   key={task.id}
-                  className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                  className="p-4 bg-card rounded-lg border border-border"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">{task.type}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">ID: {task.id}</p>
+                      <h3 className="font-medium text-foreground">{task.type}</h3>
+                      <p className="text-sm text-muted-foreground">ID: {task.id}</p>
                     </div>
                     <span
                       className={cn(
@@ -270,7 +270,7 @@ export function ClusterPage() {
                   </div>
 
                   {task.assignedTo && (
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <div className="text-sm text-muted-foreground">
                       分配给: {task.assignedTo}
                     </div>
                   )}

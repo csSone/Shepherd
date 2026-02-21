@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import { useConfig } from '@/features/config/hooks';
+import { useConfig } from '@/lib/config';
 import type {
   Client,
   ClusterTask,

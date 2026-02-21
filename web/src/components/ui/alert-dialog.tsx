@@ -21,7 +21,7 @@ export function AlertDialog() {
       {/* 对话框内容 */}
       <div
         className={cn(
-          'relative bg-white dark:bg-gray-900 text-card-foreground rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800',
+          'relative bg-card text-card-foreground rounded-xl shadow-2xl border border-border',
           'max-w-md w-full',
           'animate-in fade-in-0 zoom-in-95 duration-200',
           'p-6'
@@ -30,7 +30,7 @@ export function AlertDialog() {
         {/* 关闭按钮 */}
         <button
           onClick={close}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -41,12 +41,12 @@ export function AlertDialog() {
         </div>
 
         {/* 标题 */}
-        <h2 className={cn('text-lg font-semibold mb-2', isDestructive ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white')}>
+        <h2 className={cn('text-lg font-semibold mb-2', isDestructive ? 'text-destructive' : 'text-foreground')}>
           {state.title}
         </h2>
 
         {/* 描述 */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-sm text-muted-foreground mb-6">
           {state.description}
         </p>
 

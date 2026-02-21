@@ -91,7 +91,7 @@ export function DialogContent({ className, children }: DialogContentProps) {
       {/* 对话框内容 */}
       <div
         className={cn(
-          'relative bg-white dark:bg-gray-900 text-card-foreground rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800',
+          'relative bg-card text-card-foreground rounded-xl shadow-2xl border border-border',
           'max-w-lg w-full',
           'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200',
           className
@@ -113,7 +113,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn('flex flex-col space-y-1.5 p-6 border-b border-gray-200 dark:border-gray-800', className)}>
+    <div className={cn('flex flex-col space-y-1.5 p-6 border-b border-border', className)}>
       {children}
     </div>
   );
@@ -168,7 +168,7 @@ export function DialogFooter({ className, children }: DialogFooterProps) {
   return (
     <div
       className={cn(
-        'flex items-center p-6 pt-4 gap-3 justify-end border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50',
+        'flex items-center p-6 pt-4 gap-3 justify-end border-t border-border bg-gray-50 dark:bg-gray-800/50',
         className
       )}
     >

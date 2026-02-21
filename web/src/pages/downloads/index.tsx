@@ -80,8 +80,8 @@ export function DownloadsPage() {
       {/* 标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">下载管理</h1>
-          <p className="text-gray-600 dark:text-gray-300">
+          <h1 className="text-2xl font-bold text-foreground">下载管理</h1>
+          <p className="text-muted-foreground">
             管理本地下载任务或从 HuggingFace 搜索模型
           </p>
         </div>
@@ -114,7 +114,7 @@ export function DownloadsPage() {
       </div>
 
       {/* 标签切换 */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-border">
         <nav className="flex gap-6">
           <Button
             onClick={() => setActiveTab('local')}
@@ -152,43 +152,43 @@ export function DownloadsPage() {
         <>
           {/* 统计卡片 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">总任务</div>
+            <div className="p-4 bg-card rounded-lg border border-border">
+              <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+              <div className="text-sm text-muted-foreground">总任务</div>
             </div>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="p-4 bg-card rounded-lg border border-border">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.active}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">进行中</div>
+              <div className="text-sm text-muted-foreground">进行中</div>
             </div>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="p-4 bg-card rounded-lg border border-border">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.completed}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">已完成</div>
+              <div className="text-sm text-muted-foreground">已完成</div>
             </div>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="p-4 bg-card rounded-lg border border-border">
+              <div className="text-2xl font-bold text-foreground">
                 {((stats.downloadedBytes / (stats.totalBytes || 1)) * 100).toFixed(1)}%
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">总进度</div>
+              <div className="text-sm text-muted-foreground">总进度</div>
             </div>
           </div>
 
           {/* 搜索和过滤 */}
-          <div className="flex flex-wrap items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-lg border border-border">
             <div className="relative flex-1 min-w-[200px]">
-              <CloudDownload className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <CloudDownload className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="搜索仓库 ID 或文件名..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-input text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <select
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value as DownloadState | '')}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-2 border border-border rounded-lg bg-input text-foreground"
             >
               <option value="">所有状态</option>
               <option value="downloading">下载中</option>
@@ -200,7 +200,7 @@ export function DownloadsPage() {
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value as DownloadSource | '')}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-2 border border-border rounded-lg bg-input text-foreground"
             >
               <option value="">所有来源</option>
               <option value="huggingface">HuggingFace</option>
@@ -213,11 +213,11 @@ export function DownloadsPage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-gray-600 dark:text-gray-300">加载中...</p>
+                <p className="text-muted-foreground">加载中...</p>
               </div>
             </div>
           ) : filteredDownloads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-300">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <CloudDownload className="w-12 h-12 mb-4" />
               <p className="text-lg mb-2">暂无下载任务</p>
               <p className="text-sm mb-4">创建新任务开始下载模型</p>

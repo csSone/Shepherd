@@ -77,7 +77,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
     : 0;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-shadow">
+    <div className="bg-card rounded-lg border border-border p-4 hover:shadow-lg transition-shadow">
       {/* 标题栏 */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -86,18 +86,18 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
               'p-2 rounded-lg',
               isConnected
                 ? 'bg-green-100 dark:bg-green-900/30'
-                : 'bg-gray-100 dark:bg-gray-700'
+                : 'bg-muted'
             )}
           >
             {isConnected ? (
               <Server className="w-5 h-5 text-green-600 dark:text-green-400" />
             ) : (
-              <Server className="w-5 h-5 text-gray-400" />
+              <Server className="w-5 h-5 text-muted-foreground" />
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">{client.name}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-300">
+            <h3 className="font-semibold text-foreground">{client.name}</h3>
+            <p className="text-sm text-muted-foreground">
               {client.address}:{client.port}
             </p>
           </div>
@@ -109,16 +109,16 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
       </div>
 
       {/* 能力信息 */}
-      <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+      <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-muted rounded-lg">
         <div className="flex items-center gap-2 text-sm">
-          <Cpu className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-600 dark:text-gray-300">
+          <Cpu className="w-4 h-4 text-muted-foreground" />
+          <span className="text-muted-foreground">
             {client.capabilities.cpuCount} 核心
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <HardDrive className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-600 dark:text-gray-300">
+          <HardDrive className="w-4 h-4 text-muted-foreground" />
+          <span className="text-muted-foreground">
             {formatSize(client.capabilities.memory)}
           </span>
         </div>
@@ -126,13 +126,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           <>
             <div className="flex items-center gap-2 text-sm">
               <Server className="w-4 h-4 text-purple-500" />
-              <span className="text-gray-600 dark:text-gray-300">
+              <span className="text-muted-foreground">
                 {client.capabilities.gpuCount} GPU
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <HardDrive className="w-4 h-4 text-purple-500" />
-              <span className="text-gray-600 dark:text-gray-300">
+              <span className="text-muted-foreground">
                 {formatSize(client.capabilities.gpuMemory)}
               </span>
             </div>
@@ -159,11 +159,11 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
         <div className="space-y-2 mb-4">
           {/* CPU */}
           <div>
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
               <span>CPU</span>
               <span>{cpuPercent.toFixed(1)}%</span>
             </div>
-            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className={cn(
                   'h-full transition-all',
@@ -180,13 +180,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
 
           {/* 内存 */}
           <div>
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
               <span>内存</span>
               <span>
                 {formatSize(client.resources.memoryUsed)} / {formatSize(client.resources.memoryTotal)}
               </span>
             </div>
-            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className={cn(
                   'h-full transition-all',
@@ -205,11 +205,11 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           {client.capabilities.gpuCount > 0 && (
             <>
               <div>
-                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                   <span>GPU</span>
                   <span>{gpuPercent.toFixed(1)}%</span>
                 </div>
-                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className={cn(
                       'h-full transition-all',
@@ -221,13 +221,13 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
               </div>
 
               <div>
-                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 mb-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                   <span>GPU 内存</span>
                   <span>
                     {formatSize(client.resources.gpuMemoryUsed)} / {formatSize(client.resources.gpuMemoryTotal)}
                   </span>
                 </div>
-                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className={cn(
                       'h-full transition-all',
@@ -248,7 +248,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
 
       {/* 最后见到时间和操作 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="w-3 h-3" />
           <span>{formatLastSeen(client.lastSeen)}</span>
         </div>
@@ -270,14 +270,14 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
       {/* 元数据 */}
       {Object.keys(client.metadata).length > 0 && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-gray-500 dark:text-gray-300">
+          <summary className="cursor-pointer text-xs text-muted-foreground">
             元数据
           </summary>
-          <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded text-xs">
+          <div className="mt-2 p-2 bg-muted rounded text-xs">
             {Object.entries(client.metadata).map(([key, value]) => (
               <div key={key} className="flex justify-between gap-4">
-                <span className="text-gray-600 dark:text-gray-300">{key}:</span>
-                <span className="text-gray-900 dark:text-white font-mono">{String(value)}</span>
+                <span className="text-muted-foreground">{key}:</span>
+                <span className="text-foreground font-mono">{String(value)}</span>
               </div>
             ))}
           </div>

@@ -43,7 +43,7 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   return (
-    <div className="h-full">
+    <div className="h-full text-foreground">
       {/* 顶部标题栏 */}
       <div className="border-b px-5 py-3">
         <h1 className="text-xl font-semibold">设置</h1>
@@ -259,7 +259,7 @@ function GeneralSettingsPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-12 text-foreground">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
           <p className="text-sm text-muted-foreground mt-3">加载配置中...</p>
@@ -269,9 +269,9 @@ function GeneralSettingsPanel() {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="max-w-2xl space-y-4 text-foreground">
       <div>
-        <h2 className="text-lg font-semibold">API 兼容性设置</h2>
+        <h2 className="text-lg font-semibold ">API 兼容性设置</h2>
         <p className="text-xs text-muted-foreground">
           配置 Ollama 和 LM Studio API 兼容层端口
         </p>
@@ -312,7 +312,7 @@ function GeneralSettingsPanel() {
  */
 function BenchmarkPanel() {
   return (
-    <div className="flex h-full items-center justify-center">
+    <div className="flex h-full items-center justify-center text-foreground">
       <div className="text-center">
         <Zap size={48} className="mx-auto mb-4 text-muted-foreground" />
         <h3 className="text-lg font-semibold">性能压测</h3>
@@ -329,7 +329,7 @@ function BenchmarkPanel() {
  */
 function McpPanel() {
   return (
-    <div className="flex h-full items-center justify-center">
+    <div className="flex h-full items-center justify-center text-foreground">
       <div className="text-center">
         <Toolbox size={48} className="mx-auto mb-4 text-muted-foreground" />
         <h3 className="text-lg font-semibold">MCP 管理</h3>
@@ -346,7 +346,7 @@ function McpPanel() {
  */
 function AboutPanel() {
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto text-foreground">
       <div className="text-center mb-6">
         <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary mx-auto mb-3 text-2xl">
           🐏
@@ -400,7 +400,7 @@ function AboutPanel() {
  */
 function PathsSettingsPanel() {
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-3xl space-y-5 text-foreground">
       {/* llama.cpp 路径配置 */}
       <div className="rounded-lg border bg-card p-4">
         <PathConfigPanel type="llamacpp" />

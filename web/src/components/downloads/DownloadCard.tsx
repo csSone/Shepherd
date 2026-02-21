@@ -88,7 +88,7 @@ function getStateIcon(state: DownloadState) {
     case 'preparing':
       return <CloudDownload className="w-5 h-5 text-blue-500 animate-pulse" />;
     default:
-      return <AlertCircle className="w-5 h-5 text-gray-400" />;
+      return <AlertCircle className="w-5 h-5 text-muted-foreground" />;
   }
 }
 
@@ -108,16 +108,16 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
   const canRetry = task.state === 'failed';
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-card rounded-lg border border-border p-4 hover:shadow-md transition-shadow">
       {/* 标题栏 */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {getStateIcon(task.state)}
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-gray-900 dark:text-white truncate">
+            <h3 className="font-medium text-foreground truncate">
               {task.fileName || task.repoId}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-300 truncate">
+            <p className="text-sm text-muted-foreground truncate">
               {task.repoId}
             </p>
           </div>
@@ -131,10 +131,10 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
       {/* 来源标签 */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs">
+        <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded text-xs">
           {getSourceLabel(task.source)}
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-300">
+        <span className="text-xs text-muted-foreground">
           → {task.path}
         </span>
       </div>
@@ -142,14 +142,14 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
       {/* 进度条 */}
       <div className="mb-3">
         <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-gray-600 dark:text-gray-300">
+          <span className="text-muted-foreground">
             {formatSize(task.downloadedBytes)} / {formatSize(task.totalBytes)}
           </span>
-          <span className="font-medium text-gray-900 dark:text-white">{progressPercent}%</span>
+          <span className="font-medium text-foreground">{progressPercent}%</span>
         </div>
 
         {/* 总体进度条 */}
-        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
           <div
             className={cn(
               'h-full transition-all duration-300',
@@ -161,7 +161,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
         {/* 分块进度 */}
         {task.partsTotal > 1 && (
-          <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+          <div className="text-xs text-muted-foreground mt-1">
             分块: {task.partsCompleted} / {task.partsTotal}
           </div>
         )}
@@ -169,7 +169,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
 
       {/* 速度和预计时间 */}
       {isActive && task.speed > 0 && (
-        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 mb-3">
+        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
           <span>速度: {formatSpeed(task.speed)}</span>
           {task.eta > 0 && <span>预计: {formatTime(task.eta)}</span>}
         </div>
@@ -231,7 +231,7 @@ export function DownloadCard({ task, onPause, onResume, onCancel, onRetry }: Dow
         )}
 
         {/* 创建时间 */}
-        <div className="ml-auto text-xs text-gray-500 dark:text-gray-300">
+        <div className="ml-auto text-xs text-muted-foreground">
           {new Date(task.createdAt).toLocaleString('zh-CN')}
         </div>
       </div>

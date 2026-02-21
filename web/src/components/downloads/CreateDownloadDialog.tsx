@@ -102,16 +102,16 @@ export function CreateDownloadDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">
             创建下载任务
           </h2>
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+            className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -121,7 +121,7 @@ export function CreateDownloadDialog({
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* 来源选择 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               下载来源
             </label>
             <div className="flex gap-2">
@@ -132,7 +132,7 @@ export function CreateDownloadDialog({
                   'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md border-2 transition-colors',
                   source === 'huggingface'
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                    : 'border-border hover:border-primary'
                 )}
               >
                 <Cloud className="w-5 h-5" />
@@ -145,7 +145,7 @@ export function CreateDownloadDialog({
                   'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md border-2 transition-colors',
                   source === 'modelscope'
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                    : 'border-border hover:border-primary'
                 )}
               >
                 <Database className="w-5 h-5" />
@@ -156,7 +156,7 @@ export function CreateDownloadDialog({
 
           {/* 仓库 ID */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               仓库 ID <span className="text-red-500">*</span>
             </label>
             <input
@@ -164,17 +164,17 @@ export function CreateDownloadDialog({
               value={repoId}
               onChange={(e) => setRepoId(e.target.value)}
               placeholder={source === 'huggingface' ? 'Qwen/Qwen2-7B-Instruct' : 'Qwen/Qwen2-7B-Instruct'}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-border rounded-md bg-input text-foreground"
               required
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               例如: {source === 'huggingface' ? 'Qwen/Qwen2-7B-Instruct' : 'Qwen/Qwen2-7B-Instruct'}
             </p>
           </div>
 
           {/* 文件选择 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               文件名
             </label>
             <div className="flex gap-2">
@@ -183,7 +183,7 @@ export function CreateDownloadDialog({
                 value={fileName}
                 onChange={(e) => setFileName(e.target.value)}
                 placeholder="选择或输入 GGUF 文件名"
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="flex-1 px-3 py-2 border border-border rounded-md bg-input text-foreground"
               />
               <Button
                 type="button"
@@ -199,9 +199,9 @@ export function CreateDownloadDialog({
 
             {/* 文件浏览器 */}
             {showFileBrowser && (
-              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto">
+              <div className="mt-2 p-3 bg-muted rounded-md border border-border max-h-48 overflow-y-auto">
                 {isLoadingFiles ? (
-                  <div className="flex items-center justify-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     加载中...
                   </div>
@@ -210,12 +210,12 @@ export function CreateDownloadDialog({
                     加载失败: {filesError.message}
                   </div>
                 ) : availableFiles.length === 0 ? (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                  <div className="text-sm text-muted-foreground py-2">
                     {repoId ? '该仓库没有 GGUF 文件' : '请先输入仓库 ID'}
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       找到 {availableFiles.length} 个 GGUF 文件:
                     </p>
                     {availableFiles.map((file) => (
@@ -230,7 +230,7 @@ export function CreateDownloadDialog({
                       >
                         <File className="w-4 h-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
                         <span className="flex-1 text-sm truncate">{file.name}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-muted-foreground">
                           {formatFileSize(file.size)}
                         </span>
                         {fileName === file.name && (
@@ -246,7 +246,7 @@ export function CreateDownloadDialog({
 
           {/* 保存路径 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               保存路径（可选）
             </label>
             <input
@@ -254,16 +254,16 @@ export function CreateDownloadDialog({
               value={path}
               onChange={(e) => setPath(e.target.value)}
               placeholder="/path/to/models"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-border rounded-md bg-input text-foreground"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               留空则使用默认路径
             </p>
           </div>
 
           {/* 高级选项 */}
           <details className="group">
-            <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 list-none flex items-center gap-2">
+            <summary className="cursor-pointer text-sm font-medium text-foreground list-none flex items-center gap-2">
               <span className="transform group-open:rotate-90 transition-transform">▶</span>
               高级选项
             </summary>
@@ -271,14 +271,14 @@ export function CreateDownloadDialog({
             <div className="mt-3 space-y-3 pl-5">
               {/* 最大重试次数 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   最大重试次数
                 </label>
                 <input
                   type="number"
                   value={maxRetries}
                   onChange={(e) => setMaxRetries(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-border rounded-md bg-input text-foreground"
                   min={0}
                   max={10}
                 />
@@ -286,7 +286,7 @@ export function CreateDownloadDialog({
 
               {/* 分块大小 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   分块大小（字节）
                 </label>
                 <input
@@ -294,7 +294,7 @@ export function CreateDownloadDialog({
                   value={chunkSize}
                   onChange={(e) => setChunkSize(e.target.value)}
                   placeholder="默认: 10485760 (10MB)"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-border rounded-md bg-input text-foreground"
                   min={1024}
                   step={1024}
                 />
@@ -303,7 +303,7 @@ export function CreateDownloadDialog({
           </details>
 
           {/* 按钮 */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               type="button"
               variant="outline"

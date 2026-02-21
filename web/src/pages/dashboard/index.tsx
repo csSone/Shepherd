@@ -44,8 +44,8 @@ export function DashboardPage() {
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-3xl font-bold">仪表盘</h1>
-        <p className="text-muted-foreground">Shepherd 模型管理系统概览</p>
+        <h1 className="text-3xl font-bold text-foreground">仪表盘</h1>
+        <p className="text-muted-foreground font-medium">Shepherd 模型管理系统概览</p>
       </div>
 
       {/* 统计卡片 */}

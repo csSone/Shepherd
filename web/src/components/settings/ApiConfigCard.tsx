@@ -132,7 +132,7 @@ export function ApiConfigCard({
         onClick={handleToggle}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`${baseClasses} bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-400`}
+        className={`${baseClasses} bg-muted text-muted-foreground hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400`}
       >
         <Power className="w-4 h-4" />
         <span>{isHovered ? '启用' : '待启用'}</span>
@@ -197,8 +197,8 @@ export function ApiConfigCard({
     <div className="rounded-xl border bg-card p-5 shadow-sm">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${config.enabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
-            <Plug size={20} className={config.enabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'} />
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${config.enabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+            <Plug size={20} className={config.enabled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'} />
           </div>
           <div>
             <div className="flex items-center gap-2">

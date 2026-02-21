@@ -160,7 +160,7 @@ export function useScanModels() {
         duration_ms: number;
         models: Model[];
         scan_errors: Array<{ path: string; error: string }>;
-      }>('/scan');
+      }>('/model/scan');
       return response;
     },
     onSuccess: (data) => {
@@ -193,7 +193,7 @@ export function useScanStatus() {
         scanning: boolean;
         progress?: number;
         currentPath?: string;
-      }>('/scan/status');
+      }>('/model/scan/status');
       return response;
     },
     refetchInterval: (query) => {
