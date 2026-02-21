@@ -81,7 +81,7 @@ type Server struct {
 	portAllocator *port.PortAllocator
 
 	// 模型能力存储
-	capabilities  map[string]*ModelCapabilities // modelId -> capabilities
+	capabilities   map[string]*ModelCapabilities // modelId -> capabilities
 	capabilitiesMu sync.RWMutex
 
 	mu     sync.RWMutex
@@ -287,11 +287,11 @@ func (s *Server) setupRoutes() {
 			models.PUT("/:id/favourite", s.handleSetFavourite)
 		}
 
-		// Scan routes
-		scan := api.Group("/scan")
+		// Model scan routes
+		modelScan := api.Group("/model/scan")
 		{
-			scan.POST("", s.handleScanModels)
-			scan.GET("/status", s.handleGetScanStatus)
+			modelScan.POST("", s.handleScanModels)
+			modelScan.GET("/status", s.handleGetScanStatus)
 		}
 
 		// Download routes
@@ -610,8 +610,8 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 		}
 	}
 
-	deviceStrings := []string{}  // 简单设备描述字符串（兼容 LlamacppServer）
-	gpus := []gin.H{}             // 详细 GPU 信息（Shepherd 扩展）
+	deviceStrings := []string{} // 简单设备描述字符串（兼容 LlamacppServer）
+	gpus := []gin.H{}           // 详细 GPU 信息（Shepherd 扩展）
 
 	if llamacppBinPath != "" {
 		// 尝试使用 llama-bench 获取设备列表
@@ -711,12 +711,12 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 					deviceStrings = append(deviceStrings, deviceString)
 
 					gpus = append(gpus, gin.H{
-						"id":          deviceID,
-						"name":        gpuName,
+						"id":           deviceID,
+						"name":         gpuName,
 						"architecture": architecture,
-						"totalMemory": totalMemory,
-						"freeMemory":  freeMemory,
-						"available":   true,
+						"totalMemory":  totalMemory,
+						"freeMemory":   freeMemory,
+						"available":    true,
 					})
 				}
 			}
@@ -724,8 +724,8 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"devices": deviceStrings,  // 简单设备字符串列表（兼容 LlamacppServer）
-		"gpus":    gpus,            // 详细 GPU 信息（Shepherd 扩展）
+		"devices": deviceStrings, // 简单设备字符串列表（兼容 LlamacppServer）
+		"gpus":    gpus,          // 详细 GPU 信息（Shepherd 扩展）
 		"count":   len(gpus),
 	})
 }
@@ -763,17 +763,17 @@ func (s *Server) handleGetLlamacppBackends(c *gin.Context) {
 // handleEstimateVRAM 估算模型显存需求
 func (s *Server) handleEstimateVRAM(c *gin.Context) {
 	var req struct {
-		ModelID         string   `json:"modelId"`
-		LlamaBinPath    string   `json:"llamaBinPath"`
-		CtxSize         int      `json:"ctxSize"`
-		BatchSize       int      `json:"batchSize"`
-		UBatchSize      int      `json:"uBatchSize"`
-		Parallel        int      `json:"parallel"`
-		FlashAttention  bool     `json:"flashAttention"`
-		KVUnified       bool     `json:"kvUnified"`
-		CacheTypeK      string   `json:"cacheTypeK"`
-		CacheTypeV      string   `json:"cacheTypeV"`
-		ExtraParams     string   `json:"extraParams"`
+		ModelID        string `json:"modelId"`
+		LlamaBinPath   string `json:"llamaBinPath"`
+		CtxSize        int    `json:"ctxSize"`
+		BatchSize      int    `json:"batchSize"`
+		UBatchSize     int    `json:"uBatchSize"`
+		Parallel       int    `json:"parallel"`
+		FlashAttention bool   `json:"flashAttention"`
+		KVUnified      bool   `json:"kvUnified"`
+		CacheTypeK     string `json:"cacheTypeK"`
+		CacheTypeV     string `json:"cacheTypeV"`
+		ExtraParams    string `json:"extraParams"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1229,7 +1229,7 @@ func (s *Server) handleGetModelCapabilities(c *gin.Context) {
 // handleSetModelCapabilities 设置模型能力配置
 func (s *Server) handleSetModelCapabilities(c *gin.Context) {
 	var req struct {
-		ModelID string             `json:"modelId"`
+		ModelID      string             `json:"modelId"`
 		Capabilities *ModelCapabilities `json:"capabilities"`
 	}
 

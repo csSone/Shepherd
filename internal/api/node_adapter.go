@@ -8,21 +8,25 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/cluster/scanner"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
 )
 
 // NodeAdapter 将 API 调用适配到 Node
 type NodeAdapter struct {
-	node *node.Node
-	log  *logger.Logger
+	node    *node.Node
+	log     *logger.Logger
+	scanner *scanner.Scanner
 }
 
 // NewNodeAdapter 创建一个新的 Node API 适配器
 func NewNodeAdapter(n *node.Node, log *logger.Logger) *NodeAdapter {
 	return &NodeAdapter{
-		node: n,
-		log:  log,
+		node:    n,
+		log:     log,
+		scanner: scanner.NewScanner(&config.NetworkScanConfig{}, log),
 	}
 }
 
@@ -246,9 +250,9 @@ func (a *NodeAdapter) SendCommand(c *gin.Context) {
 
 	a.log.Infof("命令发送成功: 节点=%s, 类型=%s, ID=%s", nodeID, cmd.Type, cmd.ID)
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "命令发送成功",
-		"nodeID":   nodeID,
-		"command":  cmd.Type,
+		"message":   "命令发送成功",
+		"nodeID":    nodeID,
+		"command":   cmd.Type,
 		"commandID": cmd.ID,
 	})
 }
@@ -385,6 +389,10 @@ func (a *NodeAdapter) RegisterRoutes(router *gin.RouterGroup) {
 
 		// 命令结果上报
 		master.POST("/command/result", a.ReportCommandResult)
+
+		// Client 网络扫描
+		master.POST("/scan", a.HandleScanClients)
+		master.GET("/scan/status", a.GetClientScanStatus)
 	}
 
 	a.log.Infof("Node API 适配器路由已注册")
@@ -401,4 +409,36 @@ func (a *NodeAdapter) GetNodeInstance() *node.Node {
 // SetNodeInstance 设置底层 Node 实例
 func (a *NodeAdapter) SetNodeInstance(n *node.Node) {
 	a.node = n
+}
+
+// HandleScanClients 处理客户端扫描请求
+// POST /api/master/scan
+func (a *NodeAdapter) HandleScanClients(c *gin.Context) {
+	var req struct {
+		CIDR      string `json:"cidr,omitempty"`
+		PortRange string `json:"portRange,omitempty"`
+		Timeout   int    `json:"timeout,omitempty"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		a.log.Errorf("解析扫描请求失败: %v", err)
+	}
+
+	go func() {
+		if _, err := a.scanner.Scan(); err != nil {
+			a.log.Errorf("网络扫描失败: %v", err)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "网络扫描已启动",
+	})
+}
+
+// GetClientScanStatus 获取客户端扫描状态
+// GET /api/master/scan/status
+func (a *NodeAdapter) GetClientScanStatus(c *gin.Context) {
+	status := a.scanner.GetStatus()
+	c.JSON(http.StatusOK, status)
 }

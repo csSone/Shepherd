@@ -500,6 +500,8 @@ func TestNodeAdapter_RegisterRoutes(t *testing.T) {
 		{"GET", "/api/master/nodes/test-id/commands"},
 		{"POST", "/api/master/heartbeat"},
 		{"POST", "/api/master/command/result"},
+		{"POST", "/api/master/scan"},
+		{"GET", "/api/master/scan/status"},
 	}
 
 	for _, route := range routes {
@@ -538,4 +540,89 @@ func TestNodeAdapter_SetNodeInstance(t *testing.T) {
 	assert.Equal(t, newNode, adapter.GetNodeInstance())
 
 	adapter.SetNodeInstance(n)
+}
+
+func TestNodeAdapter_HandleScanClients(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adapter, _, cleanup := setupTestNodeAdapter(t)
+	defer cleanup()
+
+	router := gin.New()
+	router.POST("/api/master/scan", adapter.HandleScanClients)
+
+	tests := []struct {
+		name       string
+		reqBody    interface{}
+		wantStatus int
+	}{
+		{
+			name:       "start scan with empty body",
+			reqBody:    map[string]interface{}{},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "start scan with params",
+			reqBody: map[string]interface{}{
+				"cidr":      "192.168.1.0/24",
+				"portRange": "9191-9200",
+				"timeout":   5,
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "start scan with invalid json",
+			reqBody:    "invalid json",
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var body []byte
+			if s, ok := tt.reqBody.(string); ok {
+				body = []byte(s)
+			} else {
+				body, _ = json.Marshal(tt.reqBody)
+			}
+
+			req := httptest.NewRequest("POST", "/api/master/scan", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+
+			if tt.wantStatus == http.StatusOK {
+				var resp map[string]interface{}
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				assert.True(t, resp["success"].(bool))
+				assert.Equal(t, "网络扫描已启动", resp["message"])
+			}
+		})
+	}
+}
+
+func TestNodeAdapter_GetClientScanStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adapter, _, cleanup := setupTestNodeAdapter(t)
+	defer cleanup()
+
+	router := gin.New()
+	router.GET("/api/master/scan/status", adapter.GetClientScanStatus)
+
+	req := httptest.NewRequest("GET", "/api/master/scan/status", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+
+	assert.Contains(t, resp, "running")
+	assert.IsType(t, false, resp["running"])
 }
