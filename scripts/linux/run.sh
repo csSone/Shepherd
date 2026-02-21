@@ -174,14 +174,22 @@ main() {
     # 检查二进制文件
     check_binary
 
-    # 自动检测 config/node 下的配置文件
+    # 自动检测配置文件：node -> example -> 报错
     if [ -z "$CONFIG_PATH" ]; then
         local NODE_CONFIG="${PROJECT_DIR}/config/node/${MODE}.config.yaml"
+        local EXAMPLE_CONFIG="${PROJECT_DIR}/config/example/${MODE}.config.yaml"
+        
         if [ -f "$NODE_CONFIG" ]; then
             CONFIG_PATH="$NODE_CONFIG"
-            print_info "使用配置文件: ${CONFIG_PATH}"
+            print_info "使用 node 配置文件: ${CONFIG_PATH}"
+        elif [ -f "$EXAMPLE_CONFIG" ]; then
+            CONFIG_PATH="$EXAMPLE_CONFIG"
+            print_info "使用 example 配置文件: ${CONFIG_PATH}"
         else
-            print_info "未找到 node 配置文件，使用默认配置"
+            print_error "未找到配置文件，请从 example 复制一份到 node 目录:"
+            print_error "  cp config/example/${MODE}.config.yaml config/node/${MODE}.config.yaml"
+            print_error "  然后按需修改配置"
+            exit 1
         fi
     else
         # 验证自定义配置文件是否存在

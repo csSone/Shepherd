@@ -17,7 +17,7 @@ const (
 	// DefaultConfigFile is the default configuration file name
 	DefaultConfigFile = "server.config.yaml"
 	// DefaultModelsConfigFile is the default models configuration file
-	DefaultModelsConfigFile = "models.json"
+	DefaultModelsConfigFile = "node/models.json"
 	// DefaultLaunchConfigFile is the default launch configuration file
 	DefaultLaunchConfigFile = "launch_config.json"
 )
@@ -699,9 +699,11 @@ func NewManager(mode string) *Manager {
 // NewManagerWithPath creates a new configuration manager with a custom config path
 func NewManagerWithPath(mode, configPath string) *Manager {
 	configDir := filepath.Dir(configPath)
+	// models.json 始终存储在 config/node/ 目录下，与主配置文件位置无关
+	modelsDir := filepath.Join(GetConfigDir(), "node")
 	return &Manager{
 		configPath:       configPath,
-		modelsConfigPath: filepath.Join(configDir, DefaultModelsConfigFile),
+		modelsConfigPath: filepath.Join(modelsDir, "models.json"),
 		launchConfigPath: filepath.Join(configDir, DefaultLaunchConfigFile),
 		mode:             mode,
 	}

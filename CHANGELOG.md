@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-02-21
+
+### Added
+
+#### 实时日志查看功能
+- **后端日志流** - 所有日志自动发送到 LogStream，支持 SSE 实时推送
+  - `internal/logger/logger.go` - 日志同时写入文件和推送到流
+  - `internal/server/server.go` - `/api/logs/stream` SSE 端点
+
+- **前端日志 Hook** - 新增 `useLogs` hook 连接 SSE 日志流
+  - 自动连接和重连（指数退避策略）
+  - 实时显示日志条数和连接状态
+  - 支持级别过滤和内容搜索
+  - 导出 JSON/TXT 格式
+
+#### 配置管理优化
+- **配置文件查找优先级** - `run.sh` 支持多级配置查找
+  - 优先查找 `config/node/{mode}.config.yaml`
+  - 次选 `config/example/{mode}.config.yaml`
+  - 未找到时提示用户复制配置并退出
+
+- **模型数据存储位置** - 统一 `models.json` 存储路径
+  - 始终存储在 `config/node/models.json`
+  - 避免因配置文件位置不同导致数据分散
+
+### Changed
+
+- **Sidebar 样式** - 移除文字模糊效果，提升可读性
+
 ## [0.5.0] - 2026-02-21
 
 ### Added
