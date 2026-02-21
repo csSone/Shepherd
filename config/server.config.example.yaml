@@ -6,42 +6,43 @@ server:
     host: 0.0.0.0
     read_timeout: 60
     write_timeout: 60
+
 model:
     paths:
         - ./models
         - ~/.cache/huggingface/hub
     path_configs:
-        - path: /home/user/.cache/huggingface/hub
-          name: 测试目录
-          description: ""
-        - path: /home/user/workspace/LlamacppServer/build/models
-          name: ""
-          description: ""
+        # 示例配置，请根据实际情况修改
+        # - path: /path/to/your/models
+        #   name: 模型目录
+        #   description: 模型描述
     auto_scan: true
     scan_interval: 0
+
 llamacpp:
     paths:
-        - path: ./llama.cpp
-          name: Default
-          description: ""
-        - path: /home/user/workspace/llama.cpp/build-rocm/bin
-          name: Rocm后端
-          description: ""
-        - path: /home/user/workspace/llama.cpp/build-vulkan/bin
-          name: VulKan后端
-          description: ""
+        # 示例配置，请根据实际情况修改
+        # - path: ./llama.cpp
+        #   name: Default
+        #   description: 默认 llama.cpp 路径
+        # - path: /path/to/llama.cpp/build/bin
+        #   name: Backend
+        #   description: 后端描述
+
 download:
     directory: ./downloads
     max_concurrent: 4
     chunk_size: 1048576
     retry_count: 3
     timeout: 300
+
 security:
     api_key_enabled: false
     api_key: ""
     cors_enabled: true
     allowed_origins:
         - '*'
+
 compatibility:
     ollama:
         enabled: false
@@ -49,6 +50,7 @@ compatibility:
     lmstudio:
         enabled: false
         port: 1234
+
 log:
     level: info
     format: json
@@ -58,6 +60,7 @@ log:
     max_backups: 3
     max_age: 7
     compress: true
+
 storage:
     type: sqlite
     sqlite:
@@ -67,7 +70,9 @@ storage:
             synchronous: NORMAL
         enable_wal: true
     postgresql: null
+
 mode: standalone
+
 master:
     enabled: false
     client_config_dir: ""
@@ -88,6 +93,7 @@ master:
         enabled: false
         max_buffer_size: 0
         flush_interval: 0
+
 client:
     enabled: false
     master_address: ""
@@ -106,6 +112,7 @@ client:
     register_retry: 0
     heartbeat_interval: 0
     heartbeat_timeout: 0
+
 node:
     id: ""
     name: ""
