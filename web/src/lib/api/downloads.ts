@@ -54,14 +54,35 @@ export interface HuggingFaceSearchResponse {
 }
 
 /**
+ * 下载列表 API 响应（统一格式）
+ */
+export interface DownloadListApiResponse {
+  success: boolean;
+  data: {
+    downloads: DownloadTask[];
+    total: number;
+  };
+  error?: string;
+}
+
+/**
+ * 单个下载任务 API 响应（统一格式）
+ */
+export interface DownloadTaskApiResponse {
+  success: boolean;
+  data: DownloadTask;
+  error?: string;
+}
+
+/**
  * 下载管理 API
  */
 export const downloadsApi = {
   /**
    * 获取下载任务列表
    */
-  list: (): Promise<DownloadListResponse> =>
-    apiClient.get<DownloadListResponse>('/downloads'),
+  list: (): Promise<DownloadListApiResponse> =>
+    apiClient.get<DownloadListApiResponse>('/downloads'),
 
   /**
    * 创建下载任务
@@ -72,8 +93,8 @@ export const downloadsApi = {
   /**
    * 获取单个下载任务
    */
-  get: (id: string): Promise<DownloadTask> =>
-    apiClient.get<DownloadTask>(`/downloads/${id}`),
+  get: (id: string): Promise<DownloadTaskApiResponse> =>
+    apiClient.get<DownloadTaskApiResponse>(`/downloads/${id}`),
 
   /**
    * 暂停下载

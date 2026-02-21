@@ -16,12 +16,7 @@ export function useDownloads() {
     queryKey: ['downloads'],
     queryFn: async () => {
       const response = await downloadsApi.list();
-      // 处理统一响应格式 { success, data: { downloads, total } }
-      if ('success' in response && 'data' in response) {
-        return (response as any).data?.downloads || [];
-      }
-      // 兼容旧格式 { downloads, total }
-      return (response as DownloadListResponse).downloads || [];
+      return response.data?.downloads || [];
     },
     staleTime: 5 * 1000, // 5 秒
     // ✅ 动态调整刷新频率: 只在有活跃任务时轮询
@@ -43,10 +38,7 @@ export function useDownload(taskId: string) {
     queryKey: ['downloads', taskId],
     queryFn: async () => {
       const response = await downloadsApi.get(taskId);
-      if ('success' in response && 'data' in response) {
-        return (response as any).data;
-      }
-      return response as DownloadTask;
+      return response.data;
     },
     enabled: !!taskId,
     refetchInterval: (query) => {

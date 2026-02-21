@@ -4,7 +4,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -668,60 +667,88 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 		}
 	}
 
-	// 如果 llama-bench 失败，回退到 roc-smi
+	// 如果 llama-bench 失败，尝试使用 rocm-smi 作为后备方案
 	if len(deviceStrings) == 0 {
-		cmd := exec.Command("roc-smi", "--json")
+		cmd := exec.Command("rocm-smi", "--showmeminfo", "vram")
 		output, err := cmd.Output()
 		if err == nil {
-			var rocmOutput []map[string]interface{}
-			if err := json.Unmarshal(output, &rocmOutput); err == nil {
-				for i, gpu := range rocmOutput {
-					// 提取 GPU 关键信息
-					gpuName := ""
-					if name, ok := gpu["card_name"].(string); ok {
-						gpuName = name
-					} else if name, ok := gpu["Card name"].(string); ok {
-						gpuName = name
-					}
+			// 解析 rocm-smi 文本输出
+			// 输出格式:
+			// ============================= ROCm System Management Interface ============================
+			// ==================================== Memory Info ===================================
+			// GPU[0]  : VRAM Total                   : 122880 MiB
+			// GPU[0]  : VRAM Total Free              : 113684 MiB
+			lines := strings.Split(string(output), "\n")
+			gpuIndex := -1
+			var totalMemory, freeMemory string
 
-					// 获取架构信息
-					architecture := ""
-					if arch, ok := gpu["card_series"].(string); ok {
-						architecture = arch
-					} else if arch, ok := gpu["Card series"].(string); ok {
-						architecture = arch
-					}
-
-					// 获取 VRAM
-					var totalMemory, freeMemory string
-					if vram, ok := gpu["vram_total_memory"].(float64); ok {
-						totalMemory = fmt.Sprintf("%.0f MiB", vram/(1024*1024))
-					}
-					if vramFree, ok := gpu["vram_total_free_memory"].(float64); ok {
-						freeMemory = fmt.Sprintf("%.0f MiB", vramFree/(1024*1024))
-					}
-
-					// 构建 device string（类似 llama-bench 格式）
-					deviceID := fmt.Sprintf("ROCm%d", i)
-					deviceString := fmt.Sprintf("%s: %s", deviceID, gpuName)
-					if totalMemory != "" {
-						deviceString += fmt.Sprintf(" (%s", totalMemory)
-						if freeMemory != "" {
-							deviceString += fmt.Sprintf(", %s free", freeMemory)
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				// 检测新的 GPU
+				if strings.HasPrefix(line, "GPU[") {
+					// 保存前一个 GPU 的信息（如果有）
+					if gpuIndex >= 0 {
+						deviceID := fmt.Sprintf("ROCm%d", gpuIndex)
+						deviceString := fmt.Sprintf("%s: AMD Radeon Graphics", deviceID)
+						if totalMemory != "" {
+							deviceString += fmt.Sprintf(" (%s", totalMemory)
+							if freeMemory != "" {
+								deviceString += fmt.Sprintf(", %s free", freeMemory)
+							}
+							deviceString += ")"
 						}
-						deviceString += ")"
-					}
-					deviceStrings = append(deviceStrings, deviceString)
+						deviceStrings = append(deviceStrings, deviceString)
 
-					gpus = append(gpus, gin.H{
-						"id":           deviceID,
-						"name":         gpuName,
-						"architecture": architecture,
-						"totalMemory":  totalMemory,
-						"freeMemory":   freeMemory,
-						"available":    true,
-					})
+						gpus = append(gpus, gin.H{
+							"id":           deviceID,
+							"name":         "AMD Radeon Graphics",
+							"totalMemory":  totalMemory,
+							"freeMemory":   freeMemory,
+							"available":    true,
+						})
+					}
+					// 提取 GPU 索引
+					if matches := regexp.MustCompile(`GPU\[(\d+)\]`).FindStringSubmatch(line); len(matches) > 1 {
+						if idx, err := strconv.Atoi(matches[1]); err == nil {
+							gpuIndex = idx
+							totalMemory = ""
+							freeMemory = ""
+						}
+					}
+				} else if gpuIndex >= 0 {
+					// 解析 VRAM 信息
+					if strings.Contains(line, "VRAM Total") && !strings.Contains(line, "Free") {
+						if matches := regexp.MustCompile(`(\d+)\s*MiB`).FindStringSubmatch(line); len(matches) > 1 {
+							totalMemory = matches[1] + " MiB"
+						}
+					} else if strings.Contains(line, "VRAM Total Free") {
+						if matches := regexp.MustCompile(`(\d+)\s*MiB`).FindStringSubmatch(line); len(matches) > 1 {
+							freeMemory = matches[1] + " MiB"
+						}
+					}
 				}
+			}
+
+			// 保存最后一个 GPU 的信息
+			if gpuIndex >= 0 {
+				deviceID := fmt.Sprintf("ROCm%d", gpuIndex)
+				deviceString := fmt.Sprintf("%s: AMD Radeon Graphics", deviceID)
+				if totalMemory != "" {
+					deviceString += fmt.Sprintf(" (%s", totalMemory)
+					if freeMemory != "" {
+						deviceString += fmt.Sprintf(", %s free", freeMemory)
+					}
+					deviceString += ")"
+				}
+				deviceStrings = append(deviceStrings, deviceString)
+
+				gpus = append(gpus, gin.H{
+					"id":           deviceID,
+					"name":         "AMD Radeon Graphics",
+					"totalMemory":  totalMemory,
+					"freeMemory":   freeMemory,
+					"available":    true,
+				})
 			}
 		}
 	}
