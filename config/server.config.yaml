@@ -57,9 +57,8 @@ storage:
     type: sqlite
     sqlite:
         path: ./data/shepherd.db
-        pragmas:
-            cache_size: "-64000"
-            synchronous: NORMAL
+        journal_mode: WAL
+        synchronous: NORMAL
         enable_wal: true
     postgresql: null
 
@@ -68,20 +67,14 @@ mode: standalone
 master:
     enabled: false
     client_config_dir: ""
-    network_scan:
-        enabled: false
-        subnets: []
-        port_range: ""
-        timeout: 0
-        auto_discover: false
-        interval: 0
-    scheduler:
-        strategy: ""
-        max_queue_size: 0
-        task_timeout: 0
-        retry_on_failure: false
-        max_retries: 0
-    log_aggregation:
+    auto_scan: true
+    scan_interval: 300
+    scan_networks:
+        - 192.168.1.0/24
+        - 10.0.0.0/24
+    scheduling_policy: least-load
+    heartbeat_timeout: 60
+    task_queue:
         enabled: false
         max_buffer_size: 0
         flush_interval: 0
@@ -89,47 +82,13 @@ master:
 client:
     enabled: false
     master_address: ""
-    client_info:
-        id: ""
-        name: ""
-        tags: []
-        metadata: {}
-    heartbeat:
-        interval: 0
-        timeout: 0
-    conda_env:
-        enabled: false
-        conda_path: ""
-        environments: {}
+    register_token: ""
+    name: client-1
+    tags: []
+    description: ""
+    heartbeat_interval: 30
+    reconnect_delay: 5
+    max_reconnect_attempts: -1
     register_retry: 0
     heartbeat_interval: 0
     heartbeat_timeout: 0
-
-node:
-    id: ""
-    name: ""
-    role: standalone
-    master_role:
-        enabled: false
-        port: 9190
-        api_key: ""
-        ssl:
-            enabled: false
-            cert_path: ""
-            key_path: ""
-    client_role:
-        enabled: false
-        master_address: ""
-        register_retry: 0
-        heartbeat_interval: 5
-        heartbeat_timeout: 0
-    resources:
-        monitor_interval: 5
-        report_gpu: true
-        report_temperature: false
-        gpu_backend: ""
-    executor:
-        max_concurrent: 4
-        task_timeout: 300
-        allow_remote_stop: false
-        allowed_commands: []

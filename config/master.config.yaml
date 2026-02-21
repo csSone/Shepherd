@@ -2,71 +2,76 @@
 # Master 模式：管理多个 Client 节点
 
 server:
-  web_port: 9190
-  anthropic_port: 9170
-  ollama_port: 11434
-  lmstudio_port: 1234
-  host: 0.0.0.0
-  read_timeout: 60
-  write_timeout: 60
+    web_port: 9190
+    anthropic_port: 9170
+    ollama_port: 11434
+    lmstudio_port: 1234
+    host: 0.0.0.0
+    read_timeout: 60
+    write_timeout: 60
 
 # Master 配置
 master:
-  # 是否启用网络扫描自动发现 Client
-  auto_scan: false
-  # 扫描间隔（秒），0 表示只扫描一次
-  scan_interval: 300
-  # 扫描的网段（请根据实际网络环境修改）
-  scan_networks: []
-  # 任务调度策略：round-robin, least-load, resource-aware
-  scheduling_policy: least-load
-  # 心跳超时时间（秒）
-  heartbeat_timeout: 60
+    # 是否启用网络扫描自动发现 Client
+    auto_scan: true
+    # 扫描间隔（秒），0 表示只扫描一次
+    scan_interval: 300
+    # 扫描的网段
+    scan_networks:
+        - 192.168.1.0/24
+        - 10.0.0.0/24
+    # 任务调度策略：round-robin, least-load, resource-aware
+    scheduling_policy: least-load
+    # 心跳超时时间（秒）
+    heartbeat_timeout: 60
 
 # 日志配置
 log:
-  level: info
-  format: json
-  output: both
-  directory: ./logs
-  max_size: 100
-  max_backups: 3
-  max_age: 7
-  compress: true
+    level: info
+    format: json
+    output: both
+    directory: ./logs
+    max_size: 100
+    max_backups: 3
+    max_age: 7
+    compress: true
 
 # 模型配置
 model:
-  paths:
-    - ./models
-    - ~/.cache/huggingface/hub
-  auto_scan: true
-  scan_interval: 0
+    paths:
+        - ./models
+        - ~/.cache/huggingface/hub
+    auto_scan: true
+    scan_interval: 0
 
 # llama.cpp 配置
 llamacpp:
-  paths: []
+    paths:
+        - path: ./llama.cpp
+          name: Default
+          description: ""
 
 # 下载配置
 download:
-  directory: ./downloads
-  max_concurrent: 4
-  chunk_size: 1048576
-  retry_count: 3
-  timeout: 300
+    directory: ./downloads
+    max_concurrent: 4
+    chunk_size: 1048576
+    retry_count: 3
+    timeout: 300
 
 # 安全配置
 security:
-  api_key_enabled: false
-  api_key: ""
-  cors_enabled: true
-  allowed_origins:
-    - '*'
+    api_key_enabled: false
+    api_key: ""
+    cors_enabled: true
+    allowed_origins:
+        - '*'
 
 # API 兼容性
 compatibility:
-  ollama:
-    enabled: false
-    port: 11434
-  lmstudio:
-    enabled: false
-    port: 1234
+    ollama:
+        enabled: true
+        port: 11434
+    lmstudio:
+        enabled: false
+        port: 1234
