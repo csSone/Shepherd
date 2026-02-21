@@ -35,7 +35,7 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
           : await modelPathsApi.list();
 
       if (response.success) {
-        setPaths(response.data.items);
+        setPaths(response.data?.items || []);
       }
     } catch (error) {
       console.error('加载路径失败:', error);
@@ -169,7 +169,7 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
         <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
           加载中...
         </div>
-      ) : paths.length === 0 ? (
+      ) : paths?.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg">
           <FolderOpen size={36} className="text-muted-foreground mb-2" />
           <p className="text-xs text-muted-foreground">暂无配置的路径</p>
@@ -179,7 +179,7 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
         </div>
       ) : (
         <div className="space-y-2">
-          {paths.map((path, index) => (
+          {paths?.map((path, index) => (
             <PathItem
               key={`${path.path}-${index}`}
               path={path}

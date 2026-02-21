@@ -1,0 +1,15 @@
+[
+  {
+    "modelId": "gpt-oss-120b-Derestricted.MXFP4_MOE-831881cd6cbb7c2e",
+    "path": "/home/user/.cache/huggingface/hub/Oss-120b/gpt-oss-120b-Derestricted.MXFP4_MOE.gguf",
+    "size": 63387347008,
+    "favourite": false,
+    "primaryModel": {
+      "fileName": "gpt-oss-120b-Derestricted.MXFP4_MOE.gguf",
+      "name": "Gpt Oss 120b Derestricted",
+      "architecture": "gpt-oss",
+      "contextLength": 131072,
+      "embeddingLength": 2880
+    }
+  }
+]
