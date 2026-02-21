@@ -29,8 +29,14 @@ export default defineConfig({
   publicDir: 'public',
   server: {
     port: configPort,
-    // 前端独立运行，直接连接后端，不需要代理
-    // 如需跨域，在后端配置 CORS
+    // 代理 API 请求到后端服务器
+    proxy: {
+      '/api': {
+        target: 'http://localhost:9190',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
     host: true, // 监听所有地址，方便局域网访问
   },
   build: {

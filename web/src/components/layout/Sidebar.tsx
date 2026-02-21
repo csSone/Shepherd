@@ -82,8 +82,8 @@ export function Sidebar() {
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 rounded-r-full bg-current opacity-80" />
                   )}
 
-                  <Icon size={20} className={cn(isActive && 'drop-shadow-sm')} />
-                  {sidebarOpen && <span className="drop-shadow-sm">{t(item.labelKey as any)}</span>}
+                  <Icon size={20} />
+                  {sidebarOpen && <span>{t(item.labelKey as any)}</span>}
                 </Link>
               </li>
             );

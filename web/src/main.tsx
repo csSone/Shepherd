@@ -2,12 +2,15 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import './lib/i18n'
+import { i18nReady } from './lib/i18n'
 import { configLoader } from './lib/configLoader'
 import { updateApiClientUrl } from './lib/api/client'
 
 // 初始化应用
 async function initApp() {
+  // 等待 i18n 初始化完成
+  await i18nReady
+
   try {
     // 加载前端配置
     const config = await configLoader.load()

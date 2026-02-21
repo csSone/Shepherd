@@ -130,7 +130,7 @@ export function LoadModelDialog({
     llamaCppPath: '/home/user/workspace/llama.cpp/build-rocm/bin',
     mainGpu: 'default',
     capabilities: {
-      thinking: true,
+      thinking: false,  // 默认关闭，由用户根据模型类型手动启用
       tools: false,
       translation: false,
       embedding: false,
@@ -1199,76 +1199,82 @@ export function LoadModelDialog({
               </div>
             </div>
           </div>
-
-          {/* 按钮区域 */}
-          <div className="flex justify-end items-center gap-3 pt-4 border-t border-border mt-4 flex-shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              className="px-4 py-2 text-foreground hover:bg-accent rounded transition-colors disabled:opacity-50"
-            >
-              取消
-            </button>
-
-            <button
-              type="button"
-              onClick={async () => {
-                setEstimateResult('计算中...');
-
-                try {
-                  const result = await estimateVRAM.mutateAsync({
-                    modelId,
-                    llamaBinPath: params.llamaCppPath || '/home/user/workspace/llama.cpp/build-rocm/bin',
-                    ctxSize: params.ctxSize,
-                    batchSize: params.batchSize,
-                    uBatchSize: params.uBatchSize,
-                    parallel: params.parallelSlots,
-                    flashAttention: params.flashAttention,
-                    kvUnified: params.kvCacheUnified,
-                    cacheTypeK: params.kvCacheTypeK,
-                    cacheTypeV: params.kvCacheTypeV,
-                  });
-
-                  if (result.vramGB) {
-                    setEstimateResult(`约需 ${result.vramGB} GB 显存`);
-                  } else if (result.error) {
-                    setEstimateResult(`估算失败: ${result.error}`);
-                  } else {
-                    setEstimateResult('估算失败');
-                  }
-                } catch (error) {
-                  setEstimateResult(`估算出错: ${error instanceof Error ? error.message : '未知错误'}`);
-                }
-              }}
-              disabled={isLoading || estimateVRAM.isPending}
-              className="px-4 py-2 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
-            >
-              {estimateVRAM.isPending ? '计算中...' : '估算显存'}
-            </button>
-            {estimateResult && (
-              <span className="text-sm text-muted-foreground">{estimateResult}</span>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={cn(
-                'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors',
-                isLoading && 'opacity-50 cursor-not-allowed'
-              )}
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  加载中...
-                </span>
-              ) : (
-                '开始加载'
-              )}
-            </button>
-          </div>
         </form>
+
+        {/* 按钮区域 - 固定在底部 */}
+        <div className="flex justify-end items-center gap-3 px-4 py-3 border-t border-border bg-card flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-2 text-foreground hover:bg-accent rounded transition-colors disabled:opacity-50"
+          >
+            取消
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              setEstimateResult('计算中...');
+
+              try {
+                const result = await estimateVRAM.mutateAsync({
+                  modelId,
+                  llamaBinPath: params.llamaCppPath || '/home/user/workspace/llama.cpp/build-rocm/bin',
+                  ctxSize: params.ctxSize,
+                  batchSize: params.batchSize,
+                  uBatchSize: params.uBatchSize,
+                  parallel: params.parallelSlots,
+                  flashAttention: params.flashAttention,
+                  kvUnified: params.kvCacheUnified,
+                  cacheTypeK: params.kvCacheTypeK,
+                  cacheTypeV: params.kvCacheTypeV,
+                });
+
+                if (result.vramGB) {
+                  setEstimateResult(`约需 ${result.vramGB} GB 显存`);
+                } else if (result.error) {
+                  setEstimateResult(`估算失败: ${result.error}`);
+                } else {
+                  setEstimateResult('估算失败');
+                }
+              } catch (error) {
+                setEstimateResult(`估算出错: ${error instanceof Error ? error.message : '未知错误'}`);
+              }
+            }}
+            disabled={isLoading || estimateVRAM.isPending}
+            className="px-4 py-2 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
+          >
+            {estimateVRAM.isPending ? '计算中...' : '估算显存'}
+          </button>
+          {estimateResult && (
+            <span className="text-sm text-muted-foreground">{estimateResult}</span>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              // 需要手动触发表单提交
+              const form = document.querySelector('form') as HTMLFormElement;
+              if (form) form.requestSubmit();
+            }}
+            disabled={isLoading}
+            className={cn(
+              'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors',
+              isLoading && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                加载中...
+              </span>
+            ) : (
+              '开始加载'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

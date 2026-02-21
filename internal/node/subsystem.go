@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -91,7 +92,8 @@ func (sm *SubsystemManager) Start() error {
 	}
 
 	// 按依赖顺序启动子系统
-	startOrder := []string{"heartbeat", "commands", "resource"}
+	// registration 必须最先启动，因为客户端需要先注册到 Master
+	startOrder := []string{"registration", "heartbeat", "commands", "resource"}
 
 	for _, name := range startOrder {
 		if subsystem, exists := sm.subsystems[name]; exists {
@@ -371,4 +373,150 @@ func (cs *CommandSubsystem) commandLoop(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// RegistrationSubsystem handles initial registration with master
+type RegistrationSubsystem struct {
+	node    *Node
+	running bool
+	mu      sync.RWMutex
+}
+
+// NewRegistrationSubsystem creates a new registration subsystem
+func NewRegistrationSubsystem(node *Node) *RegistrationSubsystem {
+	return &RegistrationSubsystem{
+		node: node,
+	}
+}
+
+func (rs *RegistrationSubsystem) Name() string {
+	return "registration"
+}
+
+func (rs *RegistrationSubsystem) Start(ctx context.Context) error {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+
+	if rs.running {
+		return fmt.Errorf("注册子系统已在运行")
+	}
+
+	rs.running = true
+
+	// 立即执行注册
+	go rs.registerWithMaster(ctx)
+
+	return nil
+}
+
+func (rs *RegistrationSubsystem) Stop() error {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+
+	rs.running = false
+	return nil
+}
+
+func (rs *RegistrationSubsystem) IsRunning() bool {
+	rs.mu.RLock()
+	defer rs.mu.RUnlock()
+	return rs.running
+}
+
+// registerWithMaster 向 Master 注册当前节点
+func (rs *RegistrationSubsystem) registerWithMaster(ctx context.Context) {
+	// 检查是否配置了 Master 地址
+	if rs.node.config == nil || rs.node.config.MasterAddress == "" {
+		logger.Infof("未配置 Master 地址，跳过注册")
+		return
+	}
+
+	// 构建节点信息
+	nodeInfo := &NodeInfo{
+		ID:       rs.node.GetID(),
+		Name:     rs.node.GetName(),
+		Address:  rs.node.GetAddress(),
+		Port:     rs.node.GetPort(),
+		Role:     rs.node.GetRole(),
+		Status:   rs.node.GetStatus(),
+		Version:  rs.node.GetVersion(),
+		Tags:     rs.node.GetTags(),
+		Metadata: rs.node.GetMetadata(),
+		Capabilities: &NodeCapabilities{
+			SupportsLlama:  rs.node.capabilities.SupportsLlama,
+			SupportsPython: rs.node.capabilities.SupportsPython,
+			GPU:            rs.node.capabilities.GPU,
+			GPUCount:       rs.node.capabilities.GPUCount,
+			CPUCount:       rs.node.capabilities.CPUCount,
+			Memory:         rs.node.capabilities.Memory,
+			CondaEnvs:      rs.node.capabilities.CondaEnvs,
+		},
+		Resources:   rs.node.GetResources(),
+		LastSeen:    time.Now(),
+		RegisteredAt: time.Now(),
+	}
+
+	// 构建 Master URL
+	masterURL := fmt.Sprintf("%s/api/master/nodes/register", rs.node.config.MasterAddress)
+
+	// 序列化节点信息
+	body, err := json.Marshal(nodeInfo)
+	if err != nil {
+		logger.Errorf("序列化节点信息失败: %v", err)
+		return
+	}
+
+	// 创建 HTTP 客户端（带超时）
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// 重试注册逻辑
+	maxRetries := rs.node.config.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 5
+	}
+
+	retryDelay := 5 * time.Second
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			logger.Infof("注册失败，%v 后重试 (第 %d/%d 次)", retryDelay, attempt, maxRetries)
+			select {
+			case <-time.After(retryDelay):
+			case <-ctx.Done():
+				logger.Warnf("注册被取消")
+				return
+			}
+		}
+
+		// 创建 HTTP 请求
+		req, err := http.NewRequestWithContext(ctx, "POST", masterURL, bytes.NewBuffer(body))
+		if err != nil {
+			logger.Errorf("创建注册请求失败: %v", err)
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		// 发送请求
+		resp, err := client.Do(req)
+		if err != nil {
+			logger.Errorf("发送注册请求失败: %v", err)
+			continue
+		}
+
+		// 读取响应
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		// 检查响应状态
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+			logger.Infof("成功注册到 Master: %s (节点ID: %s)", rs.node.config.MasterAddress, rs.node.GetID())
+			return
+		}
+
+		logger.Errorf("注册失败: HTTP %d - %s", resp.StatusCode, string(respBody))
+	}
+
+	logger.Errorf("注册到 Master 失败，已达最大重试次数: %d", maxRetries)
 }

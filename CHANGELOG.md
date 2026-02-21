@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-21
+
+### Added
+
+#### Master-Client 分布式架构修复
+- **RegistrationSubsystem** - 新增客户端注册子系统，修复 master-client 无法连接的问题
+  - 客户端启动时自动向 `/api/master/nodes/register` 发送注册请求
+  - 包含重试逻辑（最多 5 次，每次间隔 5 秒）
+  - 发送完整的节点信息（ID、名称、地址、端口、能力、资源等）
+  - 注册成功后才开始发送心跳
+  - 修复文件：`internal/node/subsystem.go`, `internal/node/node.go`
+
+- **子系统启动顺序优化** - 确保 registration 最先启动
+  - 启动顺序：registration → heartbeat → commands → resource
+  - 客户端必须先注册到 Master 才能发送心跳
+  - 修复文件：`internal/node/subsystem.go`
+
+### Fixed
+
+- **Master-Client 连接问题** - 修复客户端节点无法连接到 Master 的根本原因
+  - 客户端之前只有心跳子系统，没有注册逻辑
+  - Master 只有在客户端先注册后才会接受心跳
+  - 现在客户端启动时会自动注册到 Master，然后才开始发送心跳
+
 ## [0.4.0] - 2025-02-21
 
 ### Added

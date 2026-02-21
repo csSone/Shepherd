@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 
 const languages = [
   { code: 'zh-CN', name: '简体中文', flag: '🇨🇳', region: '中国大陆' },
-  { code: 'en', name: 'English', flag: '🇺🇸', region: 'United States' },
+  { code: 'en-US', name: 'English', flag: '🇺🇸', region: 'United States' },
 ];
 
 const themes = [

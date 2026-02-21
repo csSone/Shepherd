@@ -69,19 +69,20 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
 
   // 更新路径
   const handleUpdate = async (data: LlamaCppPathConfig | ModelPathConfig) => {
-    if (type === 'models') {
-      try {
-        const response = await modelPathsApi.update(data as ModelPathConfig);
+    try {
+      const response =
+        type === 'llamacpp'
+          ? await llamacppPathsApi.update(data as LlamaCppPathConfig)
+          : await modelPathsApi.update(data as ModelPathConfig);
 
-        if (response.success) {
-          await loadPaths();
-        } else {
-          throw new Error(response.error || '更新失败');
-        }
-      } catch (error) {
-        console.error('更新路径失败:', error);
-        throw error;
+      if (response.success) {
+        await loadPaths();
+      } else {
+        throw new Error(response.error || '更新失败');
       }
+    } catch (error) {
+      console.error('更新路径失败:', error);
+      throw error;
     }
   };
 

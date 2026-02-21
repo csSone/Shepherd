@@ -25,7 +25,7 @@ llamacpp:
           name: Default
           description: ""
         - path: /home/user/workspace/llama.cpp/build-rocm/bin
-          name: ""
+          name: Rocm
           description: ""
         - path: /home/user/workspace/llama.cpp/build-vulkan/bin
           name: Vulkan

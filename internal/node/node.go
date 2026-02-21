@@ -597,14 +597,24 @@ func (n *Node) initSubsystems() error {
 	// 根据节点角色初始化子系统
 	switch n.role {
 	case NodeRoleClient:
-		// 客户端节点需要心跳子系统
+		// 客户端节点需要注册子系统和心跳子系统
+		registrationSubsystem := NewRegistrationSubsystem(n)
+		if err := n.subsystemManager.Register(registrationSubsystem); err != nil {
+			return fmt.Errorf("注册注册子系统失败: %w", err)
+		}
+
 		heartbeatSubsystem := NewHeartbeatSubsystem(n, 30*time.Second)
 		if err := n.subsystemManager.Register(heartbeatSubsystem); err != nil {
 			return fmt.Errorf("注册心跳子系统失败: %w", err)
 		}
 
 	case NodeRoleHybrid:
-		// Hybrid 节点同时需要心跳和命令管理子系统
+		// Hybrid 节点需要注册、心跳和命令管理子系统
+		registrationSubsystem := NewRegistrationSubsystem(n)
+		if err := n.subsystemManager.Register(registrationSubsystem); err != nil {
+			return fmt.Errorf("注册注册子系统失败: %w", err)
+		}
+
 		heartbeatSubsystem := NewHeartbeatSubsystem(n, 30*time.Second)
 		if err := n.subsystemManager.Register(heartbeatSubsystem); err != nil {
 			return fmt.Errorf("注册心跳子系统失败: %w", err)

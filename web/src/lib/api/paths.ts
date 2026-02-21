@@ -51,6 +51,12 @@ export const llamacppPathsApi = {
     apiClient.post<PathMutationResponse>('/config/llamacpp/paths', data),
 
   /**
+   * 更新 llama.cpp 路径
+   */
+  update: (data: LlamaCppPathConfig) =>
+    apiClient.put<PathMutationResponse>('/config/llamacpp/paths', data),
+
+  /**
    * 删除 llama.cpp 路径
    */
   remove: (path: string) =>

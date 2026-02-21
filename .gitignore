@@ -77,4 +77,4 @@ AGENTS.md
 # Local configuration files and directories
 config/node
 config.local
-/internal/model/config
+/internal/model/config 

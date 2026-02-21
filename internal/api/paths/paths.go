@@ -126,6 +126,67 @@ func (h *Handler) RemoveLlamaCppPath(c *gin.Context) {
 	})
 }
 
+// UpdateLlamaCppPath updates an existing llama.cpp path
+func (h *Handler) UpdateLlamaCppPath(c *gin.Context) {
+	var req struct {
+		OriginalPath string           `json:"originalPath"` // 原始路径，用于匹配
+		Path         string           `json:"path"`         // 新路径
+		Name         string           `json:"name"`
+		Description  string           `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.BadRequest(c, "Invalid request body")
+		return
+	}
+
+	// Validate new path
+	if req.Path == "" {
+		api.BadRequest(c, "Path is required")
+		return
+	}
+
+	// Normalize and validate new path
+	normalizedPath, err := h.validateAndNormalizePath(req.Path)
+	if err != nil {
+		api.BadRequest(c, fmt.Sprintf("Invalid path: %v", err))
+		return
+	}
+
+	// Load current config
+	cfg := h.configManager.Get()
+
+	// Find and update using original path
+	found := false
+	for i, p := range cfg.Llamacpp.Paths {
+		// Match by original path or by name
+		if p.Path == req.OriginalPath || (req.Name != "" && p.Name == req.Name) {
+			cfg.Llamacpp.Paths[i] = config.LlamacppPath{
+				Path:        normalizedPath,
+				Name:        req.Name,
+				Description: req.Description,
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		api.NotFound(c, "Path")
+		return
+	}
+
+	// Save config
+	if err := h.configManager.Save(cfg); err != nil {
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save config", err.Error())
+		return
+	}
+
+	api.Success(c, gin.H{
+		"message": "Llama.cpp path updated successfully",
+		"updated": cfg.Llamacpp.Paths,
+	})
+}
+
 // TestLlamaCppPath tests if a llama.cpp path is valid
 func (h *Handler) TestLlamaCppPath(c *gin.Context) {
 	var req struct {

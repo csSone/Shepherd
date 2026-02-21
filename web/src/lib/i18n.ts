@@ -56,14 +56,14 @@ export function setStoredLanguage(language: SupportedLanguage): void {
 /**
  * 初始化 i18n
  */
-i18n
+export const i18nReady = i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
     fallbackLng: DEFAULT_LANGUAGE,
     defaultNS: 'translation',
-    supportedLngs: SUPPORTED_LANGUAGES.map(lang => lang.code),
+    supportedLngs: ['zh-CN', 'en-US', 'zh', 'en'],
     interpolation: {
       escapeValue: false,
     },

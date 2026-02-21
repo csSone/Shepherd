@@ -101,6 +101,8 @@ export function PathEditDialog({
     setIsSaving(true);
     try {
       const dataToSave = {
+        // 编辑时传递原始路径用于匹配
+        ...(isEdit && { originalPath: path?.path }),
         path: formData.path.trim(),
         name: formData.name.trim() || undefined,
         description: formData.description.trim() || undefined,

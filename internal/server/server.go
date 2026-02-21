@@ -231,6 +231,7 @@ func (s *Server) setupRoutes() {
 			{
 				llamacpp.GET("", s.handlers.Paths.GetLlamaCppPaths)
 				llamacpp.POST("", s.handlers.Paths.AddLlamaCppPath)
+				llamacpp.PUT("", s.handlers.Paths.UpdateLlamaCppPath)
 				llamacpp.DELETE("", s.handlers.Paths.RemoveLlamaCppPath)
 				llamacpp.POST("/test", s.handlers.Paths.TestLlamaCppPath)
 			}
@@ -700,11 +701,11 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 						deviceStrings = append(deviceStrings, deviceString)
 
 						gpus = append(gpus, gin.H{
-							"id":           deviceID,
-							"name":         "AMD Radeon Graphics",
-							"totalMemory":  totalMemory,
-							"freeMemory":   freeMemory,
-							"available":    true,
+							"id":          deviceID,
+							"name":        "AMD Radeon Graphics",
+							"totalMemory": totalMemory,
+							"freeMemory":  freeMemory,
+							"available":   true,
 						})
 					}
 					// 提取 GPU 索引
@@ -743,11 +744,11 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 				deviceStrings = append(deviceStrings, deviceString)
 
 				gpus = append(gpus, gin.H{
-					"id":           deviceID,
-					"name":         "AMD Radeon Graphics",
-					"totalMemory":  totalMemory,
-					"freeMemory":   freeMemory,
-					"available":    true,
+					"id":          deviceID,
+					"name":        "AMD Radeon Graphics",
+					"totalMemory": totalMemory,
+					"freeMemory":  freeMemory,
+					"available":   true,
 				})
 			}
 		}
@@ -1116,15 +1117,46 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 	// 检查是否异步加载（查询参数 async=true）
 	asyncMode := c.DefaultQuery("async", "true") == "true"
 
-	var req model.LoadRequest
+	// 定义包含 capabilities 的请求结构
+	var req struct {
+		model.LoadRequest
+		Capabilities *ModelCapabilities `json:"capabilities"`
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// 使用默认值
-		req = model.LoadRequest{
+		req.LoadRequest = model.LoadRequest{
 			ModelID: id,
 			CtxSize: 4096,
 		}
 	} else {
-		req.ModelID = id
+		req.LoadRequest.ModelID = id
+	}
+
+	// 如果请求中包含 capabilities，保存到内存存储
+	if req.Capabilities != nil {
+		// 应用约束规则：rerank 和 embedding 互斥
+		if req.Capabilities.Rerank && req.Capabilities.Embedding {
+			api.BadRequest(c, "rerank 和 embedding 不能同时启用")
+			return
+		}
+
+		// 如果启用了 rerank 或 embedding，则禁用 thinking 和 tools
+		if req.Capabilities.Rerank || req.Capabilities.Embedding {
+			req.Capabilities.Thinking = false
+			req.Capabilities.Tools = false
+		}
+
+		// 保存到内存存储
+		s.capabilitiesMu.Lock()
+		s.capabilities[req.LoadRequest.ModelID] = req.Capabilities
+		s.capabilitiesMu.Unlock()
+
+		logger.Info("模型能力已更新", "modelId", req.LoadRequest.ModelID,
+			"thinking", req.Capabilities.Thinking,
+			"tools", req.Capabilities.Tools,
+			"rerank", req.Capabilities.Rerank,
+			"embedding", req.Capabilities.Embedding)
 	}
 
 	var result *model.LoadResult
@@ -1132,7 +1164,7 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 
 	if asyncMode {
 		// 异步加载
-		result, err = s.modelMgr.LoadAsync(&req)
+		result, err = s.modelMgr.LoadAsync(&req.LoadRequest)
 		if err != nil {
 			api.ErrorWithDetails(c, types.ErrInternalError, "加载模型失败", err.Error())
 			return
@@ -1160,8 +1192,8 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 			return
 		}
 	} else {
-		// 同步加载（旧模式，保持兼容性）
-		result, err = s.modelMgr.Load(&req)
+		// 同步加载
+		result, err = s.modelMgr.Load(&req.LoadRequest)
 		if err != nil {
 			api.ErrorWithDetails(c, types.ErrInternalError, "加载模型失败", err.Error())
 			return
