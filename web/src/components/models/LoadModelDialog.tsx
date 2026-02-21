@@ -541,16 +541,27 @@ export function LoadModelDialog({
         </div>
 
         {/* 预设配置按钮 */}
-        <div className="px-4 py-3 border-b border-border bg-muted flex-shrink-0">
+        <div className="px-4 py-3 border-b border-border bg-muted/50 flex-shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-foreground">预设配置:</span>
+            <span className="text-sm font-medium text-foreground mr-2">预设配置:</span>
             {Object.entries(PRESETS).map(([key, preset]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => applyPreset(preset.params)}
                 disabled={isLoading}
-                className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                  "border shadow-sm",
+                  "hover:shadow-md hover:-translate-y-px active:translate-y-0",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  // 根据预设类型使用不同的样式
+                  key === 'fast' && "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80",
+                  key === 'balanced' && "bg-primary/10 text-primary border-primary/30 hover:bg-primary/15",
+                  key === 'performance' && "bg-accent text-accent-foreground border-border hover:bg-accent/80",
+                  key === 'max' && "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/15",
+                  "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+                )}
                 title={preset.description}
               >
                 {preset.name}

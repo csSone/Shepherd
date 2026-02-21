@@ -59,8 +59,11 @@ export function useRegisterNode() {
 
   return useMutation({
     mutationFn: async (nodeInfo: NodeRegisterRequest) => {
-      const response = await apiClient.post<NodeRegisterResponse>('/master/nodes/register', nodeInfo);
-      return response;
+      const response = await apiClient.post<{
+        success: boolean;
+        data: NodeRegisterResponse;
+      }>('/master/nodes/register', nodeInfo);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nodes'] });
@@ -73,8 +76,11 @@ export function useUnregisterNode() {
 
   return useMutation({
     mutationFn: async (nodeId: string) => {
-      const response = await apiClient.delete<{ success: boolean }>(`/master/nodes/${nodeId}`);
-      return response;
+      const response = await apiClient.delete<{
+        success: boolean;
+        data?: { message: string };
+      }>(`/master/nodes/${nodeId}`);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nodes'] });
@@ -87,8 +93,11 @@ export function useSendCommand() {
 
   return useMutation({
     mutationFn: async ({ nodeId, command }: { nodeId: string; command: SendCommandRequest }) => {
-      const response = await apiClient.post<SendCommandResponse>(`/master/nodes/${nodeId}/command`, command);
-      return response;
+      const response = await apiClient.post<{
+        success: boolean;
+        data: SendCommandResponse;
+      }>(`/master/nodes/${nodeId}/command`, command);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nodes'] });

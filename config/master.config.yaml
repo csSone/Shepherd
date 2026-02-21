@@ -10,13 +10,25 @@ model:
     paths:
         - /home/user/workspace/Shepherd/models
         - /home/user/.cache/huggingface/hub
-    path_configs: []
+    path_configs:
+        - path: /home/user/.cache/huggingface/hub
+          name: ""
+          description: ""
+        - path: /home/user/workspace/LlamacppServer/build/models
+          name: ""
+          description: ""
     auto_scan: true
     scan_interval: 0
 llamacpp:
     paths:
         - path: /home/user/workspace/Shepherd/llama.cpp
           name: Default
+          description: ""
+        - path: /home/user/workspace/llama.cpp/build-rocm/bin
+          name: ""
+          description: ""
+        - path: /home/user/workspace/llama.cpp/build-vulkan/bin
+          name: Vulkan
           description: ""
 download:
     directory: /home/user/workspace/Shepherd/downloads

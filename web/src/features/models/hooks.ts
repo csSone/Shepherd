@@ -139,14 +139,17 @@ export function useScanModels() {
   return useMutation({
     mutationFn: async () => {
       const response = await apiClient.post<{
-        message: string;
-        models_found: number;
-        errors: number;
-        duration_ms: number;
-        models: Model[];
-        scan_errors: Array<{ path: string; error: string }>;
+        success: boolean;
+        data: {
+          message: string;
+          models_found: number;
+          errors: number;
+          duration_ms: number;
+          models: Model[];
+          scan_errors: Array<{ path: string; error: string }>;
+        };
       }>('/model/scan');
-      return response;
+      return response.data;
     },
     onSuccess: (data) => {
       // 扫描完成后强制刷新模型列表，清除缓存
@@ -175,11 +178,14 @@ export function useScanStatus() {
     queryKey: ['scan', 'status'],
     queryFn: async () => {
       const response = await apiClient.get<{
-        scanning: boolean;
-        progress?: number;
-        currentPath?: string;
+        success: boolean;
+        data: {
+          scanning: boolean;
+          progress?: number;
+          currentPath?: string;
+        };
       }>('/model/scan/status');
-      return response;
+      return response.data;
     },
     refetchInterval: (query) => {
       // 如果正在扫描，每秒刷新一次；否则不刷新
