@@ -1,0 +1,195 @@
+# Shepherd Web 前端独立配置
+# 此文件由前端直接读取，不依赖后端
+#
+# 重要说明：
+# - 这是前端的主配置文件
+# - 修改此文件后，重新加载前端即可生效
+
+# 目标后端服务器配置
+backend:
+  # 后端 API 地址（请根据实际情况修改）
+  urls:
+    - "http://localhost:9190"
+  # 当前使用的后端索引（0 表示第一个）
+  currentIndex: 0
+  # 连接超时时间（毫秒）
+  timeout: 30000
+  # 连接重试配置
+  retry:
+    count: 3
+    delay: 1000
+
+# 前端服务器配置
+server:
+  # 开发服务器端口
+  port: 3030
+  # 是否启用 HTTPS
+  https: false
+  # SSL 证书路径
+  sslCert: ""
+  sslKey: ""
+
+# CORS 配置
+cors:
+  # 允许的后端源（请根据实际情况修改）
+  allowedOrigins:
+    - "http://localhost:9190"
+  # 是否发送凭据
+  credentials: false
+
+# 功能开关
+features:
+  models: true
+  downloads: true
+  cluster: true
+  logs: true
+  chat: true
+  settings: true
+  dashboard: true
+
+# UI 配置
+ui:
+  theme: "auto"
+  language: "zh-CN"
+  pageSize: 20
+  pageSizeOptions:
+    - 10
+    - 20
+    - 50
+    - 100
+  virtualScrollThreshold: 100
+  animations: true
+  skeleton: true
+  breadcrumb: true
+  sidebarExpanded: true
+
+# SSE 实时事件配置
+sse:
+  endpoint: "/api/events"
+  reconnect: true
+  reconnectDelay: 2000
+  maxReconnectAttempts: -1
+  connectionTimeout: 60000
+  heartbeatInterval: 30000
+  heartbeatEnabled: true
+
+# 缓存配置
+cache:
+  modelsTTL: 60000
+  clientsTTL: 30000
+  downloadsTTL: 5000
+  configTTL: 300000
+  persistent: true
+  prefix: "shepherd_web_"
+  versioning: true
+
+# 日志配置
+logging:
+  level: "info"
+  console: true
+  remote: false
+  remoteEndpoint: "/api/logs"
+  batchSize: 50
+  flushInterval: 5000
+
+# OpenAI API 配置
+openai:
+  endpoint: "/v1/chat/completions"
+  defaultModel: ""
+  temperature: 0.7
+  maxTokens: 4096
+  topP: 0.9
+  frequencyPenalty: 0
+  presencePenalty: 0
+  streamTimeout: 120000
+
+# 性能配置
+performance:
+  monitoring: false
+  sampleRate: 0.1
+  preloading: true
+  preloadResources:
+    - "/api/config"
+    - "/api/models"
+  virtualScroll: true
+  codeSplitting: true
+  lazyImageThreshold: 1024
+
+# 安全配置
+security:
+  apiKey: ""
+  cspEnabled: false
+  xssProtection: true
+  clickjackingProtection: true
+  strictTransportSecurity: false
+  requestSigning: false
+
+# 错误处理配置
+errors:
+  showDialog: true
+  showDetails: true
+  reporting: false
+  reportingEndpoint: "/api/errors"
+  supportEmail: ""
+
+# 通知配置
+notifications:
+  enabled: true
+  desktop: true
+  sound: false
+  duration: 5000
+  defaultTypes:
+    - "model"
+    - "download"
+    - "system"
+    - "error"
+  requestPermission: true
+
+# WebSocket 配置
+websocket:
+  enabled: false
+  endpoint: "/api/ws"
+  heartbeatInterval: 30000
+  reconnectInterval: 5000
+
+# 开发工具配置
+devtools:
+  debug: false
+  reactDevTools: true
+  reduxDevTools: false
+  showPerformance: false
+  logNetworkRequests: false
+
+# 布局配置
+layout:
+  headerHeight: 60
+  sidebarWidth: 260
+  sidebarCollapsedWidth: 70
+  contentMaxWidth: 1400
+  stickyHeader: true
+  stickySidebar: true
+
+# 导入导出配置
+importExport:
+  importEnabled: true
+  exportEnabled: true
+  importFormats:
+    - "json"
+    - "csv"
+  exportFormats:
+    - "json"
+    - "csv"
+  maxExportRows: 10000
+
+# 上传配置
+upload:
+  maxFileSize: 524288000
+  chunkSize: 5242880
+  chunked: true
+  timeout: 300000
+  allowedTypes:
+    - ".gguf"
+    - ".bin"
+    - ".json"
+    - ".txt"
+    - ".md"
