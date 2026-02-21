@@ -1,0 +1,7 @@
+# 忽略所有本地配置文件
+*.yaml
+*.json
+
+# 保留示例配置文件（以 .example 结尾）
+!.example.yaml
+!.example.json
