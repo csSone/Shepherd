@@ -164,13 +164,13 @@ main() {
             print_info "启动 Master 模式..."
             ;;
         client)
-            if [ -z "$MASTER_ADDR" ]; then
-                print_error "Client 模式需要指定 Master 地址 (--master)"
-                print_info "示例: $0 client --master http://192.168.1.100:9190"
-                exit 1
-            fi
             print_info "启动 Client 模式..."
-            print_info "Master 地址: ${MASTER_ADDR}"
+
+            if [ -n "$MASTER_ADDR" ]; then
+                print_info "Master 地址: ${MASTER_ADDR}"
+            else
+                print_info "将从配置文件读取 Master 地址"
+            fi
 
             if [ -n "$CLIENT_NAME" ]; then
                 print_info "Client 名称: ${CLIENT_NAME}"
@@ -198,7 +198,11 @@ main() {
     echo "=========================================="
     echo "  模式: ${MODE}"
     if [ "$MODE" = "client" ]; then
-        echo "  Master: ${MASTER_ADDR}"
+        if [ -n "$MASTER_ADDR" ]; then
+            echo "  Master: ${MASTER_ADDR}"
+        else
+            echo "  Master: (从配置文件读取)"
+        fi
     fi
     echo "=========================================="
     echo ""
