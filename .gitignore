@@ -78,6 +78,5 @@ AGENTS.md
 config/*.yaml
 config/*.json
 config.local/
-internal/model/config/*.yaml
-internal/model/config/*.json
-internal/model/config.local/*.png
+./internal/model/config/*.yaml
+./internal/model/config/*.json
