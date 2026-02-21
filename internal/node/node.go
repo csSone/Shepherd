@@ -4,10 +4,12 @@ package node
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/shepherd-project/shepherd/Shepherd/internal/version"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 // Node represents a distributed node in the Shepherd system
@@ -42,13 +44,13 @@ type Node struct {
 	cancel  context.CancelFunc
 
 	// Subsystems
-	resource          *ResourceMonitor
-	subsystemManager  *SubsystemManager
+	resource         *ResourceMonitor
+	subsystemManager *SubsystemManager
 
 	// Client registry (for Master role)
-	clientRegistry  *clientRegistry
-	commandQueue    *commandQueue
-	commandResults  *commandResultStore
+	clientRegistry *clientRegistry
+	commandQueue   *commandQueue
+	commandResults *commandResultStore
 }
 
 // NewNode creates a new Node instance
@@ -84,20 +86,27 @@ func NewNode(config *NodeConfig) (*Node, error) {
 		cancel:    cancel,
 	}
 
-	// Initialize capabilities
+	// 检测系统资源
+	cpuCount := runtime.NumCPU()
+	var memoryTotal int64 = 1024 * 1024 * 1024 // 1GB default
+	if vmStat, err := mem.VirtualMemory(); err == nil {
+		memoryTotal = int64(vmStat.Total)
+	}
+
+	// Initialize capabilities with detected system resources
 	node.capabilities = &NodeCapabilities{
 		SupportsLlama:  true,
 		SupportsPython: true,
 		GPU:            false,
-		CPUCount:       1,
-		Memory:         1024 * 1024 * 1024, // 1GB default
+		CPUCount:       cpuCount,
+		Memory:         memoryTotal,
 	}
 
-	// Initialize resources
+	// Initialize resources with detected system resources
 	node.resources = &NodeResources{
-		CPUTotal:    1000,                    // 1 core in millicores
-		MemoryTotal: 1024 * 1024 * 1024,      // 1GB
-		DiskTotal:   10 * 1024 * 1024 * 1024, // 10GB
+		CPUTotal:    int64(cpuCount) * 1000, // Convert to millicores
+		MemoryTotal: memoryTotal,
+		DiskTotal:   10 * 1024 * 1024 * 1024, // 10GB (will be updated by resource monitor)
 		GPUInfo:     make([]GPUInfo, 0),
 		LoadAverage: make([]float64, 3),
 	}
