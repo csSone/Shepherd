@@ -125,7 +125,7 @@ scripts\windows\build.bat
 make build
 ```
 
-**更多脚本信息请查看：** [scripts/README.md](scripts/README.md)
+**更多脚本信息请查看：** [doc/scripts.md](doc/scripts.md)
 
 ### 使用 Makefile
 
@@ -207,7 +207,7 @@ ui:
   pageSize: 20
 ```
 
-前端现在完全独立运行，不依赖后端配置。详见 [web/DEPLOYMENT.md](web/DEPLOYMENT.md) 和 [web/DEVELOPMENT.md](web/DEVELOPMENT.md)。
+前端现在完全独立运行，不依赖后端配置。详见 [doc/web/deployment.md](doc/web/deployment.md) 和 [doc/web/development.md](doc/web/development.md)。
 
 **功能状态说明：**
 - ✅ 已实现：模型管理、下载管理、聊天、设置、仪表盘、路径配置
@@ -322,7 +322,7 @@ REM 运行前先编译
 scripts\windows\run.bat standalone -b
 ```
 
-**详细文档:** [scripts/README.md](scripts/README.md)
+**详细文档:** [doc/scripts.md](doc/scripts.md)
 
 </details>
 
@@ -649,7 +649,7 @@ Shepherd/
 │   ├── shepherd-standalone-*.log
 │   ├── shepherd-master-*.log
 │   └── shepherd-client-*.log
-└── docs/                  # 项目文档
+└── doc/                   # 项目文档
 ```
 
 ---
@@ -700,13 +700,12 @@ Shepherd 采用了多层防护确保系统稳定运行：
 
 | 文档 | 描述 |
 |------|------|
-| [编译和安装](docs/06-编译和安装.md) | 详细编译指南 |
-| [项目概述](docs/01-项目概述.md) | 项目背景和目标 |
-| [架构设计](docs/03-架构设计.md) | 系统架构说明 |
-| [实施路线图](docs/04-实施路线图.md) | 开发进度和计划 |
-| [API 参考](docs/05-API参考.md) | API 接口文档 |
-| [Web 前端部署](web/DEPLOYMENT.md) | 前端部署指南 |
-| [Web 前端开发](web/DEVELOPMENT.md) | 前端开发文档 |
+| [贡献指南](doc/contributing.md) | 贡献指南 |
+| [安全策略](doc/security.md) | 安全策略 |
+| [AI 代理指南](doc/agents.md) | AI 编码代理指南 |
+| [脚本总览](doc/scripts.md) | 脚本文档总览 |
+| [Web 前端部署](doc/web/deployment.md) | 前端部署指南 |
+| [Web 前端开发](doc/web/development.md) | 前端开发文档 |
 
 ---
 
@@ -831,7 +830,7 @@ make clean
 
 ### 贡献指南
 
-欢迎贡献！请查看 [贡献指南](CONTRIBUTING.md)。
+欢迎贡献！请查看 [贡献指南](doc/contributing.md)。
 
 1. Fork 本仓库
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
