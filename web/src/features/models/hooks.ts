@@ -15,10 +15,11 @@ export function useModels() {
   return useQuery<Model[]>({
     queryKey: ['models'],
     queryFn: async (): Promise<Model[]> => {
-      const response = await apiClient.get('/models') as ModelListResponse;
+      const response = await apiClient.get<{ success: boolean; data: ModelListResponse }>('/models');
+      const data = response.data;
       // 调试日志：检查返回的数据
-      console.log('[useModels] 获取到模型列表:', response.models.length, '个模型');
-      const qwenModel = response.models.find((m: Model) => m.name.includes('Qwen3.5-397B'));
+      console.log('[useModels] 获取到模型列表:', data.models.length, '个模型');
+      const qwenModel = data.models.find((m: Model) => m.name.includes('Qwen3.5-397B'));
       if (qwenModel) {
         console.log('[useModels] Qwen3.5-397B 模型数据:', {
           name: qwenModel.name,
@@ -28,7 +29,7 @@ export function useModels() {
           mmprojPath: qwenModel.mmprojPath,
         });
       }
-      return response.models;
+      return data.models;
     },
     staleTime: 5 * 1000, // 5 秒后数据视为过期，会更频繁刷新
     refetchOnWindowFocus: true, // 窗口获得焦点时刷新
@@ -42,8 +43,8 @@ export function useModel(modelId: string) {
   return useQuery({
     queryKey: ['models', modelId],
     queryFn: async () => {
-      const response = await apiClient.get<{ model: Model }>(`/models/${modelId}`);
-      return response.model;
+      const response = await apiClient.get<{ success: boolean; data: { model: Model } }>(`/models/${modelId}`);
+      return response.data.model;
     },
     enabled: !!modelId,
   });
@@ -271,8 +272,8 @@ export function useGPUs() {
   return useQuery<SystemGPUListResponse>({
     queryKey: ['system', 'gpus'],
     queryFn: async () => {
-      const response = await apiClient.get<SystemGPUListResponse>('/system/gpus');
-      return response;
+      const response = await apiClient.get<{ success: boolean; data: SystemGPUListResponse }>('/system/gpus');
+      return response.data;
     },
     staleTime: 60 * 1000, // GPU 信息缓存 1 分钟
     refetchOnWindowFocus: false,
@@ -301,8 +302,8 @@ export function useLlamacppBackends() {
   return useQuery({
     queryKey: ['system', 'llamacpp-backends'],
     queryFn: async () => {
-      const response = await apiClient.get<LlamacppBackendListResponse>('/system/llamacpp-backends');
-      return response.backends;
+      const response = await apiClient.get<{ success: boolean; data: LlamacppBackendListResponse }>('/system/llamacpp-backends');
+      return response.data.backends;
     },
     staleTime: 60 * 1000, // 后端列表缓存 1 分钟
     refetchOnWindowFocus: false,
@@ -316,8 +317,8 @@ export function useModelCapabilities(modelId: string) {
   return useQuery({
     queryKey: ['models', 'capabilities', modelId],
     queryFn: async () => {
-      const response = await apiClient.get<{ capabilities: ModelCapabilities }>('/models/capabilities/get', { modelId });
-      return response.capabilities;
+      const response = await apiClient.get<{ success: boolean; data: { capabilities: ModelCapabilities } }>('/models/capabilities/get', { modelId });
+      return response.data.capabilities;
     },
     enabled: !!modelId,
     staleTime: 10 * 60 * 1000, // 能力配置缓存 10 分钟
@@ -369,17 +370,13 @@ export interface EstimateVRAMParams {
 }
 
 /**
- * 显存估算响应
+ * 显存估算响应数据
  */
-export interface EstimateVRAMResponse {
+export interface EstimateVRAMData {
   success: boolean;
-  data?: {
-    vram?: string;      // "60565"
-    vramMB?: number;    // 60565
-    vramGB?: string;    // "59.15"
-    error?: string;
-    details?: string;
-  };
+  vram?: string;      // "60565"
+  vramMB?: number;    // 60565
+  vramGB?: string;    // "59.15"
   error?: string;
   details?: string;
 }
@@ -390,11 +387,11 @@ export interface EstimateVRAMResponse {
 export function useEstimateVRAM() {
   return useMutation({
     mutationFn: async (params: EstimateVRAMParams) => {
-      const response = await apiClient.post<EstimateVRAMResponse>(
+      const response = await apiClient.post<{ success: boolean; data: EstimateVRAMData }>(
         '/models/vram/estimate',
         params
       );
-      return response;
+      return response.data;
     },
   });
 }

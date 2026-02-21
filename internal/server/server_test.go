@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,11 +67,14 @@ func TestServerHandleServerInfo(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
-	assert.Equal(t, "1.0.0", response["version"])
-	assert.Equal(t, "Shepherd", response["name"])
-	assert.Equal(t, "running", response["status"])
+	assert.Equal(t, true, response["success"])
+	data, ok := response["data"].(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "1.0.0", data["version"])
+	assert.Equal(t, "Shepherd", data["name"])
+	assert.Equal(t, "running", data["status"])
 
-	ports, ok := response["ports"].(map[string]interface{})
+	ports, ok := data["ports"].(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, float64(8080), ports["web"])
 	assert.Equal(t, float64(8070), ports["anthropic"])
@@ -109,28 +113,28 @@ func TestServerRoutes(t *testing.T) {
 
 		// Model routes - 注意：测试中没有预加载模型，所以 test-id 返回错误状态码是正确的
 		{"List models", "GET", "/api/models", http.StatusOK},
-		{"Get model", "GET", "/api/models/test-id", http.StatusNotFound}, // 模型不存在
-		{"Load model", "POST", "/api/models/test-id/load", http.StatusInternalServerError}, // 模型不存在时加载失败
+		{"Get model", "GET", "/api/models/test-id", http.StatusNotFound},                       // 模型不存在
+		{"Load model", "POST", "/api/models/test-id/load", http.StatusInternalServerError},     // 模型不存在时加载失败
 		{"Unload model", "POST", "/api/models/test-id/unload", http.StatusInternalServerError}, // 模型不存在时卸载失败
-		{"Set alias", "PUT", "/api/models/test-id/alias", http.StatusBadRequest}, // 缺少请求体
-		{"Set favourite", "PUT", "/api/models/test-id/favourite", http.StatusBadRequest}, // 缺少请求体
+		{"Set alias", "PUT", "/api/models/test-id/alias", http.StatusBadRequest},               // 缺少请求体
+		{"Set favourite", "PUT", "/api/models/test-id/favourite", http.StatusBadRequest},       // 缺少请求体
 
 		// Scan routes
-		{"Scan models", "POST", "/api/scan", http.StatusOK},
-		{"Scan status", "GET", "/api/scan/status", http.StatusOK},
+		{"Scan models", "POST", "/api/model/scan", http.StatusOK},
+		{"Scan status", "GET", "/api/model/scan/status", http.StatusOK},
 
 		// Download routes
 		{"List downloads", "GET", "/api/downloads", http.StatusOK},
-		{"Create download", "POST", "/api/downloads", http.StatusOK},
-		{"Get download", "GET", "/api/downloads/test-id", http.StatusOK},
-		{"Pause download", "POST", "/api/downloads/test-id/pause", http.StatusOK},
-		{"Resume download", "POST", "/api/downloads/test-id/resume", http.StatusOK},
-		{"Delete download", "DELETE", "/api/downloads/test-id", http.StatusOK},
+		{"Create download", "POST", "/api/downloads", http.StatusCreated},                 // 201 Created
+		{"Get download", "GET", "/api/downloads/test-id", http.StatusNotFound},            // 下载不存在
+		{"Pause download", "POST", "/api/downloads/test-id/pause", http.StatusNotFound},   // 下载不存在
+		{"Resume download", "POST", "/api/downloads/test-id/resume", http.StatusNotFound}, // 下载不存在
+		{"Delete download", "DELETE", "/api/downloads/test-id", http.StatusNotFound},      // 下载不存在
 
 		// Process routes
 		{"List processes", "GET", "/api/processes", http.StatusOK},
-		{"Get process", "GET", "/api/processes/test-id", http.StatusOK},
-		{"Stop process", "POST", "/api/processes/test-id/stop", http.StatusOK},
+		{"Get process", "GET", "/api/processes/test-id", http.StatusNotFound},                   // 进程不存在
+		{"Stop process", "POST", "/api/processes/test-id/stop", http.StatusInternalServerError}, // 进程停止失败（进程不存在是内部错误）
 
 		// Note: SSE endpoint /api/events is tested separately
 
@@ -143,7 +147,25 @@ func TestServerRoutes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			var body string
+			// 为需要请求体的端点提供空 JSON 对象
+			if strings.Contains(tt.path, "/api/config") && tt.method == "PUT" {
+				body = "{}"
+			} else if strings.Contains(tt.path, "/api/scan") && tt.method == "POST" {
+				body = "{}"
+			} else if strings.Contains(tt.path, "/api/downloads") && tt.method == "POST" {
+				// Create download 需要特定的参数，但我们只测试路由存在
+				body = `{"url": "http://example.com/model.gguf", "target_path": "/tmp"}`
+			}
+
+			var req *http.Request
+			if body != "" {
+				req = httptest.NewRequest(tt.method, tt.path, strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req = httptest.NewRequest(tt.method, tt.path, nil)
+			}
+
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 

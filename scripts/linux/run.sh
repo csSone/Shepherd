@@ -50,9 +50,10 @@ show_help() {
     -h, --help     显示此帮助信息
     -b, --build    运行前先编译
     -v, --version  显示版本信息
+    --config PATH  指定配置文件路径
 
 Client 模式选项:
-    --master URL   Master 地址 (必需)
+    --master URL   Master 地址 (可选，也可从配置文件读取)
     --name NAME    Client 名称 (可选)
     --tags TAGS    Client 标签，逗号分隔 (可选)
 
@@ -63,11 +64,20 @@ Client 模式选项:
     # Master 模式
     $0 master
 
-    # Client 模式
+    # Client 模式（从命令行指定 Master 地址）
     $0 client --master http://192.168.1.100:9190 --name client-1
+
+    # Client 模式（从配置文件读取 Master 地址）
+    $0 client
 
     # 运行前先编译
     $0 standalone -b
+
+    # 使用自定义配置文件
+    $0 standalone --config config/node/standalone.config.yaml
+
+    # 使用示例配置
+    $0 master --config config/example/master.config.yaml
 
 EOF
 }
@@ -105,6 +115,7 @@ main() {
     local MASTER_ADDR=""
     local CLIENT_NAME=""
     local CLIENT_TAGS=""
+    local CONFIG_PATH=""
 
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -123,6 +134,10 @@ main() {
                 ;;
             -v|--version)
                 show_version
+                ;;
+            --config)
+                CONFIG_PATH="$2"
+                shift 2
                 ;;
             --master)
                 MASTER_ADDR="$2"
@@ -159,6 +174,29 @@ main() {
     # 检查二进制文件
     check_binary
 
+    # 自动检测 config/node 下的配置文件
+    if [ -z "$CONFIG_PATH" ]; then
+        local NODE_CONFIG="${PROJECT_DIR}/config/node/${MODE}.config.yaml"
+        if [ -f "$NODE_CONFIG" ]; then
+            CONFIG_PATH="$NODE_CONFIG"
+            print_info "使用配置文件: ${CONFIG_PATH}"
+        else
+            print_info "未找到 node 配置文件，使用默认配置"
+        fi
+    else
+        # 验证自定义配置文件是否存在
+        if [ ! -f "$CONFIG_PATH" ]; then
+            # 尝试相对于项目目录的路径
+            if [ -f "${PROJECT_DIR}/${CONFIG_PATH}" ]; then
+                CONFIG_PATH="${PROJECT_DIR}/${CONFIG_PATH}"
+            else
+                print_error "配置文件不存在: ${CONFIG_PATH}"
+                exit 1
+            fi
+        fi
+        print_info "使用自定义配置文件: ${CONFIG_PATH}"
+    fi
+
     case "$MODE" in
         master)
             print_info "启动 Master 模式..."
@@ -187,9 +225,14 @@ main() {
             ;;
     esac
 
-    # 构建命令参数（使用位置参数）
+    # 构建命令参数
     local ARGS=()
     ARGS+=("${MODE}")
+
+    # 添加配置文件参数
+    if [ -n "${CONFIG_PATH}" ]; then
+        ARGS+=("--config" "${CONFIG_PATH}")
+    fi
 
     # 显示启动信息
     echo ""

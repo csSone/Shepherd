@@ -3,13 +3,13 @@ package filesystem
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 )
 
@@ -44,15 +44,12 @@ func (h *Handler) ListDirectory(c *gin.Context) {
 	// 如果没有指定路径,返回系统根目录列表
 	if path == "" {
 		roots := h.getSystemRoots()
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data": gin.H{
-				"currentPath": "",
-				"parentPath":  "",
-				"folders":     roots,
-				"files":       []DirectoryItem{},
-				"roots":       roots,
-			},
+		api.Success(c, gin.H{
+			"currentPath": "",
+			"parentPath":  "",
+			"folders":     roots,
+			"files":       []DirectoryItem{},
+			"roots":       roots,
 		})
 		return
 	}
@@ -61,10 +58,7 @@ func (h *Handler) ListDirectory(c *gin.Context) {
 	cleanPath, err := h.sanitizePath(path)
 	if err != nil {
 		logger.Errorf("路径验证失败: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("无效的路径: %v", err),
-		})
+		api.BadRequest(c, fmt.Sprintf("无效的路径: %v", err))
 		return
 	}
 
@@ -72,27 +66,21 @@ func (h *Handler) ListDirectory(c *gin.Context) {
 	fileInfo, err := os.Stat(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			c.JSON(http.StatusOK, gin.H{
-				"success": true,
-				"data": gin.H{
-					"currentPath": cleanPath,
-					"parentPath":  filepath.Dir(cleanPath),
-					"folders":     []DirectoryItem{},
-					"files":       []DirectoryItem{},
-					"error":       "目录不存在",
-				},
-			})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data": gin.H{
+			api.Success(c, gin.H{
 				"currentPath": cleanPath,
 				"parentPath":  filepath.Dir(cleanPath),
 				"folders":     []DirectoryItem{},
 				"files":       []DirectoryItem{},
-				"error":       "无法访问目录",
-			},
+				"error":       "目录不存在",
+			})
+			return
+		}
+		api.Success(c, gin.H{
+			"currentPath": cleanPath,
+			"parentPath":  filepath.Dir(cleanPath),
+			"folders":     []DirectoryItem{},
+			"files":       []DirectoryItem{},
+			"error":       "无法访问目录",
 		})
 		return
 	}
@@ -105,15 +93,12 @@ func (h *Handler) ListDirectory(c *gin.Context) {
 	// 读取目录内容
 	entries, err := os.ReadDir(cleanPath)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data": gin.H{
-				"currentPath": cleanPath,
-				"parentPath":  filepath.Dir(cleanPath),
-				"folders":     []DirectoryItem{},
-				"files":       []DirectoryItem{},
-				"error":       "无法读取目录内容",
-			},
+		api.Success(c, gin.H{
+			"currentPath": cleanPath,
+			"parentPath":  filepath.Dir(cleanPath),
+			"folders":     []DirectoryItem{},
+			"files":       []DirectoryItem{},
+			"error":       "无法读取目录内容",
 		})
 		return
 	}
@@ -157,10 +142,7 @@ func (h *Handler) ListDirectory(c *gin.Context) {
 		Files:       files,
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    response,
-	})
+	api.Success(c, response)
 }
 
 // sanitizePath 清理和验证路径,防止路径遍历攻击
@@ -230,17 +212,14 @@ func (h *Handler) ValidatePath(c *gin.Context) {
 
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "路径参数缺失",
-		})
+		api.BadRequest(c, "路径参数缺失")
 		return
 	}
 
 	// 验证路径
 	cleanPath, err := h.sanitizePath(req.Path)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		api.Success(c, gin.H{
 			"success": false,
 			"valid":   false,
 			"error":   err.Error(),
@@ -251,7 +230,7 @@ func (h *Handler) ValidatePath(c *gin.Context) {
 	// 检查路径是否存在
 	fileInfo, err := os.Stat(cleanPath)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		api.Success(c, gin.H{
 			"success": false,
 			"valid":   false,
 			"exists":  false,
@@ -262,7 +241,7 @@ func (h *Handler) ValidatePath(c *gin.Context) {
 
 	// 检查是否为目录
 	if !fileInfo.IsDir() {
-		c.JSON(http.StatusOK, gin.H{
+		api.Success(c, gin.H{
 			"success": false,
 			"valid":   false,
 			"exists":  true,
@@ -273,7 +252,7 @@ func (h *Handler) ValidatePath(c *gin.Context) {
 
 	// 检查可读权限
 	if !isReadable(cleanPath) {
-		c.JSON(http.StatusOK, gin.H{
+		api.Success(c, gin.H{
 			"success": false,
 			"valid":   false,
 			"exists":  true,
@@ -282,7 +261,7 @@ func (h *Handler) ValidatePath(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"success":       true,
 		"valid":         true,
 		"exists":        true,

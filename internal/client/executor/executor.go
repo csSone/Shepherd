@@ -83,7 +83,6 @@ func (e *Executor) Stop() {
 	e.cancel()
 
 	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	// Cancel all running tasks
 	for _, task := range e.runningTasks {
@@ -96,6 +95,12 @@ func (e *Executor) Stop() {
 			proc.cmd.Process.Kill()
 		}
 	}
+
+	// Clear the maps
+	e.runningTasks = make(map[string]*runningTask)
+	e.runningProcesses = make(map[string]*runningProcess)
+
+	e.mu.Unlock()
 
 	e.wg.Wait()
 }

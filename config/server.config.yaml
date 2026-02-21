@@ -8,38 +8,26 @@ server:
     write_timeout: 60
 model:
     paths:
-        - ./models
-        - ~/.cache/huggingface/hub
-    path_configs:
-        - path: /home/user/.cache/huggingface/hub
-          name: 测试目录
-          description: ""
-        - path: /home/user/workspace/LlamacppServer/build/models
-          name: ""
-          description: ""
+        - /home/user/workspace/Shepherd/models
+        - /home/user/.cache/huggingface/hub
+    path_configs: []
     auto_scan: true
     scan_interval: 0
 llamacpp:
     paths:
-        - path: ./llama.cpp
+        - path: /home/user/workspace/Shepherd/llama.cpp
           name: Default
           description: ""
-        - path: /home/user/workspace/llama.cpp/build-rocm/bin
-          name: Rocm后端
-          description: ""
-        - path: /home/user/workspace/llama.cpp/build-vulkan/bin
-          name: VulKan后端
-          description: ""
 download:
-    directory: ./downloads
+    directory: /home/user/workspace/Shepherd/downloads
     max_concurrent: 4
     chunk_size: 1048576
     retry_count: 3
     timeout: 300
 model_repo:
-    endpoint: hf-mirror.com
+    endpoint: huggingface.co
     token: ""
-    timeout: 0
+    timeout: 30
 security:
     api_key_enabled: false
     api_key: ""
@@ -48,8 +36,8 @@ security:
         - '*'
 compatibility:
     ollama:
-        enabled: false
-        port: 11435
+        enabled: true
+        port: 11434
     lmstudio:
         enabled: false
         port: 1234
@@ -57,15 +45,15 @@ log:
     level: info
     format: json
     output: both
-    directory: ./logs
+    directory: /home/user/workspace/Shepherd/logs
     max_size: 100
     max_backups: 3
     max_age: 7
     compress: true
 storage:
-    type: sqlite
+    type: memory
     sqlite:
-        path: ./data/shepherd.db
+        path: /home/user/workspace/Shepherd/Shepherd/data/shepherd.db
         pragmas:
             cache_size: "-64000"
             synchronous: NORMAL
@@ -74,24 +62,26 @@ storage:
 mode: standalone
 master:
     enabled: false
-    client_config_dir: ""
+    client_config_dir: /home/user/workspace/Shepherd/config/clients
     network_scan:
         enabled: false
-        subnets: []
-        port_range: ""
-        timeout: 0
+        subnets:
+            - 192.168.1.0/24
+            - 10.0.0.0/8
+        port_range: 9191-9200
+        timeout: 5
         auto_discover: false
         interval: 0
     scheduler:
-        strategy: ""
-        max_queue_size: 0
-        task_timeout: 0
-        retry_on_failure: false
-        max_retries: 0
+        strategy: round_robin
+        max_queue_size: 100
+        task_timeout: 300
+        retry_on_failure: true
+        max_retries: 3
     log_aggregation:
-        enabled: false
-        max_buffer_size: 0
-        flush_interval: 0
+        enabled: true
+        max_buffer_size: 1048576
+        flush_interval: 10
 client:
     enabled: false
     master_address: ""
@@ -99,19 +89,22 @@ client:
         id: ""
         name: ""
         tags: []
-        metadata: {}
+        metadata:
+            arch: amd64
+            os: linux
     heartbeat:
-        interval: 0
-        timeout: 0
+        interval: 30
+        timeout: 90
     conda_env:
         enabled: false
         conda_path: ""
-        environments: {}
-    register_retry: 0
-    heartbeat_interval: 0
-    heartbeat_timeout: 0
+        environments:
+            shepherd: ""
+    register_retry: 3
+    heartbeat_interval: 5
+    heartbeat_timeout: 15
 node:
-    id: ""
+    id: auto
     name: ""
     role: standalone
     master_role:
@@ -125,16 +118,22 @@ node:
     client_role:
         enabled: false
         master_address: ""
-        register_retry: 0
+        register_retry: 3
         heartbeat_interval: 5
-        heartbeat_timeout: 0
+        heartbeat_timeout: 15
     resources:
         monitor_interval: 5
         report_gpu: true
-        report_temperature: false
-        gpu_backend: ""
+        report_temperature: true
+        gpu_backend: auto
     executor:
         max_concurrent: 4
-        task_timeout: 300
-        allow_remote_stop: false
-        allowed_commands: []
+        task_timeout: 3600
+        allow_remote_stop: true
+        allowed_commands:
+            - load_model
+            - unload_model
+            - run_llamacpp
+            - stop_process
+            - scan_models
+            - collect_logs

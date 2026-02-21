@@ -54,7 +54,6 @@ export interface CreateDownloadParams {
  * 下载列表响应
  */
 export interface DownloadListResponse {
-  tasks: DownloadTask[];
+  downloads: DownloadTask[];
   total: number;
-  active: number;
 }

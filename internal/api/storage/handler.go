@@ -3,11 +3,12 @@ package storage
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
 )
 
 // Handler handles storage API requests
@@ -27,12 +28,9 @@ func NewHandler(configManager *config.Manager, storageMgr *storage.Manager) *Han
 // GetStorageConfig returns current storage configuration
 func (h *Handler) GetStorageConfig(c *gin.Context) {
 	cfg := h.configManager.Get()
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"config": cfg.Storage,
-			"stats":  h.getStats(),
-		},
+	api.Success(c, gin.H{
+		"config": cfg.Storage,
+		"stats":  h.getStats(),
 	})
 }
 
@@ -40,28 +38,19 @@ func (h *Handler) GetStorageConfig(c *gin.Context) {
 func (h *Handler) UpdateStorageConfig(c *gin.Context) {
 	var req storage.StorageConfig
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-		})
+		api.BadRequest(c, "Invalid request body")
 		return
 	}
 
 	// Validate storage type
 	if req.Type != storage.StorageTypeMemory && req.Type != storage.StorageTypeSQLite {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Storage type must be 'memory' or 'sqlite'",
-		})
+		api.BadRequest(c, "Storage type must be 'memory' or 'sqlite'")
 		return
 	}
 
 	// Validate SQLite config if type is sqlite
 	if req.Type == storage.StorageTypeSQLite && req.SQLite == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "SQLite configuration is required when type is 'sqlite'",
-		})
+		api.BadRequest(c, "SQLite configuration is required when type is 'sqlite'")
 		return
 	}
 
@@ -71,36 +60,27 @@ func (h *Handler) UpdateStorageConfig(c *gin.Context) {
 
 	// Save config
 	if err := h.configManager.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to save configuration",
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save configuration", err.Error())
 		return
 	}
 
 	// Note: Storage backend changes require server restart to take effect
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Storage configuration updated. Restart the server for changes to take effect.",
-			"config":  req,
-		},
+	api.Success(c, gin.H{
+		"message": "Storage configuration updated. Restart the server for changes to take effect.",
+		"config":  req,
 	})
 }
 
 // GetStats returns storage statistics
 func (h *Handler) GetStats(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    h.getStats(),
-	})
+	api.Success(c, h.getStats())
 }
 
 // getStats retrieves storage statistics
 func (h *Handler) getStats() map[string]interface{} {
 	if h.storageMgr == nil {
 		return map[string]interface{}{
-			"type": "unknown",
+			"type":  "unknown",
 			"error": "Storage manager not initialized",
 		}
 	}
@@ -130,10 +110,7 @@ func (h *Handler) getStats() map[string]interface{} {
 // GetConversations returns all conversations (with pagination)
 func (h *Handler) GetConversations(c *gin.Context) {
 	if h.storageMgr == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"success": false,
-			"error":   "Storage not initialized",
-		})
+		api.Error(c, types.ErrInternalError, "Storage not initialized")
 		return
 	}
 
@@ -156,40 +133,28 @@ func (h *Handler) GetConversations(c *gin.Context) {
 	store := h.storageMgr.GetStore()
 	convs, err := store.ListConversations(c.Request.Context(), limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to retrieve conversations",
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to retrieve conversations", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"items":  convs,
-			"count":  len(convs),
-			"limit":  limit,
-			"offset": offset,
-		},
+	api.Success(c, gin.H{
+		"items":  convs,
+		"count":  len(convs),
+		"limit":  limit,
+		"offset": offset,
 	})
 }
 
 // GetConversation retrieves a specific conversation
 func (h *Handler) GetConversation(c *gin.Context) {
 	if h.storageMgr == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"success": false,
-			"error":   "Storage not initialized",
-		})
+		api.Error(c, types.ErrInternalError, "Storage not initialized")
 		return
 	}
 
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Conversation ID is required",
-		})
+		api.BadRequest(c, "Conversation ID is required")
 		return
 	}
 
@@ -197,15 +162,9 @@ func (h *Handler) GetConversation(c *gin.Context) {
 	conv, err := store.GetConversation(c.Request.Context(), id)
 	if err != nil {
 		if err == storage.ErrConversationNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   "Conversation not found",
-			})
+			api.NotFound(c, "Conversation")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error":   "Failed to retrieve conversation",
-			})
+			api.ErrorWithDetails(c, types.ErrInternalError, "Failed to retrieve conversation", err.Error())
 		}
 		return
 	}
@@ -213,63 +172,40 @@ func (h *Handler) GetConversation(c *gin.Context) {
 	// Get messages for this conversation
 	messages, err := store.GetMessages(c.Request.Context(), id, 1000, 0)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to retrieve messages",
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to retrieve messages", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"conversation": conv,
-			"messages":     messages,
-		},
+	api.Success(c, gin.H{
+		"conversation": conv,
+		"messages":     messages,
 	})
 }
 
 // DeleteConversation deletes a conversation and its messages
 func (h *Handler) DeleteConversation(c *gin.Context) {
 	if h.storageMgr == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"success": false,
-			"error":   "Storage not initialized",
-		})
+		api.Error(c, types.ErrInternalError, "Storage not initialized")
 		return
 	}
 
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Conversation ID is required",
-		})
+		api.BadRequest(c, "Conversation ID is required")
 		return
 	}
 
 	store := h.storageMgr.GetStore()
 	if err := store.DeleteConversation(c.Request.Context(), id); err != nil {
 		if err == storage.ErrConversationNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   "Conversation not found",
-			})
+			api.NotFound(c, "Conversation")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error":   "Failed to delete conversation",
-			})
+			api.ErrorWithDetails(c, types.ErrInternalError, "Failed to delete conversation", err.Error())
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Conversation deleted successfully",
-		},
-	})
+	api.SuccessWithMessage(c, "Conversation deleted successfully")
 }
 
 // Helper function to parse query parameters with bounds

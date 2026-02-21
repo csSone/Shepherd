@@ -37,7 +37,7 @@ type App struct {
 	srv         *server.Server
 
 	// 分布式节点组件
-	node        *node.Node      // 统一节点实例
+	node        *node.Node       // 统一节点实例
 	nodeAdapter *api.NodeAdapter // Node API 适配器
 
 	// 运行模式
@@ -49,6 +49,7 @@ func main() {
 	mode := flag.String("mode", "", "运行模式: standalone, master, client")
 	version := flag.Bool("version", false, "显示版本信息")
 	masterAddr := flag.String("master-address", "", "Master 地址 (client 模式)")
+	configPath := flag.String("config", "", "配置文件路径 (可选)")
 	flag.Parse()
 
 	// 显示版本信息
@@ -84,7 +85,7 @@ func main() {
 	app := &App{}
 
 	// 初始化应用程序
-	if err := app.Initialize(runMode, *masterAddr); err != nil {
+	if err := app.Initialize(runMode, *masterAddr, *configPath); err != nil {
 		fmt.Fprintf(os.Stderr, "初始化失败: %v\n", err)
 		os.Exit(1)
 	}
@@ -119,9 +120,13 @@ func printBanner() {
 }
 
 // Initialize 初始化应用程序
-func (app *App) Initialize(runMode, masterAddr string) error {
-	// 创建配置管理器（根据运行模式）
-	app.configMgr = config.NewManager(runMode)
+func (app *App) Initialize(runMode, masterAddr, configPath string) error {
+	// 创建配置管理器（根据运行模式或自定义配置路径）
+	if configPath != "" {
+		app.configMgr = config.NewManagerWithPath(runMode, configPath)
+	} else {
+		app.configMgr = config.NewManager(runMode)
+	}
 
 	// 加载配置
 	cfg, err := app.configMgr.Load()

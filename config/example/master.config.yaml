@@ -1,0 +1,181 @@
+# Shepherd Master 模式示例配置
+# Master 模式：作为集群管理中心，管理多个 Client 节点
+# 适合多 GPU 服务器集群部署
+
+# 运行模式
+mode: master
+
+# 节点配置
+node:
+  # 节点ID
+  id: master-01
+  # 节点名称
+  name: shepherd-master
+  # 节点角色：master
+  role: master
+  
+  # Master 角色配置
+  master_role:
+    enabled: true
+    port: 9190                    # Master 服务端口
+    api_key: ""                   # API 密钥（生产环境建议设置）
+    ssl:
+      enabled: false              # 启用 HTTPS
+      cert_path: ""               # SSL 证书路径
+      key_path: ""                # SSL 密钥路径
+  
+  # Client 角色配置（Master 模式下禁用）
+  client_role:
+    enabled: false
+    master_address: ""
+    register_retry: 3
+    heartbeat_interval: 5
+    heartbeat_timeout: 15
+  
+  # 资源监控配置
+  resources:
+    monitor_interval: 5           # 监控间隔（秒）
+    report_gpu: true              # 报告 GPU 信息
+    report_temperature: true      # 报告温度信息
+    gpu_backend: auto
+  
+  # 命令执行器配置
+  executor:
+    max_concurrent: 4
+    task_timeout: 3600
+    allow_remote_stop: true
+    allowed_commands:
+      - load_model
+      - unload_model
+      - run_llamacpp
+      - stop_process
+      - scan_models
+      - collect_logs
+
+# 服务器配置
+server:
+  web_port: 9190
+  anthropic_port: 9170
+  ollama_port: 11434
+  lmstudio_port: 1234
+  host: 0.0.0.0
+  read_timeout: 60
+  write_timeout: 60
+
+# 模型配置
+model:
+  paths:
+    - ./models
+    - ~/.cache/huggingface/hub
+  auto_scan: true
+  scan_interval: 0
+
+# llama.cpp 配置
+llamacpp:
+  paths:
+    - path: ./llama.cpp
+      name: Default
+      description: 默认 llama.cpp 路径
+
+# 下载配置
+download:
+  directory: ./downloads
+  max_concurrent: 4
+  chunk_size: 1048576
+  retry_count: 3
+  timeout: 300
+
+# 模型仓库配置
+model_repo:
+  endpoint: hf-mirror.com
+  token: ""
+  timeout: 30
+
+# 安全配置
+security:
+  api_key_enabled: false
+  api_key: ""
+  cors_enabled: true
+  allowed_origins:
+    - "*"
+
+# 兼容性配置
+compatibility:
+  ollama:
+    enabled: true
+    port: 11434
+  lmstudio:
+    enabled: false
+    port: 1234
+
+# 日志配置
+log:
+  level: info
+  format: json
+  output: both
+  directory: ./logs
+  max_size: 100
+  max_backups: 3
+  max_age: 7
+  compress: true
+
+# 存储配置
+storage:
+  type: sqlite
+  sqlite:
+    path: ./data/shepherd.db
+    enable_wal: true
+    pragmas:
+      cache_size: "-64000"
+      synchronous: "NORMAL"
+
+# Master 配置
+master:
+  enabled: true
+  client_config_dir: ./config/clients  # Client 配置存储目录
+  
+  # 网络扫描配置
+  network_scan:
+    enabled: true
+    subnets:
+      - 192.168.1.0/24              # 子网 1
+      - 192.168.10.0/24             # 子网 2
+      - 10.0.0.0/8                  # 子网 3
+    port_range: 9190-9200           # Client 端口范围
+    timeout: 5                      # 扫描超时（秒）
+    auto_discover: false            # 自动发现新节点
+    interval: 0                     # 自动扫描间隔（0=手动）
+  
+  # 任务调度器配置
+  scheduler:
+    strategy: round_robin           # 调度策略
+    max_queue_size: 100             # 最大队列长度
+    task_timeout: 300               # 任务超时（秒）
+    retry_on_failure: true          # 失败时重试
+    max_retries: 3                  # 最大重试次数
+  
+  # 日志聚合配置
+  log_aggregation:
+    enabled: true
+    max_buffer_size: 1048576        # 每个 Client 缓冲区大小（1MB）
+    flush_interval: 10              # 刷新间隔（秒）
+
+# Client 配置（Master 模式下禁用）
+client:
+  enabled: false
+  master_address: ""
+  client_info:
+    id: ""
+    name: ""
+    tags: []
+    metadata: {}
+  heartbeat:
+    interval: 30
+    timeout: 90
+  conda_env:
+    enabled: false
+    conda_path: ""
+    environments: {}
+  register_retry: 3
+  heartbeat_interval: 5
+  heartbeat_timeout: 15

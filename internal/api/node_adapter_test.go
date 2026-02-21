@@ -142,8 +142,11 @@ func TestNodeAdapter_ListNodes(t *testing.T) {
 	var resp map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
-	assert.NotNil(t, resp["nodes"])
-	assert.NotNil(t, resp["stats"])
+	// 新的统一响应格式，数据在 data 字段中
+	assert.True(t, resp["success"].(bool))
+	data := resp["data"].(map[string]interface{})
+	assert.NotNil(t, data["nodes"])
+	assert.NotNil(t, data["stats"])
 }
 
 func TestNodeAdapter_GetNode(t *testing.T) {
@@ -601,8 +604,10 @@ func TestNodeAdapter_HandleScanClients(t *testing.T) {
 				var resp map[string]interface{}
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
+				// 新的统一响应格式，数据在 data 字段中
 				assert.True(t, resp["success"].(bool))
-				assert.Equal(t, "网络扫描已启动", resp["message"])
+				data := resp["data"].(map[string]interface{})
+				assert.Equal(t, "网络扫描已启动", data["message"])
 			}
 		})
 	}
@@ -627,6 +632,9 @@ func TestNodeAdapter_GetClientScanStatus(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
-	assert.Contains(t, resp, "running")
-	assert.IsType(t, false, resp["running"])
+	// 新的统一响应格式，数据在 data 字段中
+	assert.True(t, resp["success"].(bool))
+	data := resp["data"].(map[string]interface{})
+	assert.Contains(t, data, "running")
+	assert.IsType(t, false, data["running"])
 }

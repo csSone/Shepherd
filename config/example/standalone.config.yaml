@@ -1,0 +1,192 @@
+# Shepherd Standalone 模式示例配置
+# 单机模式：所有功能在本地运行，无需连接其他节点
+# 这是最常用的部署模式，适合个人用户和单服务器部署
+
+# 运行模式
+mode: standalone
+
+# 节点配置
+node:
+  # 节点ID，auto 表示自动生成 UUID
+  id: auto
+  # 节点名称，空表示使用主机名
+  name: ""
+  # 节点角色：standalone（单机）
+  role: standalone
+  
+  # Master 角色配置（单机模式下禁用）
+  master_role:
+    enabled: false
+    port: 9190
+    api_key: ""
+    ssl:
+      enabled: false
+      cert_path: ""
+      key_path: ""
+  
+  # Client 角色配置（单机模式下禁用）
+  client_role:
+    enabled: false
+    master_address: ""
+    register_retry: 3
+    heartbeat_interval: 5
+    heartbeat_timeout: 15
+  
+  # 资源监控配置
+  resources:
+    monitor_interval: 5          # 监控间隔（秒）
+    report_gpu: true             # 报告 GPU 信息
+    report_temperature: false    # 报告温度信息
+    gpu_backend: auto            # GPU 后端：auto/nvidia/amd/intel
+  
+  # 命令执行器配置
+  executor:
+    max_concurrent: 4            # 最大并发任务数
+    task_timeout: 3600           # 任务超时（秒）
+    allow_remote_stop: true      # 允许远程停止任务
+    allowed_commands:            # 允许的命令白名单
+      - load_model
+      - unload_model
+      - run_llamacpp
+      - stop_process
+      - scan_models
+      - collect_logs
+
+# 服务器配置
+server:
+  web_port: 9190                 # Web UI/API 端口
+  anthropic_port: 9170           # Anthropic API 兼容端口
+  ollama_port: 11434             # Ollama API 兼容端口
+  lmstudio_port: 1234            # LM Studio API 兼容端口
+  host: 0.0.0.0                  # 监听地址
+  read_timeout: 60               # 读取超时（秒）
+  write_timeout: 60              # 写入超时（秒）
+
+# 模型配置
+model:
+  # 模型扫描路径（按优先级排序）
+  paths:
+    - ./models                   # 本地模型目录
+    - ~/.cache/huggingface/hub   # HuggingFace 缓存目录
+  
+  # 详细路径配置（可选，用于 UI 显示）
+  path_configs:
+    - path: ./models
+      name: 本地模型
+      description: 默认模型存储目录
+    - path: ~/.cache/huggingface/hub
+      name: HuggingFace 缓存
+      description: HuggingFace Hub 缓存目录
+  
+  auto_scan: true                # 启动时自动扫描
+  scan_interval: 0               # 定期扫描间隔（秒，0=禁用）
+
+# llama.cpp 配置
+llamacpp:
+  paths:
+    - path: ./llama.cpp
+      name: Default
+      description: 默认 llama.cpp 路径
+    # 可以添加多个后端路径，UI 中可以选择
+    # - path: /opt/llama.cpp-rocm
+    #   name: ROCm
+    #   description: AMD GPU 后端
+    # - path: /opt/llama.cpp-cuda
+    #   name: CUDA
+    #   description: NVIDIA GPU 后端
+
+# 下载配置
+download:
+  directory: ./downloads         # 下载目录
+  max_concurrent: 4              # 最大并发下载数
+  chunk_size: 1048576            # 分块大小（字节，1MB）
+  retry_count: 3                 # 重试次数
+  timeout: 300                   # 超时时间（秒）
+
+# 模型仓库配置
+model_repo:
+  endpoint: hf-mirror.com        # 模型仓库地址
+  token: ""                      # HuggingFace API Token（可选）
+  timeout: 30                    # 请求超时（秒）
+
+# 安全配置
+security:
+  api_key_enabled: false         # 启用 API Key 验证
+  api_key: ""                    # API Key（启用时必须设置）
+  cors_enabled: true             # 启用 CORS
+  allowed_origins:
+    - "*"                        # 允许的来源（生产环境应限制）
+
+# API 兼容性配置
+compatibility:
+  ollama:
+    enabled: true                # 启用 Ollama API 兼容
+    port: 11434                  # Ollama 服务端口
+  lmstudio:
+    enabled: false               # 启用 LM Studio API 兼容
+    port: 1234                   # LM Studio 服务端口
+
+# 日志配置
+log:
+  level: info                    # 日志级别：debug/info/warn/error
+  format: json                   # 日志格式：json/text
+  output: both                   # 输出方式：stdout/file/both
+  directory: ./logs              # 日志目录
+  max_size: 100                  # 单文件最大大小（MB）
+  max_backups: 3                 # 保留的旧日志文件数
+  max_age: 7                     # 日志保留天数
+  compress: true                 # 压缩旧日志
+
+# 存储配置
+storage:
+  type: sqlite                   # 存储类型：memory/sqlite/postgresql
+  sqlite:
+    path: ./data/shepherd.db     # 数据库文件路径
+    enable_wal: true             # 启用 WAL 模式
+    pragmas:
+      cache_size: "-64000"       # 缓存大小（64MB）
+      synchronous: "NORMAL"      # 同步模式
+
+# Master 配置（单机模式下禁用）
+master:
+  enabled: false
+  client_config_dir: ./config/clients
+  network_scan:
+    enabled: false
+    subnets:
+      - 192.168.1.0/24
+      - 10.0.0.0/8
+    port_range: 9190-9200
+    timeout: 5
+    auto_discover: false
+    interval: 0
+  scheduler:
+    strategy: round_robin        # 调度策略：round_robin/least_loaded/resource_aware
+    max_queue_size: 100
+    task_timeout: 300
+    retry_on_failure: true
+    max_retries: 3
+  log_aggregation:
+    enabled: false
+    max_buffer_size: 1048576
+    flush_interval: 10
+
+# Client 配置（单机模式下禁用）
+client:
+  enabled: false
+  master_address: ""
+  client_info:
+    id: ""
+    name: ""
+    tags: []
+    metadata: {}
+  heartbeat:
+    interval: 30
+    timeout: 90
+  conda_env:
+    enabled: false
+    conda_path: ""
+    environments: {}
+  register_retry: 3
+  heartbeat_interval: 5
+  heartbeat_timeout: 15

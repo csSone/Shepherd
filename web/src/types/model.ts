@@ -102,11 +102,11 @@ export interface LoadModelParams {
   seed?: number;
   nPredict?: number;
 
-  // 新增：后端配置
+  // 后端配置
   llamaCppPath?: string;      // llama.cpp 可执行文件路径
   mainGpu?: number | string;  // 主GPU选择
 
-  // 新增：能力开关
+  // 能力开关
   capabilities?: {
     thinking?: boolean;    // 思考能力
     tools?: boolean;       // 工具使用
@@ -114,31 +114,31 @@ export interface LoadModelParams {
     embedding?: boolean;   // 嵌入
   };
 
-  // 新增：上下文与加速
+  // 上下文与加速
   flashAttention?: boolean;       // Flash Attention 加速
   noMmap?: boolean;               // 禁用内存映射
   lockMemory?: boolean;           // 锁定物理内存
 
-  // 新增：采样参数
+  // 采样参数
   logitsAll?: boolean;            // 输入向量模式
   reranking?: boolean;            // 重排序模式
   minP?: number;                  // Min-P 采样
 
-  // 新增：惩罚参数
+  // 惩罚参数
   presencePenalty?: number;       // 存在惩罚
   frequencyPenalty?: number;      // 频率惩罚
 
-  // 新增：批处理参数
+  // 批处理参数
   uBatchSize?: number;            // 微批大小
   parallelSlots?: number;         // 并发槽位数
 
-  // 新增：KV缓存
+  // KV缓存
   kvCacheSize?: number;           // KV缓存内存上限
   kvCacheUnified?: boolean;       // 统一KV缓存区
   kvCacheTypeK?: string;          // KV缓存类型K (f16, f32, q8_0)
   kvCacheTypeV?: string;          // KV缓存类型V
 
-  // 新增：其他参数
+  // 其他参数
   directIo?: string;              // DirectIO 模式
   disableJinja?: boolean;         // 禁用 Jinja 模板
   chatTemplate?: string;          // 内置聊天模板

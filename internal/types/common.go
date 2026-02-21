@@ -40,14 +40,15 @@ func (s NodeState) IsValid() bool {
 type ErrorCode string
 
 const (
-	ErrNodeNotFound     ErrorCode = "NODE_NOT_FOUND"
-	ErrInvalidRequest   ErrorCode = "INVALID_REQUEST"
-	ErrTimeout          ErrorCode = "TIMEOUT"
-	ErrCommandFailed    ErrorCode = "COMMAND_FAILED"
+	ErrNodeNotFound      ErrorCode = "NODE_NOT_FOUND"
+	ErrInvalidRequest    ErrorCode = "INVALID_REQUEST"
+	ErrConflict          ErrorCode = "CONFLICT"
+	ErrTimeout           ErrorCode = "TIMEOUT"
+	ErrCommandFailed     ErrorCode = "COMMAND_FAILED"
 	ErrNotAuthenticated  ErrorCode = "NOT_AUTHENTICATED"
-	ErrPermissionDenied ErrorCode = "PERMISSION_DENIED"
+	ErrPermissionDenied  ErrorCode = "PERMISSION_DENIED"
 	ErrResourceExhausted ErrorCode = "RESOURCE_EXHAUSTED"
-	ErrInternalError    ErrorCode = "INTERNAL_ERROR"
+	ErrInternalError     ErrorCode = "INTERNAL_ERROR"
 )
 
 // String returns the string representation of the error code
@@ -62,6 +63,8 @@ func (e ErrorCode) HTTPStatusCode() int {
 		return 404
 	case ErrInvalidRequest:
 		return 400
+	case ErrConflict:
+		return 409
 	case ErrTimeout:
 		return 408
 	case ErrNotAuthenticated:

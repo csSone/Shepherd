@@ -110,7 +110,7 @@ export interface ClusterOverview {
   offlineClients: number;
   busyClients: number;
   totalTasks: number;
-  pendingTasks: number;  // 新增：待处理任务数
+  pendingTasks: number;  // 待处理任务数
   runningTasks: number;
   completedTasks: number;
   failedTasks: number;

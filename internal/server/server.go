@@ -31,6 +31,7 @@ import (
 	modelrepoclient "github.com/shepherd-project/shepherd/Shepherd/internal/modelrepo"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/port"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/storage"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/websocket"
 )
 
@@ -194,9 +195,11 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 // setupMiddleware configures server middleware
 func (s *Server) setupMiddleware() {
 	s.engine.Use(
-		gin.Recovery(),
-		s.corsMiddleware(),
-		s.loggerMiddleware(),
+		api.RequestID(), // 请求 ID 追踪
+		api.RecoveryMiddleware(logger.GetLogger()), // 统一恢复中间件
+		api.CORSMiddleware([]string{"*"}),          // 统一 CORS
+		api.LoggerMiddleware(logger.GetLogger()),   // 统一日志
+		api.ErrorHandler(logger.GetLogger()),       // 统一错误处理
 	)
 }
 
@@ -582,7 +585,7 @@ func (s *Server) loggerMiddleware() gin.HandlerFunc {
 
 // Health check handler
 func (s *Server) handleServerInfo(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"version": "1.0.0",
 		"name":    "Shepherd",
 		"status":  "running",
@@ -723,7 +726,7 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"devices": deviceStrings, // 简单设备字符串列表（兼容 LlamacppServer）
 		"gpus":    gpus,          // 详细 GPU 信息（Shepherd 扩展）
 		"count":   len(gpus),
@@ -754,7 +757,7 @@ func (s *Server) handleGetLlamacppBackends(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"backends": backends,
 		"count":    len(backends),
 	})
@@ -895,24 +898,27 @@ func (s *Server) handleEstimateVRAM(c *gin.Context) {
 		result["details"] = outputStr
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": vramMB > 0,
-		"data":    result,
-	})
+	if vramMB > 0 {
+		api.Success(c, result)
+	} else {
+		errorMsg := "无法解析显存估算结果"
+		if errStr, ok := result["error"].(string); ok {
+			errorMsg = errStr
+		}
+		api.ErrorWithDetails(c, types.ErrInternalError, "无法解析显存估算结果", errorMsg)
+	}
 }
 
 // handleGetConfig 返回当前配置（不包含敏感信息）
 func (s *Server) handleGetConfig(c *gin.Context) {
 	if s.config == nil || s.config.ServerCfg == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "配置未初始化",
-		})
+		api.Error(c, types.ErrInternalError, "配置未初始化")
 		return
 	}
 
 	cfg := s.config.ServerCfg
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"mode": s.config.Mode,
 		"server": gin.H{
 			"host":           s.config.Host,
@@ -950,10 +956,7 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		api.ErrorWithDetails(c, types.ErrInvalidRequest, "无效的请求格式", err.Error())
 		return
 	}
 
@@ -971,7 +974,7 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 	}
 
 	// 更新扫描路径
-	if req.ScanPaths != nil && len(req.ScanPaths) > 0 {
+	if len(req.ScanPaths) > 0 {
 		s.config.ServerCfg.Model.Paths = req.ScanPaths
 
 		// 触发重新扫描
@@ -980,7 +983,7 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"message":          "配置更新成功",
 		"restart_required": restartRequired,
 	})
@@ -1067,17 +1070,17 @@ func (s *Server) handleListModels(c *gin.Context) {
 		dtos = append(dtos, dto)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"models": dtos, "total": len(dtos)})
+	api.Success(c, gin.H{"models": dtos, "total": len(dtos)})
 }
 
 func (s *Server) handleGetModel(c *gin.Context) {
 	id := c.Param("id")
 	model, exists := s.modelMgr.GetModel(id)
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "模型不存在"})
+		api.NotFound(c, "模型")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"model": model})
+	api.Success(c, gin.H{"model": model})
 }
 
 func (s *Server) handleLoadModel(c *gin.Context) {
@@ -1104,13 +1107,13 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 		// 异步加载
 		result, err = s.modelMgr.LoadAsync(&req)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			api.ErrorWithDetails(c, types.ErrInternalError, "加载模型失败", err.Error())
 			return
 		}
 
 		// 立即返回异步响应
 		if result.Loading {
-			c.JSON(http.StatusOK, gin.H{
+			api.Success(c, gin.H{
 				"message":  "模型正在加载中",
 				"model_id": result.ModelID,
 				"async":    true,
@@ -1121,7 +1124,7 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 
 		if result.AlreadyLoaded {
 			// 模型已加载
-			c.JSON(http.StatusOK, gin.H{
+			api.Success(c, gin.H{
 				"message":  "模型已加载",
 				"model_id": result.ModelID,
 				"port":     result.Port,
@@ -1133,17 +1136,17 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 		// 同步加载（旧模式，保持兼容性）
 		result, err = s.modelMgr.Load(&req)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			api.ErrorWithDetails(c, types.ErrInternalError, "加载模型失败", err.Error())
 			return
 		}
 	}
 
 	if !result.Success {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		api.ErrorWithDetails(c, types.ErrInternalError, "加载模型失败", result.Error.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"message":  "模型加载成功",
 		"model_id": result.ModelID,
 		"port":     result.Port,
@@ -1154,10 +1157,10 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 func (s *Server) handleUnloadModel(c *gin.Context) {
 	id := c.Param("id")
 	if err := s.modelMgr.Unload(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		api.ErrorWithDetails(c, types.ErrInternalError, "卸载模型失败", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "模型卸载成功"})
+	api.SuccessWithMessage(c, "模型卸载成功")
 }
 
 func (s *Server) handleSetAlias(c *gin.Context) {
@@ -1167,16 +1170,16 @@ func (s *Server) handleSetAlias(c *gin.Context) {
 		Alias string `json:"alias"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求"})
+		api.BadRequest(c, "无效的请求")
 		return
 	}
 
 	if err := s.modelMgr.SetAlias(id, req.Alias); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		api.ErrorWithDetails(c, types.ErrInternalError, "设置别名失败", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "别名设置成功"})
+	api.SuccessWithMessage(c, "别名设置成功")
 }
 
 func (s *Server) handleSetFavourite(c *gin.Context) {
@@ -1186,23 +1189,23 @@ func (s *Server) handleSetFavourite(c *gin.Context) {
 		Favourite bool `json:"favourite"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求"})
+		api.BadRequest(c, "无效的请求")
 		return
 	}
 
 	if err := s.modelMgr.SetFavourite(id, req.Favourite); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		api.ErrorWithDetails(c, types.ErrInternalError, "设置收藏失败", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "收藏设置成功"})
+	api.SuccessWithMessage(c, "收藏设置成功")
 }
 
 // handleGetModelCapabilities 获取模型能力配置
 func (s *Server) handleGetModelCapabilities(c *gin.Context) {
 	modelID := c.Query("modelId")
 	if modelID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 modelId 参数"})
+		api.BadRequest(c, "缺少 modelId 参数")
 		return
 	}
 
@@ -1212,17 +1215,16 @@ func (s *Server) handleGetModelCapabilities(c *gin.Context) {
 
 	if !exists {
 		// 如果没有配置过，返回默认值（全部为 false）
-		c.JSON(http.StatusOK, gin.H{
+		api.Success(c, gin.H{
 			"modelId":      modelID,
 			"capabilities": &ModelCapabilities{},
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"modelId":      modelID,
 		"capabilities": caps,
-		"success":      true,
 	})
 }
 
@@ -1234,23 +1236,23 @@ func (s *Server) handleSetModelCapabilities(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求: " + err.Error()})
+		api.BadRequest(c, "无效的请求: "+err.Error())
 		return
 	}
 
 	if req.ModelID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 modelId"})
+		api.BadRequest(c, "缺少 modelId")
 		return
 	}
 
 	if req.Capabilities == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 capabilities"})
+		api.BadRequest(c, "缺少 capabilities")
 		return
 	}
 
 	// 应用约束规则：rerank 和 embedding 互斥
 	if req.Capabilities.Rerank && req.Capabilities.Embedding {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "rerank 和 embedding 不能同时启用"})
+		api.BadRequest(c, "rerank 和 embedding 不能同时启用")
 		return
 	}
 
@@ -1271,19 +1273,19 @@ func (s *Server) handleSetModelCapabilities(c *gin.Context) {
 		"rerank", req.Capabilities.Rerank,
 		"embedding", req.Capabilities.Embedding)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "模型能力已保存",
+	api.Success(c, gin.H{
+		"modelId":      req.ModelID,
+		"capabilities": req.Capabilities,
 	})
 }
 
 func (s *Server) handleScanModels(c *gin.Context) {
 	result, err := s.modelMgr.Scan(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		api.ErrorWithDetails(c, types.ErrInternalError, "扫描失败", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"message":      "扫描完成",
 		"models_found": len(result.Models),
 		"errors":       len(result.Errors),
@@ -1295,7 +1297,7 @@ func (s *Server) handleScanModels(c *gin.Context) {
 
 func (s *Server) handleGetScanStatus(c *gin.Context) {
 	status := s.modelMgr.GetScanStatus()
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"scanning":     status.Scanning,
 		"progress":     status.Progress,
 		"current_path": status.CurrentPath,
@@ -1306,7 +1308,7 @@ func (s *Server) handleGetScanStatus(c *gin.Context) {
 
 func (s *Server) handleListDownloads(c *gin.Context) {
 	downloads := s.downloadMgr.ListDownloads()
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"downloads": downloads,
 		"total":     len(downloads),
 	})
@@ -1329,11 +1331,7 @@ func (s *Server) handleCreateDownload(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		api.BadRequest(c, "无效的请求格式: "+err.Error())
 		return
 	}
 
@@ -1345,11 +1343,7 @@ func (s *Server) handleCreateDownload(c *gin.Context) {
 		// 生成下载 URL
 		url, err := s.repoClient.GenerateDownloadURL(req.Source, req.RepoID, req.FileName)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"error":   "生成下载URL失败",
-				"message": err.Error(),
-			})
+			api.ErrorWithDetails(c, types.ErrInvalidRequest, "生成下载URL失败", err.Error())
 			return
 		}
 		downloadURL = url
@@ -1359,90 +1353,84 @@ func (s *Server) handleCreateDownload(c *gin.Context) {
 		downloadURL = req.URL
 		targetPath = req.TargetPath
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "缺少必要参数",
-			"message": "请提供 source/repoId 或 url",
-		})
+		api.BadRequest(c, "缺少必要参数: 请提供 source/repoId 或 url")
 		return
 	}
 
 	task, err := s.downloadMgr.CreateDownload(downloadURL, targetPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "创建下载失败",
-			"message": err.Error(),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "创建下载失败", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
-		"message": "下载任务已创建",
-		"data":    task,
-	})
+	// Get request ID from context
+	requestID := "unknown"
+	if id := c.GetString("requestId"); id != "" {
+		requestID = id
+	}
+
+	c.JSON(http.StatusCreated, types.NewSuccessResponse(task, requestID))
 }
 
 func (s *Server) handleGetDownload(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		api.BadRequest(c, "下载ID不能为空")
 		return
 	}
 
 	task, exists := s.downloadMgr.GetDownload(id)
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "下载任务不存在"})
+		api.NotFound(c, "下载任务")
 		return
 	}
 
-	c.JSON(http.StatusOK, task)
+	api.Success(c, task)
 }
 
 func (s *Server) handlePauseDownload(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		api.BadRequest(c, "下载ID不能为空")
 		return
 	}
 
 	if err := s.downloadMgr.PauseDownload(id); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		api.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "下载已暂停"})
+	api.SuccessWithMessage(c, "下载已暂停")
 }
 
 func (s *Server) handleResumeDownload(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		api.BadRequest(c, "下载ID不能为空")
 		return
 	}
 
 	if err := s.downloadMgr.ResumeDownload(id); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		api.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "下载已恢复"})
+	api.SuccessWithMessage(c, "下载已恢复")
 }
 
 func (s *Server) handleDeleteDownload(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "下载ID不能为空"})
+		api.BadRequest(c, "下载ID不能为空")
 		return
 	}
 
 	if err := s.downloadMgr.DeleteDownload(id); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		api.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "下载任务已删除"})
+	api.SuccessWithMessage(c, "下载任务已删除")
 }
 
 // handleListModelFiles handles requests to list model files from a repository
@@ -1452,46 +1440,30 @@ func (s *Server) handleListModelFiles(c *gin.Context) {
 	repoID := c.Query("repoId")
 
 	if source == "" || repoID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "缺少必要参数: 需要 source 和 repoId 查询参数",
-		})
+		api.BadRequest(c, "缺少必要参数: 需要 source 和 repoId 查询参数")
 		return
 	}
 
 	// 目前只支持 HuggingFace
 	if source != "huggingface" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "目前只支持 HuggingFace 源",
-		})
+		api.BadRequest(c, "目前只支持 HuggingFace 源")
 		return
 	}
 
 	files, err := s.repoClient.ListGGUFFiles(repoID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "获取文件列表失败",
-			"message": err.Error(),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "获取文件列表失败", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    files,
-	})
+	api.Success(c, files)
 }
 
 // handleSearchModels handles requests to search for models on HuggingFace
 func (s *Server) handleSearchModels(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "缺少必要参数: 需要 q 查询参数",
-		})
+		api.BadRequest(c, "缺少必要参数: 需要 q 查询参数")
 		return
 	}
 
@@ -1505,30 +1477,20 @@ func (s *Server) handleSearchModels(c *gin.Context) {
 
 	result, err := s.repoClient.SearchHuggingFaceModels(query, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "搜索模型失败",
-			"message": err.Error(),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "搜索模型失败", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    result,
-	})
+	api.Success(c, result)
 }
 
 // handleGetModelRepoConfig returns the current model repository configuration
 func (s *Server) handleGetModelRepoConfig(c *gin.Context) {
 	cfg := s.config.ConfigMgr.Get()
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"endpoint": cfg.ModelRepo.Endpoint,
-			"token":    maskToken(cfg.ModelRepo.Token),
-			"timeout":  cfg.ModelRepo.Timeout,
-		},
+	api.Success(c, gin.H{
+		"endpoint": cfg.ModelRepo.Endpoint,
+		"token":    maskToken(cfg.ModelRepo.Token),
+		"timeout":  cfg.ModelRepo.Timeout,
 	})
 }
 
@@ -1552,10 +1514,7 @@ func (s *Server) handleUpdateModelRepoConfig(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的请求数据",
-		})
+		api.BadRequest(c, "无效的请求数据")
 		return
 	}
 
@@ -1578,11 +1537,7 @@ func (s *Server) handleUpdateModelRepoConfig(c *gin.Context) {
 
 	// Save config
 	if err := s.config.ConfigMgr.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "保存配置失败",
-			"message": err.Error(),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "保存配置失败", err.Error())
 		return
 	}
 
@@ -1593,29 +1548,23 @@ func (s *Server) handleUpdateModelRepoConfig(c *gin.Context) {
 	}
 	s.repoClient = modelrepoclient.NewClientWithConfig(cfg.ModelRepo.Endpoint, cfg.ModelRepo.Token, timeout)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"endpoint": cfg.ModelRepo.Endpoint,
-			"token":    maskToken(cfg.ModelRepo.Token),
-			"timeout":  cfg.ModelRepo.Timeout,
-		},
+	api.Success(c, gin.H{
+		"endpoint": cfg.ModelRepo.Endpoint,
+		"token":    maskToken(cfg.ModelRepo.Token),
+		"timeout":  cfg.ModelRepo.Timeout,
 	})
 }
 
 // handleGetAvailableEndpoints returns available HuggingFace endpoints
 func (s *Server) handleGetAvailableEndpoints(c *gin.Context) {
 	endpoints := modelrepoclient.GetAvailableEndpoints()
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    endpoints,
-	})
+	api.Success(c, endpoints)
 }
 
 func (s *Server) handleListProcesses(c *gin.Context) {
 	processMgr := s.modelMgr.GetProcessManager()
 	if processMgr == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "进程管理器未初始化"})
+		api.Error(c, types.ErrInternalError, "进程管理器未初始化")
 		return
 	}
 
@@ -1656,7 +1605,7 @@ func (s *Server) handleListProcesses(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"processes": processes,
 		"stats": gin.H{
 			"running": len(running),
@@ -1669,26 +1618,23 @@ func (s *Server) handleListProcesses(c *gin.Context) {
 func (s *Server) handleGetProcess(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "进程ID不能为空"})
+		api.BadRequest(c, "进程ID不能为空")
 		return
 	}
 
 	processMgr := s.modelMgr.GetProcessManager()
 	if processMgr == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "进程管理器未初始化"})
+		api.Error(c, types.ErrInternalError, "进程管理器未初始化")
 		return
 	}
 
 	proc, exists := processMgr.Get(id)
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "进程不存在",
-			"process": nil,
-		})
+		api.NotFound(c, "进程")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"process": gin.H{
 			"id":       proc.ID,
 			"name":     proc.Name,
@@ -1705,25 +1651,22 @@ func (s *Server) handleGetProcess(c *gin.Context) {
 func (s *Server) handleStopProcess(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "进程ID不能为空"})
+		api.BadRequest(c, "进程ID不能为空")
 		return
 	}
 
 	processMgr := s.modelMgr.GetProcessManager()
 	if processMgr == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "进程管理器未初始化"})
+		api.Error(c, types.ErrInternalError, "进程管理器未初始化")
 		return
 	}
 
 	if err := processMgr.Stop(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "停止进程失败",
-			"message": err.Error(),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "停止进程失败", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"message": "进程已停止",
 		"id":      id,
 	})
@@ -1815,7 +1758,7 @@ func (s *Server) handleLogEntries(c *gin.Context) {
 	logStream := logger.GetLogStream()
 	entries := logStream.GetEntries(limit)
 
-	c.JSON(http.StatusOK, gin.H{
+	api.Success(c, gin.H{
 		"entries": entries,
 		"count":   len(entries),
 	})

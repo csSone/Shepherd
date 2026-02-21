@@ -148,9 +148,10 @@ func TestGetQuantizationString(t *testing.T) {
 		{1, "F16"},
 		{2, "Q4_0"},
 		{3, "Q4_1"},
-		{7, "Q5_0"},
-		{8, "Q5_1"},
-		{9, "Q8_0"},
+		{6, "Q5_0"},
+		{7, "Q5_1"},
+		{8, "Q8_0"},
+		{9, "Q8_1"},
 		{10, "Q2_K"},
 		{11, "Q3_K_S"},
 		{12, "Q3_K_M"},
@@ -160,7 +161,7 @@ func TestGetQuantizationString(t *testing.T) {
 		{16, "Q5_K_S"},
 		{17, "Q5_K_M"},
 		{18, "Q6_K"},
-		{28, "MXFP4"},
+		{28, "IQ4_NL"},
 		{41, "MXFP4"},
 	}
 

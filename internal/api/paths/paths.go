@@ -3,12 +3,13 @@ package paths
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
 )
 
 // Handler handles path configuration requests
@@ -28,12 +29,9 @@ func (h *Handler) GetLlamaCppPaths(c *gin.Context) {
 	cfg := h.configManager.Get()
 	paths := cfg.Llamacpp.Paths
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"items": paths,
-			"count": len(paths),
-		},
+	api.Success(c, gin.H{
+		"items": paths,
+		"count": len(paths),
 	})
 }
 
@@ -41,29 +39,20 @@ func (h *Handler) GetLlamaCppPaths(c *gin.Context) {
 func (h *Handler) AddLlamaCppPath(c *gin.Context) {
 	var req config.LlamacppPath
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-		})
+		api.BadRequest(c, "Invalid request body")
 		return
 	}
 
 	// Validate path
 	if req.Path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Path is required",
-		})
+		api.BadRequest(c, "Path is required")
 		return
 	}
 
 	// Normalize and validate path
 	normalizedPath, err := h.validateAndNormalizePath(req.Path)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Invalid path: %v", err),
-		})
+		api.BadRequest(c, fmt.Sprintf("Invalid path: %v", err))
 		return
 	}
 	req.Path = normalizedPath
@@ -74,10 +63,7 @@ func (h *Handler) AddLlamaCppPath(c *gin.Context) {
 	// Check for duplicate
 	for _, p := range cfg.Llamacpp.Paths {
 		if p.Path == req.Path {
-			c.JSON(http.StatusConflict, gin.H{
-				"success": false,
-				"error":   "Path already exists",
-			})
+			api.Error(c, types.ErrConflict, "Path already exists")
 			return
 		}
 	}
@@ -87,20 +73,14 @@ func (h *Handler) AddLlamaCppPath(c *gin.Context) {
 
 	// Save config
 	if err := h.configManager.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to save config: %v", err),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save config", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Llama.cpp path added successfully",
-			"added":   req,
-			"count":   len(cfg.Llamacpp.Paths),
-		},
+	api.Success(c, gin.H{
+		"message": "Llama.cpp path added successfully",
+		"added":   req,
+		"count":   len(cfg.Llamacpp.Paths),
 	})
 }
 
@@ -108,10 +88,7 @@ func (h *Handler) AddLlamaCppPath(c *gin.Context) {
 func (h *Handler) RemoveLlamaCppPath(c *gin.Context) {
 	path := c.Query("path")
 	if path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Path query parameter is required",
-		})
+		api.BadRequest(c, "Path query parameter is required")
 		return
 	}
 
@@ -130,10 +107,7 @@ func (h *Handler) RemoveLlamaCppPath(c *gin.Context) {
 	}
 
 	if !found {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Path not found",
-		})
+		api.NotFound(c, "Path")
 		return
 	}
 
@@ -141,20 +115,14 @@ func (h *Handler) RemoveLlamaCppPath(c *gin.Context) {
 
 	// Save config
 	if err := h.configManager.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to save config: %v", err),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save config", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Llama.cpp path removed successfully",
-			"removed": path,
-			"count":   len(cfg.Llamacpp.Paths),
-		},
+	api.Success(c, gin.H{
+		"message": "Llama.cpp path removed successfully",
+		"removed": path,
+		"count":   len(cfg.Llamacpp.Paths),
 	})
 }
 
@@ -164,26 +132,21 @@ func (h *Handler) TestLlamaCppPath(c *gin.Context) {
 		Path string `json:"path" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-		})
+		api.BadRequest(c, "Invalid request body")
 		return
 	}
 
 	// Validate path
 	_, err := h.validateAndNormalizePath(req.Path)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"valid":   false,
-			"error":   err.Error(),
+		api.Success(c, gin.H{
+			"valid": false,
+			"error": err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	api.Success(c, gin.H{
 		"valid":   true,
 		"message": "Path is valid",
 	})
@@ -194,12 +157,9 @@ func (h *Handler) GetModelPaths(c *gin.Context) {
 	cfg := h.configManager.Get()
 	paths := cfg.Model.PathConfigs
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"items": paths,
-			"count": len(paths),
-		},
+	api.Success(c, gin.H{
+		"items": paths,
+		"count": len(paths),
 	})
 }
 
@@ -207,29 +167,20 @@ func (h *Handler) GetModelPaths(c *gin.Context) {
 func (h *Handler) AddModelPath(c *gin.Context) {
 	var req config.ModelPath
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-		})
+		api.BadRequest(c, "Invalid request body")
 		return
 	}
 
 	// Validate path
 	if req.Path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Path is required",
-		})
+		api.BadRequest(c, "Path is required")
 		return
 	}
 
 	// Normalize and validate path
 	normalizedPath, err := h.validateAndNormalizePath(req.Path)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Invalid path: %v", err),
-		})
+		api.BadRequest(c, fmt.Sprintf("Invalid path: %v", err))
 		return
 	}
 	req.Path = normalizedPath
@@ -240,10 +191,7 @@ func (h *Handler) AddModelPath(c *gin.Context) {
 	// Check for duplicate
 	for _, p := range cfg.Model.PathConfigs {
 		if p.Path == req.Path {
-			c.JSON(http.StatusConflict, gin.H{
-				"success": false,
-				"error":   "Path already exists",
-			})
+			api.Error(c, types.ErrConflict, "Path already exists")
 			return
 		}
 	}
@@ -253,20 +201,14 @@ func (h *Handler) AddModelPath(c *gin.Context) {
 
 	// Save config
 	if err := h.configManager.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to save config: %v", err),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save config", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Model path added successfully",
-			"added":   req,
-			"count":   len(cfg.Model.PathConfigs),
-		},
+	api.Success(c, gin.H{
+		"message": "Model path added successfully",
+		"added":   req,
+		"count":   len(cfg.Model.PathConfigs),
 	})
 }
 
@@ -274,29 +216,20 @@ func (h *Handler) AddModelPath(c *gin.Context) {
 func (h *Handler) UpdateModelPath(c *gin.Context) {
 	var req config.ModelPath
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-		})
+		api.BadRequest(c, "Invalid request body")
 		return
 	}
 
 	// Validate path
 	if req.Path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Path is required",
-		})
+		api.BadRequest(c, "Path is required")
 		return
 	}
 
 	// Normalize and validate path
 	normalizedPath, err := h.validateAndNormalizePath(req.Path)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Invalid path: %v", err),
-		})
+		api.BadRequest(c, fmt.Sprintf("Invalid path: %v", err))
 		return
 	}
 	req.Path = normalizedPath
@@ -315,28 +248,19 @@ func (h *Handler) UpdateModelPath(c *gin.Context) {
 	}
 
 	if !found {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Path not found",
-		})
+		api.NotFound(c, "Path")
 		return
 	}
 
 	// Save config
 	if err := h.configManager.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to save config: %v", err),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save config", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Model path updated successfully",
-			"updated": req,
-		},
+	api.Success(c, gin.H{
+		"message": "Model path updated successfully",
+		"updated": req,
 	})
 }
 
@@ -344,10 +268,7 @@ func (h *Handler) UpdateModelPath(c *gin.Context) {
 func (h *Handler) RemoveModelPath(c *gin.Context) {
 	path := c.Query("path")
 	if path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Path query parameter is required",
-		})
+		api.BadRequest(c, "Path query parameter is required")
 		return
 	}
 
@@ -366,10 +287,7 @@ func (h *Handler) RemoveModelPath(c *gin.Context) {
 	}
 
 	if !found {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Path not found",
-		})
+		api.NotFound(c, "Path")
 		return
 	}
 
@@ -377,20 +295,14 @@ func (h *Handler) RemoveModelPath(c *gin.Context) {
 
 	// Save config
 	if err := h.configManager.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to save config: %v", err),
-		})
+		api.ErrorWithDetails(c, types.ErrInternalError, "Failed to save config", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"message": "Model path removed successfully",
-			"removed": path,
-			"count":   len(cfg.Model.PathConfigs),
-		},
+	api.Success(c, gin.H{
+		"message": "Model path removed successfully",
+		"removed": path,
+		"count":   len(cfg.Model.PathConfigs),
 	})
 }
 

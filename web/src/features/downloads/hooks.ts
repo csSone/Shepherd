@@ -16,7 +16,7 @@ export function useDownloads() {
     queryKey: ['downloads'],
     queryFn: async () => {
       const response = await downloadsApi.list();
-      return response.tasks;
+      return response.downloads;
     },
     staleTime: 5 * 1000, // 5 秒
     // ✅ 动态调整刷新频率: 只在有活跃任务时轮询

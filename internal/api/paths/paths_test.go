@@ -249,7 +249,9 @@ func TestHandler_TestLlamaCppPath(t *testing.T) {
 
 			if tt.wantStatus == http.StatusOK {
 				assert.True(t, resp["success"].(bool))
-				assert.Equal(t, tt.wantValid, resp["valid"])
+				// 新响应格式: data 字段包含实际数据
+				data := resp["data"].(map[string]interface{})
+				assert.Equal(t, tt.wantValid, data["valid"])
 			} else {
 				assert.False(t, resp["success"].(bool))
 			}

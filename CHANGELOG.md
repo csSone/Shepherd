@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-02-21
+
 ### Added
+
+#### 统一 API 响应格式
+- **后端响应统一** - 所有 API 端点使用 `api.Success()` 和 `api.Error()` 统一响应格式
+  - 迁移 `server.go` 中的 handlers 到新的响应格式
+  - 响应格式: `{success: true, data: {...}, metadata: {...}}`
+  - 支持类型安全的泛型响应
+
+- **前端适配** - 更新所有 hooks 以处理新的响应格式
+  - `useModels`, `useModel`, `useModelCapabilities` - 模型相关 hooks
+  - `useGPUs`, `useLlamacppBackends`, `useEstimateVRAM` - 系统相关 hooks
+  - `useServerConfig`, `useClusterOverview`, `useClients` - 集群相关 hooks
+  - `useNodes`, `useNode`, `useNodeStats` - 节点相关 hooks
+  - `useDownloads` - 下载相关 hooks
+
+#### 配置文件管理增强
+- **标准配置目录结构** - 创建 `config/example/` 和 `config/node/` 目录
+  - `config/example/` - 标准示例配置（standalone/master/client）
+  - `config/node/` - 实际运行的节点配置
+  - `config/README.md` - 配置目录说明文档
+
+- **命令行配置支持** - 添加 `--config` 参数支持自定义配置文件
+  - `shepherd --config /path/to/config.yaml`
+  - 脚本自动检测 `config/node/` 下的配置文件
 
 #### 架构重构 - 职责分离与类型统一
 - **统一类型系统** - 新增 `internal/types/common.go` 统一状态和类型定义

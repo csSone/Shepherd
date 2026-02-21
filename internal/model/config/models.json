@@ -29,5 +29,59 @@
   {
     "modelId": "test-model-bad278024c588990",
     "favourite": true
+  },
+  {
+    "modelId": "test-model-0037240e66b26b97",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-1fc464e9d1d599fe",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-e457b1f22f143269",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-cccad4dfa5c17ff9",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-9bc85292d8156c39",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-cc67dc0e401a97b0",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-d9ec99e14f5c071f",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-ecd503cdf2c4e02e",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-2e93ced96b6281bd",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-a9d69cba689b186d",
+    "favourite": true
+  },
+  {
+    "modelId": "test-model-2dc8ee2420713da7",
+    "alias": "Test Model",
+    "favourite": false
+  },
+  {
+    "modelId": "test-model-6075d9af3c3e8c53",
+    "favourite": true
   }
 ]

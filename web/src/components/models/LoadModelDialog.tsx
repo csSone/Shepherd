@@ -1219,10 +1219,10 @@ export function LoadModelDialog({
                     cacheTypeV: params.kvCacheTypeV,
                   });
 
-                  if (result.data?.vramGB) {
-                    setEstimateResult(`约需 ${result.data.vramGB} GB 显存`);
-                  } else if (result.error || result.data?.error) {
-                    setEstimateResult(`估算失败: ${result.error || result.data?.error}`);
+                  if (result.vramGB) {
+                    setEstimateResult(`约需 ${result.vramGB} GB 显存`);
+                  } else if (result.error) {
+                    setEstimateResult(`估算失败: ${result.error}`);
                   } else {
                     setEstimateResult('估算失败');
                   }

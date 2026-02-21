@@ -75,8 +75,6 @@ data/
 AGENTS.md
 
 # Local configuration files and directories
-config/*.yaml
-config/*.json
-config.local/
-./internal/model/config/*.yaml
-./internal/model/config/*.json
+config/node
+config.local/*
+/internal/model/config/*

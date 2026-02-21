@@ -14,8 +14,8 @@ export function useNodes() {
   return useQuery({
     queryKey: ['nodes'],
     queryFn: async () => {
-      const response = await apiClient.get<NodeListResponse>('/master/nodes');
-      return response.nodes;
+      const response = await apiClient.get<{ success: boolean; data: NodeListResponse }>('/master/nodes');
+      return response.data.nodes;
     },
     refetchInterval: 5000,
   });
@@ -25,8 +25,8 @@ export function useNode(nodeId: string) {
   return useQuery({
     queryKey: ['nodes', nodeId],
     queryFn: async () => {
-      const response = await apiClient.get<{ node: DistributedNode }>(`/master/nodes/${nodeId}`);
-      return response.node;
+      const response = await apiClient.get<{ success: boolean; data: { node: DistributedNode } }>(`/master/nodes/${nodeId}`);
+      return response.data.node;
     },
     enabled: !!nodeId,
   });
@@ -36,8 +36,8 @@ export function useNodeStats() {
   return useQuery({
     queryKey: ['nodes', 'stats'],
     queryFn: async () => {
-      const response = await apiClient.get<NodeListResponse>('/master/nodes');
-      return response.stats;
+      const response = await apiClient.get<{ success: boolean; data: NodeListResponse }>('/master/nodes');
+      return response.data.stats;
     },
     refetchInterval: 5000,
   });
@@ -47,8 +47,8 @@ export function useNodesWithStats() {
   return useQuery({
     queryKey: ['nodes'],
     queryFn: async () => {
-      const response = await apiClient.get<NodeListResponse>('/master/nodes');
-      return response;
+      const response = await apiClient.get<{ success: boolean; data: NodeListResponse }>('/master/nodes');
+      return response.data;
     },
     refetchInterval: 5000,
   });
@@ -100,8 +100,8 @@ export function useNodesByRole(role: string) {
   return useQuery<DistributedNode[]>({
     queryKey: ['nodes', 'role', role],
     queryFn: async () => {
-      const response = await apiClient.get('/master/nodes') as NodeListResponse;
-      return response.nodes.filter((node) => node.role === role);
+      const response = await apiClient.get<{ success: boolean; data: NodeListResponse }>('/master/nodes');
+      return response.data.nodes.filter((node) => node.role === role);
     },
     enabled: !!role,
   });
@@ -111,8 +111,8 @@ export function useNodesByStatus(status: string) {
   return useQuery<DistributedNode[]>({
     queryKey: ['nodes', 'status', status],
     queryFn: async () => {
-      const response = await apiClient.get('/master/nodes') as NodeListResponse;
-      return response.nodes.filter((node) => node.status === status);
+      const response = await apiClient.get<{ success: boolean; data: NodeListResponse }>('/master/nodes');
+      return response.data.nodes.filter((node) => node.status === status);
     },
     enabled: !!status,
   });

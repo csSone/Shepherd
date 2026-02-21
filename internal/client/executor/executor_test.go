@@ -407,6 +407,9 @@ func TestExecuteLoadModelParameterParsing(t *testing.T) {
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
+	// 设置较短的超时时间以避免测试挂起
+	executor.config.TaskTimeout = 5 * time.Second
+
 	// 测试参数解析
 	task := &cluster.Task{
 		ID:   "test-task",
@@ -421,17 +424,20 @@ func TestExecuteLoadModelParameterParsing(t *testing.T) {
 		},
 	}
 
-	// 注意：这个测试会因为找不到二进制文件而失败，但我们可以验证参数解析
+	// 执行任务 - 应该失败（模型文件不存在或启动失败）
+	// 如果系统上有 llama-server，它会尝试启动并等待模型加载完成
+	// 但由于模型文件不存在或启动参数错误，最终会超时或失败
 	result, err := executor.ExecuteTask(task)
 
-	// 应该失败在二进制文件查找
+	// 应该失败（模型文件不存在或启动失败）
 	assert.Error(t, err)
 	assert.NotNil(t, result)
+	assert.False(t, result.Success, "任务应该失败因为模型文件不存在")
 
-	// 如果失败在参数解析之前，检查错误消息
+	// 验证参数解析正确 - 不应该有"缺少"参数的错误
 	if result.Error != "" {
 		// 应该不是参数解析错误
-		assert.NotContains(t, result.Error, "缺少")
+		assert.NotContains(t, result.Error, "缺少", "参数应该完整")
 	}
 }
 

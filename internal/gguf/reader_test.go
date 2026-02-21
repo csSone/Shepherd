@@ -135,7 +135,7 @@ func TestInvalidFile(t *testing.T) {
 		{
 			name:    "Invalid magic",
 			content: []byte("TEST"), // Not "GGUF"
-			wantErr: "invalid GGUF magic number",
+			wantErr: "invalid GGUF format",
 		},
 		{
 			name:    "Truncated header",
@@ -181,10 +181,15 @@ func TestFileTypeMapping(t *testing.T) {
 		{6, "Q5_0"},
 		{7, "Q5_1"},
 		{8, "Q8_0"},
-		{11, "Q3_K_M"},
-		{12, "Q4_K_M"},
-		{13, "Q5_K_M"},
-		{15, "Q2_K_S"},
+		{10, "Q2_K"},
+		{11, "Q3_K_S"},
+		{12, "Q3_K_M"},
+		{13, "Q3_K_L"},
+		{14, "Q4_K_S"},
+		{15, "Q4_K_M"},
+		{16, "Q5_K_S"},
+		{17, "Q5_K_M"},
+		{18, "Q6_K"},
 		{20, "Q4_K_S"},
 		{21, "Q3_K_S_XL"},
 	}

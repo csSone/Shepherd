@@ -75,18 +75,25 @@ func RecoveryMiddleware(log *logger.Logger) gin.HandlerFunc {
 func CORSMiddleware(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
+		allowOrigin := ""
 
 		// Check if origin is allowed
 		allowed := false
 		for _, allowedOrigin := range allowedOrigins {
-			if allowedOrigin == "*" || allowedOrigin == origin {
+			if allowedOrigin == "*" {
 				allowed = true
+				allowOrigin = "*"
+				break
+			}
+			if allowedOrigin == origin {
+				allowed = true
+				allowOrigin = origin
 				break
 			}
 		}
 
 		if allowed {
-			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Origin", allowOrigin)
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Request-ID")
 			c.Header("Access-Control-Expose-Headers", "X-Request-ID")

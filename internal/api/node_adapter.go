@@ -4,7 +4,6 @@ package api
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +13,7 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
 )
 
 // NodeAdapter 将 API 调用适配到 Node 和 Scheduler
@@ -155,50 +155,35 @@ func (a *NodeAdapter) RegisterNode(c *gin.Context) {
 	var nodeInfo node.NodeInfo
 	if err := c.ShouldBindJSON(&nodeInfo); err != nil {
 		a.log.Errorf("解析节点注册请求失败: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		ValidationError(c, err)
 		return
 	}
 
 	// 验证必需字段
 	if nodeInfo.ID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "缺少必需字段",
-			"message": "节点ID不能为空",
-		})
+		BadRequest(c, "节点ID不能为空")
 		return
 	}
 
 	if nodeInfo.Address == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "缺少必需字段",
-			"message": "节点地址不能为空",
-		})
+		BadRequest(c, "节点地址不能为空")
 		return
 	}
 
 	if nodeInfo.Port <= 0 || nodeInfo.Port > 65535 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的端口",
-			"message": "端口必须在1-65535范围内",
-		})
+		BadRequest(c, "端口必须在1-65535范围内")
 		return
 	}
 
 	// 调用 Node 的注册方法
 	if err := a.node.RegisterClient(&nodeInfo); err != nil {
 		a.log.Errorf("注册客户端失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "注册失败",
-			"message": err.Error(),
-		})
+		ErrorWithDetails(c, types.ErrInternalError, "注册失败", err.Error())
 		return
 	}
 
 	a.log.Infof("节点注册成功: %s (%s:%d)", nodeInfo.ID, nodeInfo.Address, nodeInfo.Port)
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"message": "节点注册成功",
 		"node":    nodeInfo,
 	})
@@ -216,7 +201,7 @@ func (a *NodeAdapter) ListNodes(c *gin.Context) {
 		nodes[i] = *client
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"nodes": nodes,
 		"stats": gin.H{
 			"total":   total,
@@ -232,23 +217,18 @@ func (a *NodeAdapter) ListNodes(c *gin.Context) {
 func (a *NodeAdapter) GetNode(c *gin.Context) {
 	nodeID := c.Param("id")
 	if nodeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "节点ID不能为空",
-		})
+		BadRequest(c, "节点ID不能为空")
 		return
 	}
 
 	client, err := a.node.GetClient(nodeID)
 	if err != nil {
 		a.log.Errorf("获取节点失败: %v", err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "节点未找到",
-			"message": err.Error(),
-		})
+		NotFound(c, "节点")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"node": client,
 	})
 }
@@ -258,23 +238,18 @@ func (a *NodeAdapter) GetNode(c *gin.Context) {
 func (a *NodeAdapter) UnregisterNode(c *gin.Context) {
 	nodeID := c.Param("id")
 	if nodeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "节点ID不能为空",
-		})
+		BadRequest(c, "节点ID不能为空")
 		return
 	}
 
 	if err := a.node.UnregisterClient(nodeID); err != nil {
 		a.log.Errorf("注销节点失败: %v", err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "注销失败",
-			"message": err.Error(),
-		})
+		NotFound(c, "节点")
 		return
 	}
 
 	a.log.Infof("节点注销成功: %s", nodeID)
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"message": "节点注销成功",
 		"nodeID":  nodeID,
 	})
@@ -288,34 +263,25 @@ func (a *NodeAdapter) HandleHeartbeat(c *gin.Context) {
 	var heartbeat node.HeartbeatMessage
 	if err := c.ShouldBindJSON(&heartbeat); err != nil {
 		a.log.Errorf("解析心跳请求失败: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		ValidationError(c, err)
 		return
 	}
 
 	// 验证必需字段
 	if heartbeat.NodeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "缺少必需字段",
-			"message": "节点ID不能为空",
-		})
+		BadRequest(c, "节点ID不能为空")
 		return
 	}
 
 	// 调用 Node 的心跳处理
 	if err := a.node.HandleHeartbeat(heartbeat.NodeID, &heartbeat); err != nil {
 		a.log.Errorf("处理心跳失败: %v", err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "心跳处理失败",
-			"message": err.Error(),
-		})
+		NotFound(c, "节点")
 		return
 	}
 
 	a.log.Debugf("心跳处理成功: 节点=%s, 时间=%v", heartbeat.NodeID, heartbeat.Timestamp.Unix())
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"message":   "心跳处理成功",
 		"timestamp": time.Now().Unix(),
 	})
@@ -328,19 +294,14 @@ func (a *NodeAdapter) HandleHeartbeat(c *gin.Context) {
 func (a *NodeAdapter) SendCommand(c *gin.Context) {
 	nodeID := c.Param("id")
 	if nodeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "节点ID不能为空",
-		})
+		BadRequest(c, "节点ID不能为空")
 		return
 	}
 
 	var cmd node.Command
 	if err := c.ShouldBindJSON(&cmd); err != nil {
 		a.log.Errorf("解析命令请求失败: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		ValidationError(c, err)
 		return
 	}
 
@@ -358,15 +319,12 @@ func (a *NodeAdapter) SendCommand(c *gin.Context) {
 	// 将命令加入队列
 	if err := a.node.QueueCommand(nodeID, &cmd); err != nil {
 		a.log.Errorf("命令发送失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "命令发送失败",
-			"message": err.Error(),
-		})
+		ErrorWithDetails(c, types.ErrInternalError, "命令发送失败", err.Error())
 		return
 	}
 
 	a.log.Infof("命令发送成功: 节点=%s, 类型=%s, ID=%s", nodeID, cmd.Type, cmd.ID)
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"message":   "命令发送成功",
 		"nodeID":    nodeID,
 		"command":   cmd.Type,
@@ -379,9 +337,7 @@ func (a *NodeAdapter) SendCommand(c *gin.Context) {
 func (a *NodeAdapter) GetCommands(c *gin.Context) {
 	nodeID := c.Param("id")
 	if nodeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "节点ID不能为空",
-		})
+		BadRequest(c, "节点ID不能为空")
 		return
 	}
 
@@ -389,8 +345,7 @@ func (a *NodeAdapter) GetCommands(c *gin.Context) {
 	commands := a.node.GetPendingCommands(nodeID)
 
 	a.log.Debugf("返回待执行命令: 节点=%s, 数量=%d", nodeID, len(commands))
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
+	Success(c, gin.H{
 		"commands": commands,
 	})
 }
@@ -409,19 +364,13 @@ func (a *NodeAdapter) ReportCommandResult(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		a.log.Errorf("解析命令结果请求失败: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		ValidationError(c, err)
 		return
 	}
 
 	// 验证必需字段
 	if req.NodeID == "" || req.CommandID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "缺少必需字段",
-			"message": "节点ID和命令ID不能为空",
-		})
+		BadRequest(c, "节点ID和命令ID不能为空")
 		return
 	}
 
@@ -462,10 +411,7 @@ func (a *NodeAdapter) ReportCommandResult(c *gin.Context) {
 	// 存储命令结果到持久化存储
 	if err := a.node.StoreCommandResult(result); err != nil {
 		a.log.Errorf("存储命令结果失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "存储命令结果失败",
-			"message": err.Error(),
-		})
+		ErrorWithDetails(c, types.ErrInternalError, "存储命令结果失败", err.Error())
 		return
 	}
 
@@ -478,9 +424,7 @@ func (a *NodeAdapter) ReportCommandResult(c *gin.Context) {
 		a.log.Errorf("命令执行失败: %s", req.Error)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "命令结果已记录",
-	})
+	SuccessWithMessage(c, "命令结果已记录")
 }
 
 // ==================== 路由注册 ====================
@@ -579,17 +523,14 @@ func (a *NodeAdapter) HandleScanClients(c *gin.Context) {
 		}
 	}()
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "网络扫描已启动",
-	})
+	SuccessWithMessage(c, "网络扫描已启动")
 }
 
 // GetClientScanStatus 获取客户端扫描状态
 // GET /api/master/scan/status
 func (a *NodeAdapter) GetClientScanStatus(c *gin.Context) {
 	status := a.scanner.GetStatus()
-	c.JSON(http.StatusOK, status)
+	Success(c, status)
 }
 
 // ==================== 任务管理 API ====================
@@ -599,7 +540,7 @@ func (a *NodeAdapter) GetClientScanStatus(c *gin.Context) {
 func (a *NodeAdapter) ListTasks(c *gin.Context) {
 	tasks := a.scheduler.ListTasks()
 
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"tasks": tasks,
 		"total": len(tasks),
 	})
@@ -615,18 +556,12 @@ func (a *NodeAdapter) CreateTask(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		a.log.Errorf("解析任务创建请求失败: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "无效的请求格式",
-			"message": err.Error(),
-		})
+		ValidationError(c, err)
 		return
 	}
 
 	if req.Type == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "缺少必需字段",
-			"message": "任务类型不能为空",
-		})
+		BadRequest(c, "任务类型不能为空")
 		return
 	}
 
@@ -634,15 +569,12 @@ func (a *NodeAdapter) CreateTask(c *gin.Context) {
 	task, err := a.scheduler.SubmitTask(cluster.TaskType(req.Type), req.Payload)
 	if err != nil {
 		a.log.Errorf("创建任务失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "创建任务失败",
-			"message": err.Error(),
-		})
+		ErrorWithDetails(c, types.ErrInternalError, "创建任务失败", err.Error())
 		return
 	}
 
 	a.log.Infof("任务创建成功: ID=%s, Type=%s", task.ID, task.Type)
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"task": task,
 	})
 }
@@ -652,25 +584,19 @@ func (a *NodeAdapter) CreateTask(c *gin.Context) {
 func (a *NodeAdapter) DeleteTask(c *gin.Context) {
 	taskID := c.Param("id")
 	if taskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "任务ID不能为空",
-		})
+		BadRequest(c, "任务ID不能为空")
 		return
 	}
 
 	// 使用 scheduler 取消任务
 	if err := a.scheduler.CancelTask(taskID); err != nil {
 		a.log.Errorf("删除任务失败: %v", err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "任务未找到",
-			"message": err.Error(),
-		})
+		NotFound(c, "任务")
 		return
 	}
 
 	a.log.Infof("任务删除成功: %s", taskID)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	Success(c, gin.H{
 		"message": "任务删除成功",
 		"taskId":  taskID,
 	})
@@ -681,35 +607,26 @@ func (a *NodeAdapter) DeleteTask(c *gin.Context) {
 func (a *NodeAdapter) RetryTask(c *gin.Context) {
 	taskID := c.Param("id")
 	if taskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "任务ID不能为空",
-		})
+		BadRequest(c, "任务ID不能为空")
 		return
 	}
 
 	// 使用 scheduler 重试任务
 	if err := a.scheduler.RetryTask(taskID); err != nil {
 		a.log.Errorf("重试任务失败: %v", err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "重试任务失败",
-			"message": err.Error(),
-		})
+		NotFound(c, "任务")
 		return
 	}
 
 	// 获取更新后的任务
 	task, exists := a.scheduler.GetTask(taskID)
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "任务未找到",
-			"message": fmt.Sprintf("任务 %s 不存在", taskID),
-		})
+		NotFound(c, fmt.Sprintf("任务 %s", taskID))
 		return
 	}
 
 	a.log.Infof("任务重试: %s", taskID)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	Success(c, gin.H{
 		"message": "任务已重置为待处理状态",
 		"task":    task,
 	})
@@ -755,7 +672,7 @@ func (a *NodeAdapter) ListClients(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"clients": clientList,
 		"total":   total,
 		"stats": gin.H{
@@ -793,7 +710,7 @@ func (a *NodeAdapter) GetClusterOverview(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	Success(c, gin.H{
 		"totalClients":   total,
 		"onlineClients":  online,
 		"offlineClients": offline,

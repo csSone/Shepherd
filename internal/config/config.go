@@ -696,6 +696,17 @@ func NewManager(mode string) *Manager {
 	}
 }
 
+// NewManagerWithPath creates a new configuration manager with a custom config path
+func NewManagerWithPath(mode, configPath string) *Manager {
+	configDir := filepath.Dir(configPath)
+	return &Manager{
+		configPath:       configPath,
+		modelsConfigPath: filepath.Join(configDir, DefaultModelsConfigFile),
+		launchConfigPath: filepath.Join(configDir, DefaultLaunchConfigFile),
+		mode:             mode,
+	}
+}
+
 // GetConfigPath returns the main configuration file path
 func (m *Manager) GetConfigPath() string {
 	return m.configPath

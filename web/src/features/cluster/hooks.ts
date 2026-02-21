@@ -49,8 +49,8 @@ export function useServerConfig() {
   return useQuery({
     queryKey: ['server', 'config'],
     queryFn: async (): Promise<ServerConfigResponse> => {
-      const response = await apiClient.get('/config');
-      return response as ServerConfigResponse;
+      const response = await apiClient.get<{ success: boolean; data: ServerConfigResponse }>('/config');
+      return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 分钟
     refetchInterval: false,
@@ -77,8 +77,8 @@ export function useClusterOverview() {
   return useQuery({
     queryKey: ['cluster', 'overview'],
     queryFn: async () => {
-      const response = await apiClient.get<ClusterOverview>('/master/overview');
-      return response;
+      const response = await apiClient.get<{ success: boolean; data: ClusterOverview }>('/master/overview');
+      return response.data;
     },
     staleTime: 10 * 1000, // 10 秒
     refetchInterval: 5000, // 每 5 秒刷新
@@ -95,8 +95,8 @@ export function useClients() {
   return useQuery({
     queryKey: ['cluster', 'clients'],
     queryFn: async () => {
-      const response = await apiClient.get<ClientListResponse>('/master/clients');
-      return response.clients;
+      const response = await apiClient.get<{ success: boolean; data: ClientListResponse }>('/master/clients');
+      return response.data.clients;
     },
     staleTime: 10 * 1000,
     refetchInterval: 5000,
@@ -111,8 +111,8 @@ export function useClient(clientId: string) {
   return useQuery({
     queryKey: ['cluster', 'clients', clientId],
     queryFn: async () => {
-      const response = await apiClient.get<{ client: Client }>(`/master/clients/${clientId}`);
-      return response.client;
+      const response = await apiClient.get<{ success: boolean; data: { client: Client } }>(`/master/clients/${clientId}`);
+      return response.data.client;
     },
     enabled: !!clientId,
     refetchInterval: 3000,
@@ -145,8 +145,8 @@ export function useClusterTasks() {
   return useQuery({
     queryKey: ['cluster', 'tasks'],
     queryFn: async () => {
-      const response = await apiClient.get<TaskListResponse>('/master/tasks');
-      return response.tasks;
+      const response = await apiClient.get<{ success: boolean; data: TaskListResponse }>('/master/tasks');
+      return response.data.tasks;
     },
     staleTime: 5 * 1000,
     refetchInterval: 2000,
@@ -166,8 +166,8 @@ export function useCreateClusterTask() {
       payload: Record<string, unknown>;
       assignTo?: string;
     }) => {
-      const response = await apiClient.post<{ task: ClusterTask }>('/master/tasks', task);
-      return response.task;
+      const response = await apiClient.post<{ success: boolean; data: { task: ClusterTask } }>('/master/tasks', task);
+      return response.data.task;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cluster', 'tasks'] });
@@ -237,8 +237,8 @@ export function useScanStatus() {
   return useQuery({
     queryKey: ['cluster', 'scan'],
     queryFn: async () => {
-      const response = await apiClient.get<ScanStatus>('/master/scan/status');
-      return response;
+      const response = await apiClient.get<{ success: boolean; data: ScanStatus }>('/master/scan/status');
+      return response.data;
     },
     refetchInterval: (query) => {
       const data = query.state.data;
