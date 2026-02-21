@@ -140,6 +140,38 @@ func (s *Scheduler) CancelTask(taskID string) error {
 	return nil
 }
 
+// RetryTask retries a failed task
+func (s *Scheduler) RetryTask(taskID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	task, exists := s.tasks[taskID]
+	if !exists {
+		return fmt.Errorf("任务不存在: %s", taskID)
+	}
+
+	// Only failed or cancelled tasks can be retried
+	if task.Status != cluster.TaskStatusFailed && task.Status != cluster.TaskStatusCancelled {
+		return fmt.Errorf("只能重试失败或已取消的任务，当前状态: %s", task.Status)
+	}
+
+	// Reset task status
+	task.Status = cluster.TaskStatusPending
+	task.Error = ""
+	task.AssignedTo = ""
+	task.StartedAt = nil
+	task.CompletedAt = nil
+	task.Result = nil
+
+	// Re-queue the task
+	select {
+	case s.queue <- task:
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("任务队列已满")
+	}
+}
+
 // dispatchLoop dispatches tasks from the queue
 func (s *Scheduler) dispatchLoop() {
 	defer s.wg.Done()

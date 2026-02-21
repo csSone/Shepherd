@@ -8,25 +8,142 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/cluster"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/cluster/scanner"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/cluster/scheduler"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
 )
 
-// NodeAdapter 将 API 调用适配到 Node
+// NodeAdapter 将 API 调用适配到 Node 和 Scheduler
 type NodeAdapter struct {
-	node    *node.Node
-	log     *logger.Logger
-	scanner *scanner.Scanner
+	node      *node.Node
+	log       *logger.Logger
+	scanner   *scanner.Scanner
+	scheduler *scheduler.Scheduler
 }
 
 // NewNodeAdapter 创建一个新的 Node API 适配器
-func NewNodeAdapter(n *node.Node, log *logger.Logger) *NodeAdapter {
+func NewNodeAdapter(n *node.Node, log *logger.Logger, schedulerCfg *config.SchedulerConfig) *NodeAdapter {
+	// 创建 scheduler.ClientManager 适配器，将 Node 适配到 Scheduler 的接口
+	clientMgr := &nodeClientManager{node: n}
+
+	// 创建 Scheduler
+	sched := scheduler.NewScheduler(schedulerCfg, clientMgr)
+
 	return &NodeAdapter{
-		node:    n,
-		log:     log,
-		scanner: scanner.NewScanner(&config.NetworkScanConfig{}, log),
+		node:      n,
+		log:       log,
+		scanner:   scanner.NewScanner(&config.NetworkScanConfig{}, log),
+		scheduler: sched,
+	}
+}
+
+// nodeClientManager 将 node.Node 适配为 scheduler.ClientManager 接口
+type nodeClientManager struct {
+	node *node.Node
+}
+
+// GetOnlineClients 返回所有在线客户端
+func (m *nodeClientManager) GetOnlineClients() []*cluster.Client {
+	clients := m.node.ListClients()
+
+	result := make([]*cluster.Client, 0, len(clients))
+	for _, info := range clients {
+		client := &cluster.Client{
+			ID:           info.ID,
+			Name:         info.Name,
+			Address:      info.Address,
+			Port:         info.Port,
+			Tags:         info.Tags,
+			Capabilities: convertNodeCapabilitiesToCluster(info.Capabilities),
+			Status:       cluster.ClientStatus(info.Status),
+			LastSeen:     info.LastSeen,
+			Metadata:     make(map[string]string),
+			Connected:    info.Status == node.NodeStatusOnline,
+		}
+
+		// 复制 metadata
+		for k, v := range info.Metadata {
+			client.Metadata[k] = v
+		}
+
+		result = append(result, client)
+	}
+
+	return result
+}
+
+// GetClient 根据ID获取客户端
+func (m *nodeClientManager) GetClient(clientID string) (*cluster.Client, bool) {
+	info, err := m.node.GetClient(clientID)
+	if err != nil {
+		return nil, false
+	}
+
+	client := &cluster.Client{
+		ID:           info.ID,
+		Name:         info.Name,
+		Address:      info.Address,
+		Port:         info.Port,
+		Tags:         info.Tags,
+		Capabilities: convertNodeCapabilitiesToCluster(info.Capabilities),
+		Status:       cluster.ClientStatus(info.Status),
+		LastSeen:     info.LastSeen,
+		Metadata:     make(map[string]string),
+		Connected:    info.Status == node.NodeStatusOnline,
+	}
+
+	// 复制 metadata
+	for k, v := range info.Metadata {
+		client.Metadata[k] = v
+	}
+
+	return client, true
+}
+
+// SendCommand 向客户端发送命令
+func (m *nodeClientManager) SendCommand(clientID string, command *cluster.Command) (map[string]interface{}, error) {
+	// 将 cluster.Command 转换为 node.Command
+	nodeCmd := &node.Command{
+		ID:         command.ID,
+		Type:       node.CommandType(command.Type),
+		Payload:    command.Payload,
+		FromNodeID: m.node.GetID(),
+		ToNodeID:   clientID,
+		CreatedAt:  time.Now(),
+		Priority:   5, // 默认优先级
+		RetryCount: 0,
+		MaxRetries: 3,
+	}
+
+	// 将命令加入队列
+	if err := m.node.QueueCommand(clientID, nodeCmd); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"commandId": command.ID,
+		"status":    "queued",
+	}, nil
+}
+
+// convertNodeCapabilitiesToCluster 转换节点能力格式
+func convertNodeCapabilitiesToCluster(cap *node.NodeCapabilities) *cluster.Capabilities {
+	if cap == nil {
+		return nil
+	}
+
+	return &cluster.Capabilities{
+		GPU:           cap.GPU,
+		GPUName:       "", // 简化实现
+		GPUMemory:     cap.Memory,
+		CPUCount:      cap.CPUCount,
+		Memory:        cap.Memory,
+		SupportsLlama: cap.SupportsLlama,
+		SupportsPython: cap.SupportsPython,
+		CondaEnvs:     cap.CondaEnvs,
 	}
 }
 
@@ -393,6 +510,38 @@ func (a *NodeAdapter) RegisterRoutes(router *gin.RouterGroup) {
 		// Client 网络扫描
 		master.POST("/scan", a.HandleScanClients)
 		master.GET("/scan/status", a.GetClientScanStatus)
+
+		// ========== 兼容性路由 ==========
+		// 为了向后兼容，将 /clients 映射到 /nodes
+
+		// GET /api/master/clients - 返回客户端列表（前端期望的格式）
+		master.GET("/clients", a.ListClients)
+
+		// GET /api/master/clients/:id -> GET /api/master/nodes/:id
+		master.GET("/clients/:id", func(c *gin.Context) {
+			a.GetNode(c)
+		})
+
+		// DELETE /api/master/clients/:id -> DELETE /api/master/nodes/:id
+		master.DELETE("/clients/:id", func(c *gin.Context) {
+			a.UnregisterNode(c)
+		})
+
+		// GET /api/master/overview - 返回集群概览
+		master.GET("/overview", a.GetClusterOverview)
+
+		// ========== 任务管理路由 ==========
+		// GET /api/master/tasks - 获取所有任务
+		master.GET("/tasks", a.ListTasks)
+
+		// POST /api/master/tasks - 创建新任务
+		master.POST("/tasks", a.CreateTask)
+
+		// DELETE /api/master/tasks/:id - 删除任务
+		master.DELETE("/tasks/:id", a.DeleteTask)
+
+		// POST /api/master/tasks/:id/retry - 重试任务
+		master.POST("/tasks/:id/retry", a.RetryTask)
 	}
 
 	a.log.Infof("Node API 适配器路由已注册")
@@ -442,3 +591,226 @@ func (a *NodeAdapter) GetClientScanStatus(c *gin.Context) {
 	status := a.scanner.GetStatus()
 	c.JSON(http.StatusOK, status)
 }
+
+// ==================== 任务管理 API ====================
+
+// ListTasks 返回所有任务列表
+// GET /api/master/tasks
+func (a *NodeAdapter) ListTasks(c *gin.Context) {
+	tasks := a.scheduler.ListTasks()
+
+	c.JSON(http.StatusOK, gin.H{
+		"tasks": tasks,
+		"total": len(tasks),
+	})
+}
+
+// CreateTask 创建新任务
+// POST /api/master/tasks
+func (a *NodeAdapter) CreateTask(c *gin.Context) {
+	var req struct {
+		Type    string                 `json:"type"`
+		Payload map[string]interface{} `json:"payload"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		a.log.Errorf("解析任务创建请求失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "无效的请求格式",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	if req.Type == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "缺少必需字段",
+			"message": "任务类型不能为空",
+		})
+		return
+	}
+
+	// 使用 scheduler 提交任务
+	task, err := a.scheduler.SubmitTask(cluster.TaskType(req.Type), req.Payload)
+	if err != nil {
+		a.log.Errorf("创建任务失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "创建任务失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	a.log.Infof("任务创建成功: ID=%s, Type=%s", task.ID, task.Type)
+	c.JSON(http.StatusOK, gin.H{
+		"task": task,
+	})
+}
+
+// DeleteTask 删除任务
+// DELETE /api/master/tasks/:id
+func (a *NodeAdapter) DeleteTask(c *gin.Context) {
+	taskID := c.Param("id")
+	if taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "任务ID不能为空",
+		})
+		return
+	}
+
+	// 使用 scheduler 取消任务
+	if err := a.scheduler.CancelTask(taskID); err != nil {
+		a.log.Errorf("删除任务失败: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "任务未找到",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	a.log.Infof("任务删除成功: %s", taskID)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "任务删除成功",
+		"taskId":  taskID,
+	})
+}
+
+// RetryTask 重试任务
+// POST /api/master/tasks/:id/retry
+func (a *NodeAdapter) RetryTask(c *gin.Context) {
+	taskID := c.Param("id")
+	if taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "任务ID不能为空",
+		})
+		return
+	}
+
+	// 使用 scheduler 重试任务
+	if err := a.scheduler.RetryTask(taskID); err != nil {
+		a.log.Errorf("重试任务失败: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "重试任务失败",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// 获取更新后的任务
+	task, exists := a.scheduler.GetTask(taskID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "任务未找到",
+			"message": fmt.Sprintf("任务 %s 不存在", taskID),
+		})
+		return
+	}
+
+	a.log.Infof("任务重试: %s", taskID)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "任务已重置为待处理状态",
+		"task":    task,
+	})
+}
+
+// ==================== 兼容性 API 方法 ====================
+
+// ListClients 返回客户端列表（前端期望的格式）
+// GET /api/master/clients
+func (a *NodeAdapter) ListClients(c *gin.Context) {
+	clients := a.node.ListClients()
+	total, online, offline, busy := a.node.GetClientCount()
+
+	// 转换为前端期望的格式
+	clientList := make([]gin.H, len(clients))
+	for i, client := range clients {
+		// 计算 GPU 内存总量
+		var gpuMemoryTotal int64 = 0
+		if client.Resources != nil && len(client.Resources.GPUInfo) > 0 {
+			for _, gpu := range client.Resources.GPUInfo {
+				gpuMemoryTotal += gpu.TotalMemory
+			}
+		}
+
+		clientList[i] = gin.H{
+			"id":        client.ID,
+			"name":      client.Name,
+			"address":   client.Address,
+			"port":      client.Port,
+			"tags":      client.Tags,
+			"status":    client.Status,
+			"lastSeen":  client.LastSeen.Format(time.RFC3339),
+			"connected": client.Status == "online",
+			"metadata":  client.Metadata,
+			"capabilities": gin.H{
+				"cpuCount":       client.Capabilities.CPUCount,
+				"memory":         client.Capabilities.Memory,
+				"gpuCount":       client.Capabilities.GPUCount,
+				"gpuMemory":      gpuMemoryTotal,
+				"supportsLlama":  client.Capabilities.SupportsLlama,
+				"supportsPython": client.Capabilities.SupportsPython,
+			},
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"clients": clientList,
+		"total":   total,
+		"stats": gin.H{
+			"total":   total,
+			"online":  online,
+			"offline": offline,
+			"busy":    busy,
+		},
+	})
+}
+
+// GetClusterOverview 返回集群概览
+// GET /api/master/overview
+func (a *NodeAdapter) GetClusterOverview(c *gin.Context) {
+	total, online, offline, busy := a.node.GetClientCount()
+
+	// 从 scheduler 获取任务统计
+	tasks := a.scheduler.ListTasks()
+	totalTasks := len(tasks)
+	runningTasks := 0
+	completedTasks := 0
+	failedTasks := 0
+	pendingTasks := 0
+
+	for _, task := range tasks {
+		switch task.Status {
+		case cluster.TaskStatusRunning:
+			runningTasks++
+		case cluster.TaskStatusCompleted:
+			completedTasks++
+		case cluster.TaskStatusFailed:
+			failedTasks++
+		case cluster.TaskStatusPending:
+			pendingTasks++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"totalClients":   total,
+		"onlineClients":  online,
+		"offlineClients": offline,
+		"busyClients":    busy,
+		"totalTasks":     totalTasks,
+		"pendingTasks":   pendingTasks,
+		"runningTasks":   runningTasks,
+		"completedTasks": completedTasks,
+		"failedTasks":    failedTasks,
+		"nodes": gin.H{
+			"stats": gin.H{
+				"total":   total,
+				"online":  online,
+				"offline": offline,
+				"busy":    busy,
+			},
+		},
+	})
+}
+

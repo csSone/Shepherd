@@ -110,6 +110,15 @@ export interface PerformanceConfig {
 }
 
 /**
+ * 服务器运行模式配置
+ */
+export interface ServerModeConfig {
+  mode: 'master' | 'client' | 'standalone';
+  masterAddress?: string;
+  clientName?: string;
+}
+
+/**
  * 应用配置接口
  */
 export interface AppConfig {
@@ -121,6 +130,7 @@ export interface AppConfig {
   cache: CacheConfig;
   openai?: OpenAIConfig;
   performance?: PerformanceConfig;
+  server: ServerModeConfig;
 }
 
 /**

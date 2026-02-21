@@ -1,7 +1,11 @@
 // Package node provides distributed node management types and interfaces.
 package node
 
-import "time"
+import (
+	"time"
+
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
+)
 
 // NodeRole represents the role of a node in the distributed architecture
 type NodeRole string
@@ -13,16 +17,21 @@ const (
 	NodeRoleHybrid     NodeRole = "hybrid"
 )
 
-// NodeStatus represents the current status of a node
-type NodeStatus string
+// NodeStatus is an alias for the unified NodeState type
+// NodeStatus 是统一 NodeState 类型的别名，保持向后兼容
+type NodeStatus = types.NodeState
 
+// NodeStatus constants - 使用统一的 NodeState 常量
 const (
-	NodeStatusOffline  NodeStatus = "offline"
-	NodeStatusOnline   NodeStatus = "online"
-	NodeStatusBusy     NodeStatus = "busy"
-	NodeStatusError    NodeStatus = "error"
-	NodeStatusDegraded NodeStatus = "degraded"
+	NodeStatusOffline  NodeStatus = types.StateOffline
+	NodeStatusOnline   NodeStatus = types.StateOnline
+	NodeStatusBusy     NodeStatus = types.StateBusy
+	NodeStatusError    NodeStatus = types.StateError
+	NodeStatusDegraded NodeStatus = types.StateDegraded
+	NodeStatusDisabled NodeStatus = types.StateDisabled
 )
+
+// 向后兼容：旧的代码可以继续使用 NodeStatus，实际上使用的是统一的 NodeState
 
 // NodeCapabilities describes what a node can do
 type NodeCapabilities struct {

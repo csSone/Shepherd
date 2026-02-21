@@ -17,6 +17,7 @@ const STATUS_COLORS: Record<ClientStatus, string> = {
   offline: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   busy: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
   error: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+  degraded: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
   disabled: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
 };
 
@@ -28,6 +29,7 @@ const STATUS_LABELS: Record<ClientStatus, string> = {
   offline: '离线',
   busy: '忙碌',
   error: '错误',
+  degraded: '降级',
   disabled: '已禁用',
 };
 
@@ -109,36 +111,38 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
       </div>
 
       {/* 能力信息 */}
-      <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-muted rounded-lg">
-        <div className="flex items-center gap-2 text-sm">
-          <Cpu className="w-4 h-4 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            {client.capabilities.cpuCount} 核心
-          </span>
+      {client.capabilities && (
+        <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-muted rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <Cpu className="w-4 h-4 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              {client.capabilities.cpuCount} 核心
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <HardDrive className="w-4 h-4 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              {formatSize(client.capabilities.memory)}
+            </span>
+          </div>
+          {(client.capabilities.gpuCount ?? 0) > 0 && (
+            <>
+              <div className="flex items-center gap-2 text-sm">
+                <Server className="w-4 h-4 text-purple-500" />
+                <span className="text-muted-foreground">
+                  {client.capabilities.gpuCount} GPU
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <HardDrive className="w-4 h-4 text-purple-500" />
+                <span className="text-muted-foreground">
+                  {client.capabilities.gpuMemory ? formatSize(client.capabilities.gpuMemory) : 'N/A'}
+                </span>
+              </div>
+            </>
+          )}
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <HardDrive className="w-4 h-4 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            {formatSize(client.capabilities.memory)}
-          </span>
-        </div>
-        {client.capabilities.gpuCount > 0 && (
-          <>
-            <div className="flex items-center gap-2 text-sm">
-              <Server className="w-4 h-4 text-purple-500" />
-              <span className="text-muted-foreground">
-                {client.capabilities.gpuCount} GPU
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <HardDrive className="w-4 h-4 text-purple-500" />
-              <span className="text-muted-foreground">
-                {formatSize(client.capabilities.gpuMemory)}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
+      )}
 
       {/* 标签 */}
       {client.tags.length > 0 && (
@@ -202,7 +206,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           </div>
 
           {/* GPU */}
-          {client.capabilities.gpuCount > 0 && (
+          {(client.capabilities?.gpuCount ?? 0) > 0 && (
             <>
               <div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">

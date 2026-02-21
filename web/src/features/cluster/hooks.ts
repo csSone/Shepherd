@@ -13,12 +13,59 @@ import type {
 } from '@/types';
 
 /**
+ * 服务器配置响应类型
+ */
+interface ServerConfigResponse {
+  mode: 'master' | 'client' | 'standalone';
+  server: {
+    host: string;
+    web_port: number;
+    anthropic_port: number;
+    ollama_port: number;
+    lm_studio_port: number;
+  };
+  storage: {
+    type: string;
+    sqlite: Record<string, unknown>;
+  };
+  models: {
+    paths: string[];
+    auto_scan: boolean;
+  };
+  node: {
+    role: string;
+    id: string;
+    name: string;
+  };
+  llamacpp: {
+    paths: Array<{ name: string; path: string; description: string }>;
+  };
+}
+
+/**
+ * 获取服务器配置 Hook
+ */
+export function useServerConfig() {
+  return useQuery({
+    queryKey: ['server', 'config'],
+    queryFn: async (): Promise<ServerConfigResponse> => {
+      const response = await apiClient.get('/config');
+      return response as ServerConfigResponse;
+    },
+    staleTime: 5 * 60 * 1000, // 5 分钟
+    refetchInterval: false,
+  });
+}
+
+/**
  * 获取当前运行模式
  * 集群相关功能仅在 Master 模式下可用
  */
-function useClusterMode() {
-  const { data: config } = useConfig();
-  return config?.server?.mode || 'standalone';
+function useClusterMode(): 'master' | 'client' | 'standalone' {
+  const { data: serverConfig } = useServerConfig();
+
+  // 从后端 API 获取服务器模式，如果未获取到则默认为 standalone
+  return serverConfig?.mode || 'standalone';
 }
 
 /**

@@ -9,32 +9,16 @@ import type {
 } from '@/types';
 
 /**
- * GPU 信息类型
- */
-export interface GPUInfo {
-  id: number;
-  name: string;
-  memory: string;
-  available: boolean;
-  compute_cap: string;
-}
-
-export interface GPUListResponse {
-  gpus: GPUInfo[];
-  count: number;
-}
-
-/**
  * 模型列表 Hook
  */
 export function useModels() {
-  return useQuery({
+  return useQuery<Model[]>({
     queryKey: ['models'],
-    queryFn: async () => {
-      const response = await apiClient.get<ModelListResponse>('/models');
+    queryFn: async (): Promise<Model[]> => {
+      const response = await apiClient.get('/models') as ModelListResponse;
       // 调试日志：检查返回的数据
       console.log('[useModels] 获取到模型列表:', response.models.length, '个模型');
-      const qwenModel = response.models.find(m => m.name.includes('Qwen3.5-397B'));
+      const qwenModel = response.models.find((m: Model) => m.name.includes('Qwen3.5-397B'));
       if (qwenModel) {
         console.log('[useModels] Qwen3.5-397B 模型数据:', {
           name: qwenModel.name,
@@ -169,7 +153,7 @@ export function useScanModels() {
       // 显示扫描结果
       console.log(`[useScanModels] 扫描完成: 找到 ${data.models_found} 个模型`);
       // 检查 Qwen3.5-397B 模型数据
-      const qwenModel = data.models?.find(m => m.name.includes('Qwen3.5-397B'));
+      const qwenModel = data.models?.find((m: Model) => m.name.includes('Qwen3.5-397B'));
       if (qwenModel) {
         console.log('[useScanModels] Qwen3.5-397B 扫描结果:', {
           name: qwenModel.name,
@@ -215,7 +199,7 @@ export function useFilteredModels(
     status?: ModelStatus;
     favourite?: boolean;
   }
-) {
+): Model[] {
   if (!models) return [];
 
   // 过滤模型
@@ -238,9 +222,9 @@ export function useFilteredModels(
     return true;
   });
 
-  // 排序模型：按名称排序，确保顺序稳定
-  // 使用 toSorted() 创建新数组而不是修改原数组，确保引用稳定
-  return filtered.toSorted((a, b) => {
+  // 排序模型：稳定的排序，确保每次刷新后顺序一致
+  // 排序优先级：名称（字母）> 扫描时间 > 路径
+  return [...filtered].sort((a: Model, b: Model) => {
     // 优先按显示名称（别名或模型名）排序
     const aName = (a.alias || a.displayName || a.name).toLowerCase();
     const bName = (b.alias || b.displayName || b.name).toLowerCase();
@@ -248,15 +232,21 @@ export function useFilteredModels(
     const nameCompare = aName.localeCompare(bName, 'zh-CN');
     if (nameCompare !== 0) return nameCompare;
 
-    // 如果名称相同，按路径排序
+    // 名称相同时，按扫描时间降序排序（最新的在前）
+    const aTime = new Date(a.scannedAt).getTime();
+    const bTime = new Date(b.scannedAt).getTime();
+    if (aTime !== bTime) return bTime - aTime;
+
+    // 扫描时间也相同时，按路径排序
     return a.path.localeCompare(b.path);
   });
 }
 
 /**
- * GPU 信息类型（Shepherd 扩展格式）
+ * 系统端点 GPU 信息类型（Shepherd 扩展格式）
+ * 用于 /system/gpus 端点返回的 GPU 信息
  */
-export interface GPUInfo {
+export interface SystemGPUInfo {
   id: string;          // 设备 ID，如 "ROCm0"
   name: string;        // GPU 名称
   totalMemory?: string; // 总内存，如 "122880 MiB"
@@ -266,10 +256,10 @@ export interface GPUInfo {
 }
 
 /**
- * GPU 列表响应
+ * 系统 GPU 列表响应
  */
-export interface GPUListResponse {
-  gpus: GPUInfo[];      // 详细 GPU 信息（Shepherd 扩展）
+export interface SystemGPUListResponse {
+  gpus: SystemGPUInfo[];      // 详细 GPU 信息（Shepherd 扩展）
   devices: string[];    // 简单设备字符串列表（兼容 LlamacppServer 格式）
   count: number;
 }
@@ -278,10 +268,10 @@ export interface GPUListResponse {
  * 获取系统 GPU 列表 Hook
  */
 export function useGPUs() {
-  return useQuery({
+  return useQuery<SystemGPUListResponse>({
     queryKey: ['system', 'gpus'],
     queryFn: async () => {
-      const response = await apiClient.get<GPUListResponse>('/system/gpus');
+      const response = await apiClient.get<SystemGPUListResponse>('/system/gpus');
       return response;
     },
     staleTime: 60 * 1000, // GPU 信息缓存 1 分钟
@@ -326,9 +316,7 @@ export function useModelCapabilities(modelId: string) {
   return useQuery({
     queryKey: ['models', 'capabilities', modelId],
     queryFn: async () => {
-      const response = await apiClient.get<{ capabilities: ModelCapabilities }>('/models/capabilities/get', {
-        params: { modelId },
-      });
+      const response = await apiClient.get<{ capabilities: ModelCapabilities }>('/models/capabilities/get', { modelId });
       return response.capabilities;
     },
     enabled: !!modelId,

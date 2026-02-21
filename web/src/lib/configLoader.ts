@@ -60,6 +60,11 @@ const DEFAULT_CONFIG: AppConfig = {
     prefix: 'shepherd:',
     versioning: true,
   },
+  server: {
+    mode: 'standalone',
+    masterAddress: '',
+    clientName: '',
+  },
 };
 
 export class ConfigLoader {
@@ -135,6 +140,7 @@ export class ConfigLoader {
       cache: { ...defaults.cache, ...loaded?.cache },
       openai: loaded?.openai ? { ...defaults.openai, ...loaded.openai } : defaults.openai,
       performance: loaded?.performance ? { ...defaults.performance, ...loaded.performance } : defaults.performance,
+      server: { ...defaults.server, ...loaded?.server },
     }
   }
 }

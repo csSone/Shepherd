@@ -12,15 +12,24 @@ export class ApiClient {
     this.baseUrl = baseUrl.replace(/\/+$/, '')
   }
 
-  async get(path: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+  async get<T = any>(path: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+    const url = new URL(`${this.baseUrl}${path}`, window.location.origin)
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.append(key, String(value))
+        }
+      })
+    }
+    const res = await fetch(url.toString(), {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
+      signal,
     })
     return res.json()
   }
 
-  async post(path: string, body: any): Promise<any> {
+  async post<T = any>(path: string, body?: any): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -29,7 +38,7 @@ export class ApiClient {
     return res.json()
   }
 
-  async put(path: string, body: any): Promise<any> {
+  async put<T = any>(path: string, body: any): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -38,7 +47,7 @@ export class ApiClient {
     return res.json()
   }
 
-  async delete(path: string): Promise<any> {
+  async delete<T = any>(path: string): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },

@@ -15,7 +15,7 @@ import { useAlertDialog } from '@/hooks/useAlertDialog';
  */
 export function ModelsPage() {
   const alertDialog = useAlertDialog();
-  const { data: models, isLoading } = useModels();
+  const { data: models = [], isLoading } = useModels();
   const loadModel = useLoadModel();
   const unloadModel = useUnloadModel();
   const setFavourite = useSetModelFavourite();

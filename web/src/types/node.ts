@@ -4,9 +4,9 @@
 export type NodeRole = 'standalone' | 'master' | 'client' | 'hybrid';
 
 /**
- * 节点状态
+ * 节点状态 - 统一状态定义，与后端 types.NodeState 保持一致
  */
-export type NodeStatus = 'offline' | 'online' | 'busy' | 'error' | 'degraded';
+export type NodeStatus = 'offline' | 'online' | 'busy' | 'error' | 'degraded' | 'disabled';
 
 /**
  * GPU 信息

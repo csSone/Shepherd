@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, HelpCircle, Loader2, ChevronDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LoadModelParams, ModelCapabilities } from '@/types';
-import { useGPUs, useModelCapabilities, useSetModelCapabilities, useLlamacppBackends, useEstimateVRAM, type GPUInfo, type LlamacppBackend } from '@/features/models/hooks';
+import { useGPUs, useModelCapabilities, useSetModelCapabilities, useLlamacppBackends, useEstimateVRAM, type SystemGPUInfo, type LlamacppBackend } from '@/features/models/hooks';
 
 interface LoadModelDialogProps {
   isOpen: boolean;
@@ -681,7 +681,7 @@ export function LoadModelDialog({
                     className="w-full"
                   >
                     <option value="default">默认</option>
-                    {gpus.map((gpu: GPUInfo) => (
+                    {gpus.map((gpu: SystemGPUInfo) => (
                       <option key={gpu.id} value={gpu.id}>
                         {gpu.name}
                       </option>
@@ -720,7 +720,7 @@ export function LoadModelDialog({
                       </div>
                     ) : gpus.length > 0 ? (
                       <div className="space-y-1">
-                        {gpus.map((gpu: GPUInfo) => (
+                        {gpus.map((gpu: SystemGPUInfo) => (
                           <label
                             key={gpu.id}
                             className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent"
@@ -1219,10 +1219,10 @@ export function LoadModelDialog({
                     cacheTypeV: params.kvCacheTypeV,
                   });
 
-                  if (result.data?.success && result.data.data?.vramGB) {
-                    setEstimateResult(`约需 ${result.data.data.vramGB} GB 显存`);
-                  } else if (result.data?.error) {
-                    setEstimateResult(`估算失败: ${result.data.error}`);
+                  if (result.data?.vramGB) {
+                    setEstimateResult(`约需 ${result.data.vramGB} GB 显存`);
+                  } else if (result.error || result.data?.error) {
+                    setEstimateResult(`估算失败: ${result.error || result.data?.error}`);
                   } else {
                     setEstimateResult('估算失败');
                   }

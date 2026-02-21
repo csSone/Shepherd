@@ -111,8 +111,8 @@ export function TestModelDialog({
               const content = parsed.choices?.[0]?.delta?.content || '';
               if (content) {
                 fullContent += content;
-                setMessages((prev) =
-                  prev.map((msg) =
+                setMessages((prev) =>
+                  prev.map((msg) =>
                     msg.id === assistantMessage.id
                       ? { ...msg, content: fullContent }
                       : msg
@@ -126,8 +126,8 @@ export function TestModelDialog({
         }
       }
 
-      setMessages((prev) =
-        prev.map((msg) =
+      setMessages((prev) =>
+        prev.map((msg) =>
           msg.id === assistantMessage.id
             ? { ...msg, isStreaming: false }
             : msg
@@ -135,7 +135,7 @@ export function TestModelDialog({
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : '请求失败');
-      setMessages((prev) =
+      setMessages((prev) =>
         prev.filter((msg) => msg.id !== assistantMessage.id)
       );
     } finally {

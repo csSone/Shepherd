@@ -33,8 +33,8 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 0% 25%;
+    --primary-foreground: 0 0% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -45,30 +45,31 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 0 0% 25%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* VSCode Dark+ 风格 */
+    --background: 220 15% 12%;      /* #1e1e1e */
+    --foreground: 0 0% 95%;          /* #f0f0f0 */
+    --card: 220 15% 14%;             /* #252526 - 稍浅于背景 */
+    --card-foreground: 0 0% 92%;     /* #eaeaea */
+    --popover: 220 15% 14%;
+    --popover-foreground: 0 0% 92%;
+    --primary: 0 0% 85%;             /* #d9d9d9 */
+    --primary-foreground: 220 15% 12%; /* #1e1e1e */
+    --secondary: 220 12% 20%;         /* #333333 */
+    --secondary-foreground: 0 0% 90%;
+    --muted: 220 12% 20%;            /* #333333 */
+    --muted-foreground: 0 0% 60%;    /* #999999 */
+    --accent: 220 12% 25%;           /* #3d3d3d */
+    --accent-foreground: 0 0% 90%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 220 10% 25%;           /* #3c3c3c */
+    --input: 220 10% 20%;            /* #333333 */
+    --ring: 0 0% 65%;                /* #a6a6a6 */
   }
 }
 

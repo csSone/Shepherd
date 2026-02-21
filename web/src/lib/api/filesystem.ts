@@ -47,7 +47,7 @@ export const filesystemApi = {
    * @param path 目录路径,空值表示根目录
    */
   listDirectory: (path?: string): Promise<{ success: boolean; data: DirectoryListResponse }> =>
-    apiClient.get<{ success: boolean; data: DirectoryListResponse }>('/system/filesystem', path ? { path } : {}),
+    apiClient.get<{ success: boolean; data: DirectoryListResponse }>('/system/filesystem', path ? { path } : undefined),
 
   /**
    * 验证路径

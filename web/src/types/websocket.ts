@@ -49,7 +49,7 @@ export interface PongMessage extends WebSocketMessage {
 /**
  * 事件消息
  */
-export interface EventMessage<T = unknown> extends WebSocketMessage<T> {
+export interface EventMessage<T = unknown> extends Omit<WebSocketMessage<T>, 'payload'> {
   type: 'event';
   payload: {
     eventType: string;

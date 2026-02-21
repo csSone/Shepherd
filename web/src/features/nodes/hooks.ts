@@ -97,10 +97,10 @@ export function useSendCommand() {
 }
 
 export function useNodesByRole(role: string) {
-  return useQuery({
+  return useQuery<DistributedNode[]>({
     queryKey: ['nodes', 'role', role],
     queryFn: async () => {
-      const response = await apiClient.get<NodeListResponse>('/master/nodes');
+      const response = await apiClient.get('/master/nodes') as NodeListResponse;
       return response.nodes.filter((node) => node.role === role);
     },
     enabled: !!role,
@@ -108,10 +108,10 @@ export function useNodesByRole(role: string) {
 }
 
 export function useNodesByStatus(status: string) {
-  return useQuery({
+  return useQuery<DistributedNode[]>({
     queryKey: ['nodes', 'status', status],
     queryFn: async () => {
-      const response = await apiClient.get<NodeListResponse>('/master/nodes');
+      const response = await apiClient.get('/master/nodes') as NodeListResponse;
       return response.nodes.filter((node) => node.status === status);
     },
     enabled: !!status,

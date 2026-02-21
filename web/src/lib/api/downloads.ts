@@ -111,13 +111,13 @@ export const downloadsApi = {
    * 支持 AbortSignal 用于取消请求
    */
   listModelFiles: (source: 'huggingface' | 'modelscope', repoId: string, signal?: AbortSignal): Promise<ModelFilesResponse> =>
-    apiClient.get<ModelFilesResponse>(`/repo/files?source=${source}&repoId=${encodeURIComponent(repoId)}`, undefined, signal),
+    apiClient.get<ModelFilesResponse>('/repo/files', { source, repoId }, signal),
 
   /**
    * 搜索 HuggingFace 模型
    */
   searchHuggingFace: (query: string, limit?: number, signal?: AbortSignal): Promise<HuggingFaceSearchResponse> =>
-    apiClient.get<HuggingFaceSearchResponse>(`/repo/search?q=${encodeURIComponent(query)}&limit=${limit || 20}`, undefined, signal),
+    apiClient.get<HuggingFaceSearchResponse>('/repo/search', { q: query, limit: limit || 20 }, signal),
 
   /**
    * 获取模型仓库配置

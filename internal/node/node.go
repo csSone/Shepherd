@@ -162,11 +162,121 @@ func (n *Node) Stop() error {
 	return nil
 }
 
-// GetID 获取节点ID
-func (n *Node) GetID() string {
+// ID 获取节点ID（实现 INode 接口）
+func (n *Node) ID() string {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.id
+}
+
+// GetID 获取节点ID（向后兼容）
+func (n *Node) GetID() string {
+	return n.ID()
+}
+
+// Name 获取节点名称（实现 INode 接口）
+func (n *Node) Name() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.name
+}
+
+// Role 获取节点角色（实现 INode 接口）
+func (n *Node) Role() NodeRole {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.role
+}
+
+// Status 获取节点状态（实现 INode 接口）
+func (n *Node) Status() NodeStatus {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.status
+}
+
+// Address 获取节点地址（实现 INode 接口）
+func (n *Node) Address() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.address
+}
+
+// Port 获取节点端口（实现 INode 接口）
+func (n *Node) Port() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.port
+}
+
+// Health 获取健康状态（实现 INode 接口）
+func (n *Node) Health() *HealthStatus {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	status := &HealthStatus{
+		NodeID:   n.id,
+		Status:   n.status,
+		Healthy:  n.status == NodeStatusOnline,
+		LastSeen: n.lastSeen,
+		Checks:   make(map[string]bool),
+		Issues:   make([]string, 0),
+		Warnings: make([]string, 0),
+	}
+
+	// 基本检查
+	status.Checks["running"] = n.running
+	status.Checks["context_valid"] = n.ctx.Err() == nil
+
+	// 资源检查
+	if n.resources != nil {
+		// 检查内存使用率
+		if n.resources.MemoryTotal > 0 {
+			memPercent := float64(n.resources.MemoryUsed) / float64(n.resources.MemoryTotal) * 100
+			if memPercent > 95 {
+				status.Issues = append(status.Issues, "内存使用率过高")
+				status.Healthy = false
+			} else if memPercent > 80 {
+				status.Warnings = append(status.Warnings, "内存使用率较高")
+			}
+		}
+
+		// 检查磁盘使用率
+		if n.resources.DiskTotal > 0 {
+			diskPercent := float64(n.resources.DiskUsed) / float64(n.resources.DiskTotal) * 100
+			if diskPercent > 95 {
+				status.Issues = append(status.Issues, "磁盘使用率过高")
+				status.Healthy = false
+			} else if diskPercent > 80 {
+				status.Warnings = append(status.Warnings, "磁盘使用率较高")
+			}
+		}
+	}
+
+	return status
+}
+
+// UpdateConfig 更新节点配置（实现 INode 接口）
+func (n *Node) UpdateConfig(config *NodeConfig) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.running {
+		return fmt.Errorf("节点运行时不能更新配置")
+	}
+
+	if config == nil {
+		return fmt.Errorf("配置不能为空")
+	}
+
+	// 更新配置
+	n.config = config
+	n.name = config.Name
+	n.address = config.Address
+	n.port = config.Port
+	n.updatedAt = time.Now()
+
+	return nil
 }
 
 // GetName 获取节点名称

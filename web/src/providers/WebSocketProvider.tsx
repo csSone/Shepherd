@@ -30,7 +30,7 @@ export function WebSocketProvider({
   onConnect,
   onDisconnect,
   onError,
-}: WebSocketProviderProps): JSX.Element {
+}: WebSocketProviderProps): React.ReactElement {
   const [connectionStatus, setConnectionStatus] = useState<WebSocketConnectionStatus>('disconnected');
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);

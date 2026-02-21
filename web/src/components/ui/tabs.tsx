@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 const TabsContext = React.createContext<{
   value: string;
   onValueChange: (value: string) => void;
-}> | null>(null);
+} | null>(null);
 
 interface TabsProps {
   value: string;

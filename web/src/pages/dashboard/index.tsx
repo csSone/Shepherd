@@ -1,13 +1,27 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useModels } from '@/features/models/hooks';
 import { formatBytes } from '@/lib/utils';
 import { Package, Download, Network, Activity } from 'lucide-react';
+import type { Model } from '@/types';
 
 /**
  * 仪表盘页面
  */
 export function DashboardPage() {
-  const { data: models, isLoading } = useModels();
+  const { data: models = [], isLoading } = useModels();
+
+  // 按扫描时间排序，获取最近 5 个模型（稳定的排序）
+  const recentModels = useMemo(() => {
+    return [...models]
+      .sort((a: Model, b: Model) => {
+        // 按扫描时间降序排序（最新的在前）
+        const aTime = new Date(a.scannedAt).getTime();
+        const bTime = new Date(b.scannedAt).getTime();
+        return bTime - aTime;
+      })
+      .slice(0, 5);
+  }, [models]);
 
   const stats = [
     {
@@ -74,14 +88,19 @@ export function DashboardPage() {
           <CardDescription>最近扫描的模型列表</CardDescription>
         </CardHeader>
         <CardContent>
-          {models && models.length > 0 ? (
+          {recentModels.length > 0 ? (
             <div className="space-y-4">
-              {models.slice(0, 5).map((model) => (
+              {recentModels.map((model) => (
                 <div key={model.id} className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">{model.alias || model.name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {model.metadata.architecture} • {formatBytes(model.size)}
+                      {model.metadata.architecture} • {formatBytes(model.totalSize ?? model.size)}
+                      {model.shardCount && model.shardCount > 1 && (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          ({model.shardCount} 分卷)
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">

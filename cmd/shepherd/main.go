@@ -369,7 +369,8 @@ func (app *App) buildNodeConfig() *node.NodeConfig {
 // initNodeAdapter 初始化 Node API 适配器
 func (app *App) initNodeAdapter() error {
 	if app.node != nil {
-		app.nodeAdapter = api.NewNodeAdapter(app.node, logger.GetLogger())
+		schedulerCfg := &app.cfg.Master.Scheduler
+		app.nodeAdapter = api.NewNodeAdapter(app.node, logger.GetLogger(), schedulerCfg)
 		logger.Info("Node API 适配器已创建")
 		return nil
 	}

@@ -1,17 +1,24 @@
 // Package cluster provides distributed cluster management types and interfaces.
 package cluster
 
-import "time"
+import (
+	"time"
 
-// ClientStatus represents the current status of a client
-type ClientStatus string
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
+)
 
+// ClientStatus is an alias for the unified NodeState type
+// ClientStatus 是统一 NodeState 类型的别名，保持向后兼容
+type ClientStatus = types.NodeState
+
+// ClientStatus constants - 使用统一的 NodeState 常量
 const (
-	ClientStatusOffline   ClientStatus = "offline"
-	ClientStatusOnline    ClientStatus = "online"
-	ClientStatusBusy      ClientStatus = "busy"
-	ClientStatusError     ClientStatus = "error"
-	ClientStatusDisabled  ClientStatus = "disabled"
+	ClientStatusOffline   ClientStatus = types.StateOffline
+	ClientStatusOnline    ClientStatus = types.StateOnline
+	ClientStatusBusy      ClientStatus = types.StateBusy
+	ClientStatusError     ClientStatus = types.StateError
+	ClientStatusDegraded  ClientStatus = types.StateDegraded
+	ClientStatusDisabled  ClientStatus = types.StateDisabled
 )
 
 // TaskStatus represents the current status of a task

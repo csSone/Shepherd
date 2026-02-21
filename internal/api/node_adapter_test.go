@@ -31,7 +31,11 @@ func setupTestNodeAdapter(t *testing.T) (*NodeAdapter, *node.Node, func()) {
 	log, err := logger.NewLogger(logCfg, "test")
 	require.NoError(t, err)
 
-	adapter := NewNodeAdapter(n, log)
+	schedulerCfg := &config.SchedulerConfig{
+		Strategy:     "round_robin",
+		MaxQueueSize: 100,
+	}
+	adapter := NewNodeAdapter(n, log, schedulerCfg)
 
 	cleanup := func() {
 		n.Stop()

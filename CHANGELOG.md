@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### 架构重构 - 职责分离与类型统一
+- **统一类型系统** - 新增 `internal/types/common.go` 统一状态和类型定义
+  - `types.NodeState` - 统一的节点状态枚举（包含 offline、online、busy、error、degraded、disabled）
+  - `types.ApiResponse[T]` - 类型安全的泛型 API 响应格式
+  - 消除了 `NodeStatus` 和 `ClientStatus` 的重复定义
+
+- **接口定义** - 新增 `internal/node/interfaces.go` 定义清晰的接口边界
+  - `INode` - 节点核心接口
+  - `IClientRegistry` - 客户端注册表接口
+  - `ICommandQueue` - 命令队列接口
+  - `IResourceMonitor` - 资源监控接口
+
+- **职责分离** - 将 Node 的职责拆分为独立组件
+  - `internal/registry/memory.go` - 内存客户端注册表实现
+  - `internal/commands/queue.go` - 内存命令队列实现
+  - `internal/monitor/resource.go` - 资源监控实现（含 GPU 检测）
+
+- **Scheduler 增强** - 新增任务重试功能
+  - `scheduler.RetryTask()` - 支持重试失败或已取消的任务
+
+### Changed
+
+- **Node 重构** - `internal/node/node.go` 使用接口而非直接依赖具体实现
+  - 添加接口方法（ID、Name、Role、Status、Health 等）
+  - 保留向后兼容的旧方法（GetID、GetName 等）
+  - 通过接口委托功能而非直接持有子系统
+
+- **适配层清理** - `internal/api/node_adapter.go` 移除临时实现
+  - 删除临时 `clusterTask` 结构体
+  - 删除临时 `tasks` map 和 `tasksMu`
+  - 集成真实的 `scheduler.Scheduler`
+  - 创建 `nodeClientManager` 适配器桥接接口
+  - 更新所有任务管理 API 使用真实 Scheduler
+
+- **前端类型更新** - 统一前后端类型定义
+  - `web/src/types/cluster.ts` - 更新 `Capabilities`、`Client`、`ClusterOverview`
+  - `web/src/types/node.ts` - 统一 `NodeStatus` 包含 `disabled` 状态
+  - 添加 `gpuCount`、`pendingTasks` 等字段
+
+- **TypeScript 类型安全** - 修复 `ClientCard.tsx` 中的类型问题
+  - 添加 `degraded` 状态的颜色和标签
+  - 使用可选链操作符处理 `capabilities` 和 `resources`
+  - 添加空值合并操作符提供默认值
+
+### Fixed
+
+- 修复 `ClientCard.tsx` 中 `client.capabilities` 可能为 undefined 的类型错误
+- 修复 `STATUS_COLORS` 和 `STATUS_LABELS` 缺少 `degraded` 状态的问题
+- 修复 `node_adapter_test.go` 缺少 `SchedulerConfig` 参数的问题
+- 修复 `cmd/shepherd/main.go` 中 `NewNodeAdapter` 调用参数问题
+
+### Test
+
+- 添加 `internal/registry/memory_test.go` - ClientRegistry 单元测试
+- 添加 `internal/monitor/resource_test.go` - ResourceMonitor 单元测试
+- 更新 `internal/api/node_adapter_test.go` - 添加 SchedulerConfig 参数
+- 所有测试通过（registry、monitor、api）
+- 前端类型检查通过（`npm run type-check`）
+
 
 ## [0.3.0] - 2025-02-21
 
