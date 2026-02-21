@@ -11,7 +11,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 从 linux/ 子目录向上两级到达项目根目录
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-SOURCE_CONFIG="$PROJECT_ROOT/config/web.config.yaml"
+# 查找配置文件: node > example
+SOURCE_CONFIG="$PROJECT_ROOT/config/node/web.config.yaml"
+if [ ! -f "$SOURCE_CONFIG" ]; then
+    SOURCE_CONFIG="$PROJECT_ROOT/config/example/web.config.yaml"
+fi
+
 TARGET_CONFIG="$PROJECT_ROOT/web/public/config.yaml"
 
 echo "👀 监视配置文件变化..."

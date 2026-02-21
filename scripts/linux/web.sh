@@ -60,7 +60,7 @@ show_help() {
     $0 fix                # 修复依赖问题
 
 说明:
-    端口配置请修改 config/web.config.yaml 中的 server.port
+    端口配置请修改 config/node/web.config.yaml 或 config/example/web.config.yaml 中的 server.port
 
 EOF
 }
