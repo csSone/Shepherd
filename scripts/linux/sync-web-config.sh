@@ -11,7 +11,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 从 linux/ 子目录向上两级到达项目根目录
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-SOURCE_CONFIG="$PROJECT_ROOT/config/web.config.yaml"
+SOURCE_CONFIG="$PROJECT_ROOT/config/node/web.config.yaml"
+
 TARGET_CONFIG="$PROJECT_ROOT/web/public/config.yaml"
 
 echo "📋 同步前端配置文件..."
