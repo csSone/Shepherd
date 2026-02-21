@@ -44,9 +44,6 @@ bin/
 logs/
 *.log
 
-# Config (runtime)
-config/config.yaml
-config/clients.yaml
 
 # OS
 .DS_Store
