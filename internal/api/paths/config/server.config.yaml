@@ -24,6 +24,10 @@ download:
     chunk_size: 1048576
     retry_count: 3
     timeout: 300
+model_repo:
+    endpoint: huggingface.co
+    token: ""
+    timeout: 30
 security:
     api_key_enabled: false
     api_key: ""
