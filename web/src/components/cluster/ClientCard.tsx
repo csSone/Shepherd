@@ -1,6 +1,8 @@
-import { Server, Cpu, HardDrive, Wifi, WifiOff, AlertCircle, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Server, Cpu, HardDrive, Wifi, WifiOff, AlertCircle, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ClientInfoDialog } from './ClientInfoDialog';
 import type { Client, ClientStatus } from '@/types';
 
 interface ClientCardProps {
@@ -64,6 +66,7 @@ function formatLastSeen(timestamp: string): string {
 }
 
 export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const statusColor = STATUS_COLORS[client.status];
   const statusLabel = STATUS_LABELS[client.status];
   const isConnected = client.status === 'online' || client.status === 'busy';
@@ -79,6 +82,12 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
     : 0;
 
   return (
+    <>
+      <ClientInfoDialog
+        client={client}
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+      />
     <div className="bg-card rounded-lg border border-border p-4 hover:shadow-lg transition-shadow">
       {/* 标题栏 */}
       <div className="flex items-start justify-between mb-4">
@@ -259,6 +268,14 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
 
         <div className="flex items-center gap-2">
           {actions}
+          <Button
+            onClick={() => setDialogOpen(true)}
+            variant="outline"
+            size="xs"
+          >
+            <Info className="w-3 h-3 mr-1" />
+            详情
+          </Button>
           {onDisconnect && isConnected && (
             <Button
               onClick={onDisconnect}
@@ -288,5 +305,6 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
         </details>
       )}
     </div>
+    </>
   );
 }

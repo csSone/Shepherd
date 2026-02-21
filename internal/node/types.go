@@ -48,17 +48,19 @@ type NodeCapabilities struct {
 
 // NodeResources represents current resource usage and availability
 type NodeResources struct {
-	CPUUsed     int64     `json:"cpuUsed"`     // cores * 1000 (millicores)
-	CPUTotal    int64     `json:"cpuTotal"`    // cores * 1000 (millicores)
-	MemoryUsed  int64     `json:"memoryUsed"`  // bytes
-	MemoryTotal int64     `json:"memoryTotal"` // bytes
-	DiskUsed    int64     `json:"diskUsed"`    // bytes
-	DiskTotal   int64     `json:"diskTotal"`   // bytes
-	GPUInfo     []GPUInfo `json:"gpuInfo,omitempty"`
-	NetworkRx   int64     `json:"networkRx"`             // bytes per second
-	NetworkTx   int64     `json:"networkTx"`             // bytes per second
-	Uptime      int64     `json:"uptime"`                // seconds
-	LoadAverage []float64 `json:"loadAverage,omitempty"` // 1min, 5min, 15min
+	CPUUsed       int64     `json:"cpuUsed"`     // cores * 1000 (millicores)
+	CPUTotal      int64     `json:"cpuTotal"`    // cores * 1000 (millicores)
+	MemoryUsed    int64     `json:"memoryUsed"`  // bytes
+	MemoryTotal   int64     `json:"memoryTotal"` // bytes
+	DiskUsed      int64     `json:"diskUsed"`    // bytes
+	DiskTotal     int64     `json:"diskTotal"`   // bytes
+	GPUInfo       []GPUInfo `json:"gpuInfo,omitempty"`
+	NetworkRx     int64     `json:"networkRx"`               // bytes per second
+	NetworkTx     int64     `json:"networkTx"`               // bytes per second
+	Uptime        int64     `json:"uptime"`                  // seconds
+	LoadAverage   []float64 `json:"loadAverage,omitempty"`   // 1min, 5min, 15min
+	ROCmVersion   string    `json:"rocmVersion,omitempty"`   // ROCm version (if AMD GPU)
+	KernelVersion string    `json:"kernelVersion,omitempty"` // Linux kernel version
 }
 
 // GPUInfo contains information about a GPU

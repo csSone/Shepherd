@@ -32,6 +32,24 @@ export interface ResourceUsage {
   gpuMemoryTotal: number; // bytes
   diskUsed: number; // bytes
   diskTotal: number; // bytes
+  gpuInfo?: GPUInfo[]; // 详细GPU信息
+  rocmVersion?: string; // ROCm版本
+  kernelVersion?: string; // 内核版本
+}
+
+/**
+ * GPU信息
+ */
+export interface GPUInfo {
+  index: number;
+  name: string;
+  vendor: string;
+  totalMemory: number; // bytes
+  usedMemory: number; // bytes
+  temperature: number; // celsius
+  utilization: number; // percentage 0-100
+  powerUsage: number; // watts
+  driverVersion?: string;
 }
 
 /**

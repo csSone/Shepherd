@@ -107,14 +107,14 @@ export function useClients() {
 /**
  * 单个客户端 Hook
  */
-export function useClient(clientId: string) {
+export function useClient(clientId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['cluster', 'clients', clientId],
     queryFn: async () => {
       const response = await apiClient.get<{ success: boolean; data: { client: Client } }>(`/master/clients/${clientId}`);
       return response.data.client;
     },
-    enabled: !!clientId,
+    enabled: !!clientId && options?.enabled !== false,
     refetchInterval: 3000,
   });
 }

@@ -205,6 +205,12 @@ func (rm *ResourceMonitor) initializeResources() error {
 	// 检测GPU
 	rm.detectGPUs()
 
+	// 检测ROCm版本
+	rm.resources.ROCmVersion = rm.detectROCmVersion()
+
+	// 检测内核版本
+	rm.resources.KernelVersion = rm.detectKernelVersion()
+
 	// 检测llama.cpp
 	rm.detectLlamacpp()
 
@@ -531,8 +537,39 @@ func (rm *ResourceMonitor) updateNvidiaGPU(gpu *GPUInfo) {
 
 // updateAMDGPU 更新AMD GPU信息
 func (rm *ResourceMonitor) updateAMDGPU(gpu *GPUInfo) {
-	// AMD GPU 监控的具体实现取决于ROCm版本
-	// 这里提供一个占位符实现
+	// 使用 rocm-smi 获取详细信息
+	cmd := exec.Command("rocm-smi", "--showmeminfo", "vram", "--showtemp", "--showuse", fmt.Sprintf("--gpu=%d", gpu.Index))
+	output, err := cmd.Output()
+	if err != nil {
+		return
+	}
+
+	// 解析 rocm-smi 输出
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		// 解析显存使用 (格式: GPU[0] : VRAM Total: X MiB)
+		if strings.Contains(line, "VRAM Total:") {
+			fields := strings.Fields(line)
+			for i, field := range fields {
+				if field == "Total:" && i+1 < len(fields) {
+					if val, err := strconv.ParseInt(fields[i+1], 10, 64); err == nil {
+						gpu.TotalMemory = val * 1024 * 1024 // MiB to bytes
+					}
+				}
+			}
+		}
+		// 解析温度
+		if strings.Contains(line, "Temperature") {
+			fields := strings.Fields(line)
+			for i, field := range fields {
+				if field == "Sensor" && i+2 < len(fields) {
+					if val, err := strconv.ParseFloat(fields[i+2], 64); err == nil {
+						gpu.Temperature = val
+					}
+				}
+			}
+		}
+	}
 }
 
 // updateIntelGPU 更新Intel GPU信息
@@ -618,6 +655,53 @@ func (rm *ResourceMonitor) testLlamacppPath(path string) *LlamacppInfo {
 	return info
 }
 
+// detectROCmVersion 检测ROCm版本
+func (rm *ResourceMonitor) detectROCmVersion() string {
+	// 尝试使用 rocm-smi 获取版本
+	cmd := exec.Command("rocm-smi", "--showversion")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "ROCm") {
+				fields := strings.Fields(line)
+				for i, field := range fields {
+					if strings.Contains(field, "ROCm") && i+1 < len(fields) {
+						return strings.TrimSpace(fields[i+1])
+					}
+				}
+			}
+		}
+	}
+
+	// 尝试通过 hipcc 获取版本
+	cmd = exec.Command("hipcc", "--version")
+	output, err = cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "HIP version") {
+				fields := strings.Fields(line)
+				for i, field := range fields {
+					if field == "version" && i+1 < len(fields) {
+						return strings.TrimSpace(fields[i+1])
+					}
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// detectKernelVersion 检测Linux内核版本
+func (rm *ResourceMonitor) detectKernelVersion() string {
+	if hostStat, err := host.Info(); err == nil {
+		return hostStat.KernelVersion
+	}
+	return ""
+}
+
 // Watch sets a callback function to be called when resources are updated
 func (rm *ResourceMonitor) Watch(callback func(*NodeResources)) {
 	rm.mu.Lock()
@@ -649,4 +733,3 @@ func (rm *ResourceMonitor) GetMetrics() *NodeMetrics {
 		LoadAverage: rm.resources.LoadAverage,
 	}
 }
-
