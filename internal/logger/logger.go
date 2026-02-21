@@ -180,10 +180,21 @@ func (l *Logger) rotateLog(reason string) {
 		return
 	}
 
-	// Close current file
-	l.fileWriter.Close()
+	// 第一步：先从 outputs 中移除旧的 fileWriter，防止其他 goroutine 继续使用
+	newOutputs := []io.Writer{}
+	for _, w := range l.outputs {
+		if w != l.fileWriter {
+			newOutputs = append(newOutputs, w)
+		}
+	}
+	l.outputs = newOutputs
 
-	// Rename current log file with timestamp
+	// 第二步：安全地关闭文件
+	if err := l.fileWriter.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] 关闭日志文件失败: %v\n", err)
+	}
+
+	// 第三步：重命名当前日志文件为备份
 	// 格式: shepherd-{mode}-{date}-{timestamp}-{reason}.log
 	logFileName := fmt.Sprintf("shepherd-%s-%s.log", l.serverMode, l.currentDate)
 	logFile := filepath.Join(l.logDir, logFileName)
@@ -192,31 +203,20 @@ func (l *Logger) rotateLog(reason string) {
 
 	os.Rename(logFile, backupFile)
 
-	// Compress if enabled (create .gz file)
-	// For simplicity, we'll skip actual compression here
-	// In production, you'd use gzip/compress
-
-	// Clean old backups
+	// 第四步：清理旧备份
 	l.cleanOldBackups()
 
-	// Create new log file
+	// 第五步：创建新日志文件
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] 创建新日志文件失败: %v\n", err)
 		return
 	}
 
+	// 第六步：更新 fileWriter 并添加到 outputs
 	l.fileWriter = f
 	l.currentSize = 0
-
-	// Update outputs
-	newOutputs := []io.Writer{}
-	for _, w := range l.outputs {
-		if wc, ok := w.(io.WriteCloser); ok && wc != l.fileWriter {
-			newOutputs = append(newOutputs, w)
-		}
-	}
-	newOutputs = append(newOutputs, f)
-	l.outputs = newOutputs
+	l.outputs = append(l.outputs, f)
 }
 
 func (l *Logger) cleanOldBackups() {

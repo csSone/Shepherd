@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
+import { useConfig } from '@/features/config/hooks';
 import type {
   Client,
   ClusterTask,
@@ -12,9 +13,20 @@ import type {
 } from '@/types';
 
 /**
+ * 获取当前运行模式
+ * 集群相关功能仅在 Master 模式下可用
+ */
+function useClusterMode() {
+  const { data: config } = useConfig();
+  return config?.server?.mode || 'standalone';
+}
+
+/**
  * 集群概览 Hook
  */
 export function useClusterOverview() {
+  const mode = useClusterMode();
+
   return useQuery({
     queryKey: ['cluster', 'overview'],
     queryFn: async () => {
@@ -23,6 +35,7 @@ export function useClusterOverview() {
     },
     staleTime: 10 * 1000, // 10 秒
     refetchInterval: 5000, // 每 5 秒刷新
+    enabled: mode === 'master', // 仅在 Master 模式下启用
   });
 }
 
@@ -30,6 +43,8 @@ export function useClusterOverview() {
  * 客户端列表 Hook
  */
 export function useClients() {
+  const mode = useClusterMode();
+
   return useQuery({
     queryKey: ['cluster', 'clients'],
     queryFn: async () => {
@@ -38,6 +53,7 @@ export function useClients() {
     },
     staleTime: 10 * 1000,
     refetchInterval: 5000,
+    enabled: mode === 'master', // 仅在 Master 模式下启用
   });
 }
 
@@ -77,6 +93,8 @@ export function useDisconnectClient() {
  * 任务列表 Hook
  */
 export function useClusterTasks() {
+  const mode = useClusterMode();
+
   return useQuery({
     queryKey: ['cluster', 'tasks'],
     queryFn: async () => {
@@ -85,6 +103,7 @@ export function useClusterTasks() {
     },
     staleTime: 5 * 1000,
     refetchInterval: 2000,
+    enabled: mode === 'master', // 仅在 Master 模式下启用
   });
 }
 

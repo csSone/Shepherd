@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, RefreshCw, Radar, Server, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Search, RefreshCw, Radar, Server, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   useClients,
@@ -13,12 +13,31 @@ import { ClientCard } from '@/components/cluster/ClientCard';
 import { cn } from '@/lib/utils';
 import type { ClientStatus, TaskStatus } from '@/types';
 import { useAlertDialog } from '@/hooks/useAlertDialog';
+import { useConfig } from '@/features/config/hooks';
 
 /**
  * 集群管理页面
  */
 export function ClusterPage() {
   const alertDialog = useAlertDialog();
+  const { data: config } = useConfig();
+
+  // Standalone 模式下显示提示信息
+  if (config?.server?.mode === 'standalone') {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)]">
+        <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">集群管理功能不可用</h2>
+        <p className="text-gray-600 dark:text-gray-400 text-center max-w-md">
+          集群管理功能仅在 <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">Master</span> 模式下可用。
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-500 mt-4">
+          请在配置文件中将模式设置为 <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">master</code> 或 <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">client</code>。
+        </p>
+      </div>
+    );
+  }
+
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: tasks, isLoading: tasksLoading } = useClusterTasks();
   const { data: overview } = useClusterOverview();
