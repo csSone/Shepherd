@@ -9,8 +9,8 @@
 
 ## ✨ 核心特性
 
-- **极快启动** - <500ms 启动时间，相比 Java 版本快 20 倍
-- **低内存占用** - 仅 ~30MB 内存，相比 Java 版本减少 85%
+- **极速启动** - <500ms 启动时间
+- **轻量高效** - 内存占用仅 ~30MB
 - **单一二进制** - 无需运行时依赖，开箱即用
 - **分布式架构** - 支持 Master-Client 多节点部署
 - **多 API 兼容** - OpenAI / Anthropic / Ollama / LM Studio
@@ -184,16 +184,6 @@ npm run build    # 构建生产版本
 
 ---
 
-## 📊 性能对比
-
-| 特性 | Java 版本 | Go 版本 | 改进 |
-|------|---------|---------|------|
-| 启动时间 | 5-10 秒 | <500ms | **20x** |
-| 内存占用 | ~200MB | ~30MB | **-85%** |
-| 部署体积 | ~150MB | ~15MB | **-90%** |
-
----
-
 ## 🗺️ 路线图
 
 - [x] v0.1.0 - 核心功能
@@ -231,7 +221,7 @@ Apache License 2.0 - 详见 [LICENSE](LICENSE) 文件
 ## 🙏 致谢
 
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - 核心推理引擎
-- [LlamacppServer](https://github.com/markpublish/LlamacppServer) - 原始 Java 版本
+- [LlamacppServer](https://github.com/markpublish/LlamacppServer) - 项目参考
 
 ---
 
