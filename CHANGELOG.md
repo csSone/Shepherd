@@ -5,7 +5,7 @@ All notable changes to Shepherd will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.3.0] - 2026-02-22
 
 ### Added
 - **HuggingFace SDK 集成**: 集成两个 HuggingFace Go SDK
@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 支持基础下载模式（Basic）和高级下载模式（Advanced）
   - 添加下载进度回调支持（速度、ETA、百分比）
   - 支持多种端点（官方 HuggingFace 和 HF-Mirror）
+  - 前端添加 HuggingFace 模型搜索和下载 UI
+- **llama.cpp 测试功能**: 新增 `internal/client/tester` 包
+  - 自动检测常见 llama.cpp 二进制路径
+  - 测试二进制可执行性和版本信息
+  - 支持环境变量 `LLAMACPP_SERVER_PATH`
+  - 系统信息收集（GPU/CPU/ROCm）
+  - 前端添加 llama.cpp 可用性测试 UI
+- **配置报告功能**: 新增 `internal/client/configreport` 包
+  - 收集 llama.cpp 路径配置和可用性
+  - 收集模型路径和模型数量
+  - 环境信息（OS/Kernel/Python/Go 版本）
+  - Conda 配置和执行器配置
+  - 前端添加节点配置信息展示
+- **NodeAdapter API 增强**:
+  - `POST /api/nodes/:id/test-llamacpp` - 测试 llama.cpp 可用性
+  - `GET /api/nodes/:id/config` - 获取节点配置信息
 - **配置验证测试**: 添加模式验证测试
   - 验证所有有效模式（standalone, hybrid, master, client）
   - 验证无效模式拒绝
@@ -21,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 测试 originalPath 匹配策略
   - 测试按名称匹配
   - 测试错误场景
+- **前端类型系统**: `web/src/types/node.ts` 新增配置相关类型
+  - `NodeConfigInfo` - 节点配置信息
+  - `LlamaCppPathInfo` - llama.cpp 路径信息
+  - `ModelPathInfo` - 模型路径信息
+  - `EnvironmentInfo` - 环境信息
+  - `CondaConfigInfo` - Conda 配置
+  - `ExecutorConfigInfo` - 执行器配置
 
 ### Changed
 - **路径更新逻辑改进**: 三级匹配策略
@@ -33,6 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **配置废弃标记**: 为旧的 Client/Master 配置添加废弃注释
   - `ClientConfig` 标记为废弃，建议使用 `Node.ClientRole`
   - `MasterConfig` 标记为废弃，建议使用 `Node.MasterRole`
+- **前端配置管理**: 改进配置加载和重载逻辑
+  - 支持运行时后端切换
+  - 添加配置验证
+- **LoadModelDialog 重构**: 改进模型加载对话框
+  - 添加 llama.cpp 测试按钮
+  - 改进参数配置界面
+  - 优化布局和交互
+- **Settings 页面增强**: 重新组织配置项
+  - 添加环境信息显示
+  - 改进配置保存逻辑
 
 ### Fixed
 - **路径配置 500 错误**: 修复配置验证拒绝 `standalone` 模式的问题
@@ -40,15 +73,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 改进路径规范化处理
   - 添加更好的错误消息
 - **错误消息一致性**: 统一错误响应格式
+- **下载页面**: 修复下载进度显示问题
+  - 添加速度和 ETA 显示
+  - 支持暂停/恢复下载
 
 ### Technical Details
 - **下载模式**:
   - `DownloadModeBasic`: 使用 `go-huggingface/hub`（简单可靠）
   - `DownloadModeAdvanced`: 使用 `bodaay/HuggingFaceModelDownloader`（分块、可恢复）
 - **路径匹配**: 使用规范化路径进行对比，避免符号链接等问题
-- **测试覆盖**: 新增 3 个测试函数，覆盖路径更新和配置验证
+- **测试覆盖**: 新增 5+ 个测试函数，覆盖下载、测试、配置验证
+- **新增依赖**: 两个 HuggingFace Go SDK
+- **API 新增命令**:
+  - `CommandTypeTestLlamacpp` - 测试 llama.cpp
+  - `CommandTypeGetConfig` - 获取节点配置
 
 ---
+
+## [Unreleased]
 
 ## [v0.2.0] - 2026-02-22
 
