@@ -18,10 +18,11 @@ import (
 
 // NodeAdapter 将 API 调用适配到 Node 和 Scheduler
 type NodeAdapter struct {
-	node      *node.Node
-	log       *logger.Logger
-	scanner   *scanner.Scanner
-	scheduler *scheduler.Scheduler
+	node          *node.Node
+	log           *logger.Logger
+	scanner       *scanner.Scanner
+	scheduler     *scheduler.Scheduler
+	eventCallback func(eventType string, data interface{}) // 事件回调函数，用于 WebSocket/SSE 广播
 }
 
 // NewNodeAdapter 创建一个新的 Node API 适配器
@@ -38,6 +39,11 @@ func NewNodeAdapter(n *node.Node, log *logger.Logger, schedulerCfg *config.Sched
 		scanner:   scanner.NewScanner(&config.NetworkScanConfig{}, log),
 		scheduler: sched,
 	}
+}
+
+// SetEventCallback 设置事件回调函数
+func (a *NodeAdapter) SetEventCallback(callback func(eventType string, data interface{})) {
+	a.eventCallback = callback
 }
 
 // nodeClientManager 将 node.Node 适配为 scheduler.ClientManager 接口
@@ -373,6 +379,19 @@ func (a *NodeAdapter) HandleHeartbeat(c *gin.Context) {
 	}
 
 	a.log.Debugf("心跳处理成功: 节点=%s, 时间=%v", heartbeat.NodeID, heartbeat.Timestamp.Unix())
+
+	// 广播客户端资源更新事件（通过 WebSocket/SSE）
+	if a.eventCallback != nil && heartbeat.Resources != nil {
+		// 获取更新后的客户端信息
+		if client, err := a.node.GetClient(heartbeat.NodeID); err == nil {
+			a.eventCallback("clientResourcesUpdated", gin.H{
+				"clientId":  heartbeat.NodeID,
+				"resources": a.convertNodeToFrontendFormat(client),
+				"timestamp": time.Now().Unix(),
+			})
+		}
+	}
+
 	Success(c, gin.H{
 		"message":   "心跳处理成功",
 		"timestamp": time.Now().Unix(),
@@ -521,70 +540,106 @@ func (a *NodeAdapter) ReportCommandResult(c *gin.Context) {
 
 // ==================== 路由注册 ====================
 
-// RegisterRoutes 注册所有 API 路由
-// 这个方法保持了与 MasterHandler 相同的路由结构
+// RegisterRoutes 注册所有 API 路由（统一版本）
 func (a *NodeAdapter) RegisterRoutes(router *gin.RouterGroup) {
-	master := router.Group("/master")
+	// ========== 主路由：/api/nodes/* ==========
+	nodes := router.Group("/nodes")
 	{
 		// 节点管理
-		nodes := master.Group("/nodes")
-		{
-			nodes.POST("/register", a.RegisterNode)
-			nodes.GET("", a.ListNodes)
-			nodes.GET("/:id", a.GetNode)
-			nodes.DELETE("/:id", a.UnregisterNode)
-			nodes.POST("/:id/command", a.SendCommand)
-			nodes.GET("/:id/commands", a.GetCommands)
-			nodes.POST("/:id/heartbeat", a.HandleHeartbeat)
-		}
-
-		// 心跳
-		master.POST("/heartbeat", a.HandleHeartbeat)
-
-		// 命令结果上报
-		master.POST("/command/result", a.ReportCommandResult)
-
-		// Client 网络扫描
-		master.POST("/scan", a.HandleScanClients)
-		master.GET("/scan/status", a.GetClientScanStatus)
-
-		// ========== 兼容性路由 ==========
-		// 为了向后兼容，将 /clients 映射到 /nodes
-
-		// POST /api/master/clients/register -> POST /api/master/nodes/register
-		master.POST("/clients/register", a.RegisterNode)
-
-		// GET /api/master/clients - 返回客户端列表（前端期望的格式）
-		master.GET("/clients", a.ListClients)
-
-		// GET /api/master/clients/:id -> GET /api/master/nodes/:id
-		master.GET("/clients/:id", func(c *gin.Context) {
-			a.GetNode(c)
-		})
-
-		// DELETE /api/master/clients/:id -> DELETE /api/master/nodes/:id
-		master.DELETE("/clients/:id", func(c *gin.Context) {
-			a.UnregisterNode(c)
-		})
-
-		// GET /api/master/overview - 返回集群概览
-		master.GET("/overview", a.GetClusterOverview)
-
-		// ========== 任务管理路由 ==========
-		// GET /api/master/tasks - 获取所有任务
-		master.GET("/tasks", a.ListTasks)
-
-		// POST /api/master/tasks - 创建新任务
-		master.POST("/tasks", a.CreateTask)
-
-		// DELETE /api/master/tasks/:id - 删除任务
-		master.DELETE("/tasks/:id", a.DeleteTask)
-
-		// POST /api/master/tasks/:id/retry - 重试任务
-		master.POST("/tasks/:id/retry", a.RetryTask)
+		nodes.POST("/register", a.RegisterNode)
+		nodes.GET("", a.ListNodes)
+		nodes.GET("/:id", a.GetNode)
+		nodes.DELETE("/:id", a.UnregisterNode)
+		nodes.POST("/:id/command", a.SendCommand)
+		nodes.GET("/:id/commands", a.GetCommands)
+		nodes.POST("/:id/heartbeat", a.HandleHeartbeat)
 	}
 
+	// ========== 全局路由 ==========
+	router.POST("/heartbeat", a.HandleHeartbeat)
+	router.POST("/command/result", a.ReportCommandResult)
+
+	// ========== 任务管理 ==========
+	router.POST("/tasks", a.CreateTask)
+	router.GET("/tasks", a.ListTasks)
+	router.DELETE("/tasks/:id", a.DeleteTask)
+	router.POST("/tasks/:id/retry", a.RetryTask)
+
+	// ========== 网络扫描 ==========
+	router.POST("/scan", a.HandleScanClients)
+	router.GET("/scan/status", a.GetClientScanStatus)
+
+	// ========== 集群概览 ==========
+	router.GET("/overview", a.GetClusterOverview)
+
+	// ========== 兼容性路由（已废弃）==========
+	a.registerDeprecatedRoutes(router)
+
 	a.log.Infof("Node API 适配器路由已注册")
+}
+
+// registerDeprecatedRoutes 注册废弃的兼容性路由
+func (a *NodeAdapter) registerDeprecatedRoutes(router *gin.RouterGroup) {
+	master := router.Group("/master")
+	deprecatedMiddleware := a.deprecationWarningMiddleware()
+
+	// /api/master/nodes/* -> /api/nodes/* (废弃)
+	nodes := master.Group("/nodes")
+	{
+		nodes.Use(deprecatedMiddleware)
+
+		nodes.POST("/register", a.RegisterNode)
+		nodes.GET("", a.ListNodes)
+		nodes.GET("/:id", a.GetNode)
+		nodes.DELETE("/:id", a.UnregisterNode)
+		nodes.POST("/:id/command", a.SendCommand)
+		nodes.GET("/:id/commands", a.GetCommands)
+		nodes.POST("/:id/heartbeat", a.HandleHeartbeat)
+	}
+
+	// /api/master/clients/* -> /api/nodes/* (废弃)
+	clients := master.Group("/clients")
+	{
+		clients.Use(deprecatedMiddleware)
+
+		clients.POST("/register", a.RegisterNode)
+		clients.GET("", a.ListClients)
+		clients.GET("/:id", a.GetNode)
+		clients.DELETE("/:id", a.UnregisterNode)
+	}
+
+	// /api/master/heartbeat -> /api/heartbeat (废弃)
+	master.POST("/heartbeat", deprecatedMiddleware, a.HandleHeartbeat)
+
+	// /api/master/command/result -> /api/command/result (废弃)
+	master.POST("/command/result", deprecatedMiddleware, a.ReportCommandResult)
+
+	// /api/master/scan -> /api/scan (废弃)
+	master.POST("/scan", deprecatedMiddleware, a.HandleScanClients)
+	master.GET("/scan/status", deprecatedMiddleware, a.GetClientScanStatus)
+
+	// /api/master/overview -> /api/overview (废弃)
+	master.GET("/overview", deprecatedMiddleware, a.GetClusterOverview)
+
+	// /api/master/tasks -> /api/tasks (废弃)
+	master.GET("/tasks", deprecatedMiddleware, a.ListTasks)
+	master.POST("/tasks", deprecatedMiddleware, a.CreateTask)
+	master.DELETE("/tasks/:id", a.DeleteTask)
+	master.POST("/tasks/:id/retry", deprecatedMiddleware, a.RetryTask)
+}
+
+// deprecationWarningMiddleware 废弃路由警告中间件
+func (a *NodeAdapter) deprecationWarningMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 添加响应头警告
+		c.Header("X-API-Deprecation", "This API route is deprecated. Please use /api/nodes/* instead.")
+		c.Header("X-API-Sunset", "2026-12-31") // 预计废弃日期
+
+		// 记录日志
+		a.log.Warnf("使用废弃路由: %s %s", c.Request.Method, c.Request.URL.Path)
+
+		c.Next()
+	}
 }
 
 // ==================== 辅助方法 ====================

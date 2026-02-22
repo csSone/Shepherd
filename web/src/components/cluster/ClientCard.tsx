@@ -74,10 +74,10 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
   // 资源使用百分比
   const cpuPercent = client.resources?.cpuPercent ?? 0;
   const memoryPercent = client.resources?.memoryUsed
-    ? (client.resources.memoryUsed / client.resources.memoryTotal) * 100
+    ? (client.resources.memoryUsed / (client.resources.memoryTotal ?? 1)) * 100
     : 0;
   const gpuPercent = client.resources?.gpuPercent ?? 0;
-  const gpuMemoryPercent = client.resources?.gpuMemoryUsed
+  const gpuMemoryPercent = client.resources?.gpuMemoryUsed && client.resources?.gpuMemoryTotal
     ? (client.resources.gpuMemoryUsed / client.resources.gpuMemoryTotal) * 100
     : 0;
 
@@ -134,12 +134,12 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
               {formatSize(client.capabilities.memory)}
             </span>
           </div>
-          {(client.capabilities.gpuCount ?? 0) > 0 && (
+          {(client.resources?.gpuInfo?.length ?? 0) > 0 && (
             <>
               <div className="flex items-center gap-2 text-sm">
                 <Server className="w-4 h-4 text-purple-500" />
                 <span className="text-muted-foreground">
-                  {client.capabilities.gpuCount} GPU
+                  {client.resources?.gpuInfo?.length} GPU
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -215,7 +215,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
           </div>
 
           {/* GPU */}
-          {(client.capabilities?.gpuCount ?? 0) > 0 && (
+          {(client.resources?.gpuInfo?.length ?? 0) > 0 && (
             <>
               <div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
@@ -237,7 +237,7 @@ export function ClientCard({ client, onDisconnect, actions }: ClientCardProps) {
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                   <span>GPU 内存</span>
                   <span>
-                    {formatSize(client.resources.gpuMemoryUsed)} / {formatSize(client.resources.gpuMemoryTotal)}
+                    {formatSize(client.resources.gpuMemoryUsed ?? 0)} / {formatSize(client.resources.gpuMemoryTotal ?? 0)}
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">

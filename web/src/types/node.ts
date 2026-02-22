@@ -63,6 +63,13 @@ export interface NodeResources {
   networkTx: number;
   uptime: number;
   loadAverage: number[];
+  // 兼容性字段（从 ResourceUsage 迁移）
+  cpuPercent?: number;
+  gpuPercent?: number;
+  gpuMemoryUsed?: number;
+  gpuMemoryTotal?: number;
+  rocmVersion?: string;
+  kernelVersion?: string;
 }
 
 /**
@@ -72,32 +79,14 @@ export interface NodeCapabilities {
   gpu: boolean;
   gpuCount: number;
   gpuNames: string[];
+  gpuName?: string;
+  gpuMemory?: number;
   cpuCount: number;
   memory: number;
   supportsLlama: boolean;
   supportsPython: boolean;
   condaEnvs: string[];
   dockerEnabled: boolean;
-}
-
-/**
- * 分布式节点 - 匹配后端 internal/node/types.go NodeInfo
- */
-export interface DistributedNode {
-  id: string;
-  name: string;
-  address: string;
-  port: number;
-  role: NodeRole;
-  status: NodeStatus;
-  version: string;
-  tags: string[];
-  capabilities?: NodeCapabilities;
-  resources?: NodeResources;
-  metadata: Record<string, string>;
-  createdAt: string;
-  updatedAt: string;
-  lastSeen: string;
 }
 
 /**
@@ -165,6 +154,59 @@ export interface NodeStats {
   online: number;
   offline: number;
   busy: number;
+}
+
+/**
+ * ==================== 统一节点类型（v0.2.0+）====================
+ * ==================== Unified Node Types (v0.2.0+) ====================
+ */
+
+/**
+ * 统一节点信息（匹配后端 types.NodeInfo）
+ * 这是前端唯一应该使用的节点类型
+ */
+export interface UnifiedNode {
+  id: string;
+  name: string;
+  address: string;
+  port: number;
+  role: NodeRole;
+  status: NodeStatus;
+  version: string;
+  tags: string[];
+  capabilities?: NodeCapabilities;
+  resources?: NodeResources;
+  metadata: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+  lastSeen: string;
+  registeredAt?: string;
+}
+
+// ==================== 类型别名（向后兼容）====================
+// ==================== Type Aliases (Backward Compatibility) ====================
+
+/**
+ * @deprecated 使用 UnifiedNode 代替
+ */
+export type DistributedNode = UnifiedNode;
+
+/**
+ * @deprecated 使用 UnifiedNode 代替
+ */
+export type Client = UnifiedNode;
+
+/**
+ * @deprecated 使用 NodeCapabilities 代替
+ */
+export type Capabilities = NodeCapabilities;
+
+/**
+ * @deprecated 使用 NodeResources 代替
+ */
+export interface ResourceUsage extends NodeResources {
+  cpuPercent?: number; // 保留兼容性
+  gpuPercent?: number;
 }
 
 /**

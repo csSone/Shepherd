@@ -1,73 +1,26 @@
 /**
- * 客户端状态 - 统一与 NodeStatus 保持一致
+ * @deprecated 请使用 web/src/types/node.ts 中的统一类型定义
+ *
+ * 迁移指南：
+ * - Client -> UnifiedNode
+ * - Capabilities -> NodeCapabilities
+ * - ClientStatus -> NodeStatus
+ * - ResourceUsage -> NodeResources
+ *
+ * 这个文件将在 v0.4.0 版本完全移除
  */
-export type ClientStatus = 'offline' | 'online' | 'busy' | 'error' | 'degraded' | 'disabled';
 
-/**
- * 客户端能力 - 匹配后端 cluster.Capabilities
- * 注意：后端 cluster.Capabilities 没有 GPUCount，但 node.NodeCapabilities 有
- * 这里添加 gpuCount 以兼容前端组件显示需求
- */
-export interface Capabilities {
-  gpu: boolean;
-  gpuName?: string;
-  gpuMemory?: number;  // bytes
-  gpuCount?: number;   // GPU 数量，来自 node.NodeCapabilities
-  cpuCount: number;
-  memory: number;  // bytes
-  supportsLlama: boolean;
-  supportsPython: boolean;
-  condaEnvs?: string[];
-}
+import type { UnifiedNode } from './node';
 
-/**
- * 资源使用情况
- */
-export interface ResourceUsage {
-  cpuPercent: number;
-  memoryUsed: number; // bytes
-  memoryTotal: number; // bytes
-  gpuPercent: number;
-  gpuMemoryUsed: number; // bytes
-  gpuMemoryTotal: number; // bytes
-  diskUsed: number; // bytes
-  diskTotal: number; // bytes
-  gpuInfo?: GPUInfo[]; // 详细GPU信息
-  rocmVersion?: string; // ROCm版本
-  kernelVersion?: string; // 内核版本
-}
-
-/**
- * GPU信息
- */
-export interface GPUInfo {
-  index: number;
-  name: string;
-  vendor: string;
-  totalMemory: number; // bytes
-  usedMemory: number; // bytes
-  temperature: number; // celsius
-  utilization: number; // percentage 0-100
-  powerUsage: number; // watts
-  driverVersion?: string;
-}
-
-/**
- * 客户端节点 - 匹配后端 cluster.Client
- */
-export interface Client {
-  id: string;
-  name: string;
-  address: string;
-  port: number;
-  tags: string[];
-  capabilities?: Capabilities;
-  resources?: ResourceUsage;
-  status: ClientStatus;
-  lastSeen: string;  // ISO 8601 格式
-  connected: boolean;
-  metadata: Record<string, string>;
-}
+// 重新导出统一类型以保持向后兼容
+export type {
+  UnifiedNode as Client,
+  NodeCapabilities as Capabilities,
+  NodeStatus as ClientStatus,
+  NodeResources as ResourceUsage,
+  GPUInfo,
+  NodeRole,
+} from './node';
 
 /**
  * 任务类型 - 匹配后端 cluster.TaskType
@@ -146,7 +99,7 @@ export interface ClusterOverview {
  * 客户端列表响应 - 匹配后端 GET /api/master/clients 响应格式
  */
 export interface ClientListResponse {
-  clients: Client[];
+  clients: UnifiedNode[];
   total: number;
   stats?: {
     total: number;

@@ -858,9 +858,19 @@ make clean
 - [x] v0.1.2 - Web UI 前端独立架构
 - [x] v0.1.3 - 配置/下载/进程管理 API + 脚本重组
 - [x] v0.1.4 - 模型压测 UI 优化和设备检测修复
-- [ ] v0.2.0 - MCP (Model Context Protocol) 支持
+- [x] **v0.2.0** - **类型系统统一重构** (Breaking Changes)
 - [ ] v0.3.0 - 系统托盘和桌面应用
+- [ ] v0.4.0 - 移除废弃 API 路由和类型
 - [ ] v1.0.0 - 生产就绪
+
+**v0.2.0 重要更新:**
+- ✅ 统一后端类型系统 (`internal/types/node.go`)
+- ✅ 统一前端类型 (`web/src/types/node.ts` 的 `UnifiedNode`)
+- ✅ API 路由统一为 `/api/nodes/*`
+- ✅ 旧路由标记废弃 (`/api/master/clients/*`, `/api/master/nodes/*`)
+- ✅ 向后兼容类型别名
+
+**迁移指南:** 请参考 [CHANGELOG.md](CHANGELOG.md#v020---2026-02-22)
 
 ---
 

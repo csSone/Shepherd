@@ -15,6 +15,7 @@ export type SSEEventType =
   | 'scan_complete'
   | 'clientRegistered'
   | 'clientDisconnected'
+  | 'clientResourcesUpdated'
   | 'taskUpdate';
 
 /**
@@ -27,9 +28,10 @@ export interface SSEEvent<T = Record<string, unknown>> {
 }
 
 /**
- * 任务状态（从 cluster.ts 导入）
+ * 任务状态 - 从 task.ts 导入以避免循环依赖
  */
-import type { TaskStatus } from './cluster';
+import type { TaskStatus } from './task';
+import type { UnifiedNode } from './node';
 
 /**
  * 心跳事件
@@ -134,5 +136,18 @@ export interface TaskUpdateEvent extends SSEEvent {
     status: TaskStatus;
     result?: Record<string, unknown>;
     error?: string;
+  };
+}
+
+/**
+ * 客户端资源更新事件
+ * 后端发送完整节点数据（通过 convertNodeToFrontendFormat）
+ */
+export interface ClientResourcesUpdatedEvent extends SSEEvent {
+  type: 'clientResourcesUpdated';
+  data: {
+    clientId: string;
+    node: UnifiedNode;  // 完整节点数据，与后端 API 格式一致
+    timestamp: number;
   };
 }

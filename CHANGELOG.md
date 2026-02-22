@@ -5,6 +5,87 @@ All notable changes to Shepherd will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.0] - 2026-02-22
+
+### Breaking Changes
+- **API 路由统一**: `/api/master/clients/*` 和 `/api/master/nodes/*` 统一为 `/api/nodes/*`
+  - 旧路由已标记为废弃，将在 v0.4.0 移除
+  - 旧路由返回 `X-API-Deprecation` 和 `X-API-Sunset` 响应头
+- **前端类型重构**: `Client` 类型迁移到 `UnifiedNode`
+  - `web/src/types/cluster.ts` 标记为 `@deprecated`
+  - 建议使用 `web/src/types/node.ts` 中的统一类型
+
+### Added
+- **统一类型系统**: `internal/types/node.go` 新增统一节点类型定义
+  - `NodeCapabilities` - 节点能力（GPU/CPU/内存/软件支持）
+  - `NodeResources` - 节点资源使用情况
+  - `NodeInfo` - 统一节点信息（兼容 Master/Client/Node）
+  - `HeartbeatMessage` - 统一心跳消息
+  - `Command` 和 `CommandResult` - 统一命令结构
+- **类型别名系统**: 保持向后兼容
+  - `internal/node/types.go`: `NodeInfo` → `types.NodeInfo`
+  - `internal/cluster/types.go`: `Client` → `types.NodeInfo`
+- **前端统一类型**: `web/src/types/node.ts` 新增 `UnifiedNode` 接口
+- **API 响应辅助函数**: `internal/api/response.go` 提供统一响应格式
+  - `Success()`, `Error()`, `ValidationError()`, `NotFound()` 等
+- **任务类型定义**: `web/src/types/task.ts` 新增任务相关类型
+
+### Changed
+- **NodeAdapter 路由重构**: 主路由使用 `/api/nodes/*`
+  - `RegisterRoutes()` 方法重构
+  - 添加 `registerDeprecatedRoutes()` 处理旧路由
+  - 添加 `deprecationWarningMiddleware()` 废弃警告中间件
+- **前端类型导出**: `web/src/types/index.ts` 重新组织导出
+- **客户端组件更新**: 修复可选字段空值处理
+
+### Fixed
+- 修复前端 `ClientCard` 组件可选字段空值访问问题
+- 统一前后端类型定义，消除重复
+
+### Technical Details
+- **后端类型统一**: 新建 `internal/types/node.go` 作为唯一类型定义来源
+- **前端类型统一**: `web/src/types/node.ts` 的 `UnifiedNode` 作为推荐类型
+- **向后兼容策略**: 使用类型别名保持现有代码无需修改
+- **API 废弃策略**: HTTP 响应头 + 日志警告 + 文档标记
+
+### Migration Guide
+
+**后端迁移**:
+```go
+// 旧代码
+import "github.com/shepherd-project/shepherd/internal/node"
+nodeInfo := node.NodeInfo{...}
+
+// 新代码（推荐）
+import "github.com/shepherd-project/shepherd/internal/types"
+nodeInfo := types.NodeInfo{...}
+
+// 旧代码仍可编译（类型别名）
+nodeInfo := node.NodeInfo{...} // 等同于 types.NodeInfo
+```
+
+**前端迁移**:
+```typescript
+// 旧代码
+import type { Client } from '@/types/cluster';
+
+// 新代码（推荐）
+import type { UnifiedNode } from '@/types/node';
+
+// 旧代码仍可编译（类型别名）
+import type { Client } from '@/types/cluster'; // 等同于 UnifiedNode
+```
+
+**API 路由迁移**:
+```bash
+# 旧路由（已废弃）
+GET /api/master/clients
+GET /api/master/nodes
+
+# 新路由（推荐）
+GET /api/nodes
+```
+
 ## [v0.1.4] - 2026-02-22
 
 ### Added

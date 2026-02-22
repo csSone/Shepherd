@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SSEEvent } from '@/types';
+import type { UnifiedNode } from '@/types/node';
 import { apiClient } from '@/lib/api/client';
 
 /**
@@ -41,7 +42,7 @@ export function useSSE(options: UseSSEOptions = {}) {
       try {
         const data: SSEEvent = JSON.parse(event.data);
 
-        // 根据事件类型使相关查询失效
+        // 根据事件类型使相关查询失效或更新
         switch (data.type) {
           case 'modelLoad':
           case 'modelLoadStart':
@@ -57,6 +58,27 @@ export function useSSE(options: UseSSEOptions = {}) {
             queryClient.invalidateQueries({ queryKey: ['clients'] });
             queryClient.invalidateQueries({ queryKey: ['cluster'] });
             break;
+          case 'clientResourcesUpdated': {
+            // 实时更新特定客户端资源，使用 setQueryData 避免整列表刷新
+            const clientData = data.data as { clientId: string; node: UnifiedNode };
+            const { clientId, node } = clientData;
+            
+            // 更新特定客户端缓存
+            queryClient.setQueryData(['cluster', 'clients', clientId], node);
+            
+            // 更新客户端列表中的对应项
+            queryClient.setQueryData(['cluster', 'clients'], (old: unknown) => {
+              if (Array.isArray(old)) {
+                return old.map((client: Record<string, unknown>) =>
+                  client.id === clientId
+                    ? { ...node, lastSeen: new Date().toISOString() }
+                    : client
+                );
+              }
+              return old;
+            });
+            break;
+          }
           case 'taskUpdate':
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
             queryClient.invalidateQueries({ queryKey: ['cluster'] });

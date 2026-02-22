@@ -204,6 +204,39 @@ function MetricCard({
 }
 
 /**
+ * 头部统计卡片 - 玻璃态效果
+ */
+interface HeaderStatCardProps {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  color: 'blue' | 'green' | 'purple' | 'amber' | 'red' | 'slate';
+}
+
+function HeaderStatCard({ icon: Icon, label, value, color }: HeaderStatCardProps) {
+  const colorMap = {
+    blue: 'text-blue-400',
+    green: 'text-emerald-400',
+    purple: 'text-purple-400',
+    amber: 'text-amber-400',
+    red: 'text-red-400',
+    slate: 'text-slate-400',
+  };
+
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.05] transition-colors">
+      <div className={cn('p-1.5 rounded-md bg-white/5', colorMap[color])}>
+        <Icon className="w-3.5 h-3.5" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</div>
+        <div className="text-sm font-medium text-slate-200">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * GPU 详情卡片
  */
 function GPUCard({ gpu, index }: { gpu: GPUInfo; index: number }) {
@@ -322,8 +355,8 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white flex-shrink-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-500/20 via-purple-500/10 to-transparent" />
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
           <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl" />
@@ -358,57 +391,53 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
           </DialogHeader>
 
           <div className="relative z-10 grid grid-cols-4 gap-4 px-6 pb-6">
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <Cpu className="w-5 h-5 text-blue-400" />
-              <div>
-                <div className="text-xs text-slate-400">CPU 核心</div>
-                <div className="text-lg font-semibold">{capabilities?.cpuCount || 0}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <HardDrive className="w-5 h-5 text-green-400" />
-              <div>
-                <div className="text-xs text-slate-400">内存</div>
-                <div className="text-lg font-semibold">{formatSize(capabilities?.memory || 0)}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <Microchip className="w-5 h-5 text-purple-400" />
-              <div>
-                <div className="text-xs text-slate-400">GPU</div>
-                <div className="text-lg font-semibold">{capabilities?.gpuCount || 0}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <Globe className="w-5 h-5 text-amber-400" />
-              <div>
-                <div className="text-xs text-slate-400">ROCm</div>
-                <div className="text-lg font-semibold">{resources?.rocmVersion || 'N/A'}</div>
-              </div>
-            </div>
+            <HeaderStatCard
+              icon={Cpu}
+              label="CPU 核心"
+              value={capabilities?.cpuCount || 0}
+              color="blue"
+            />
+            <HeaderStatCard
+              icon={HardDrive}
+              label="内存"
+              value={formatSize(capabilities?.memory || 0)}
+              color="green"
+            />
+            <HeaderStatCard
+              icon={Microchip}
+              label="GPU"
+              value={resources?.gpuInfo?.length || 0}
+              color="purple"
+            />
+            <HeaderStatCard
+              icon={Globe}
+              label="ROCm"
+              value={resources?.rocmVersion || 'N/A'}
+              color="amber"
+            />
           </div>
         </div>
 
-        <Tabs defaultValue="resources" className="w-full">
-          <div className="border-b border-border px-6">
-            <TabsList className="w-full justify-start rounded-none bg-transparent h-12 p-0 gap-6">
+        <Tabs defaultValue="resources" className="w-full flex flex-col flex-1 overflow-hidden">
+          <div className="px-6 pt-4 flex-shrink-0">
+            <TabsList className="w-full grid grid-cols-3 bg-muted/50 p-1 rounded-xl h-auto">
               <TabsTrigger
                 value="resources"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-12"
+                className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 ease-out hover:text-foreground data-[state=active]:hover:text-primary"
               >
                 <Activity className="w-4 h-4 mr-2" />
                 资源监控
               </TabsTrigger>
               <TabsTrigger
                 value="hardware"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-12"
+                className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 ease-out hover:text-foreground data-[state=active]:hover:text-primary"
               >
                 <Monitor className="w-4 h-4 mr-2" />
                 硬件信息
               </TabsTrigger>
               <TabsTrigger
                 value="metadata"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-12"
+                className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 ease-out hover:text-foreground data-[state=active]:hover:text-primary"
               >
                 <Terminal className="w-4 h-4 mr-2" />
                 元数据
@@ -416,7 +445,7 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
             </TabsList>
           </div>
 
-          <TabsContent value="resources" className="p-6 space-y-6 mt-0">
+          <TabsContent value="resources" className="p-6 space-y-6 mt-0 flex-1 overflow-y-auto">
             <div className="flex justify-center gap-8 py-4">
               <CircularProgress
                 value={cpuPercent}
@@ -478,7 +507,7 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
             )}
           </TabsContent>
 
-          <TabsContent value="hardware" className="p-6 space-y-6 mt-0">
+          <TabsContent value="hardware" className="p-6 space-y-6 mt-0 flex-1 overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-xl border border-border bg-card p-5 space-y-4">
                 <div className="flex items-center gap-2 text-lg font-semibold">
@@ -543,7 +572,7 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
                       <Microchip className="w-4 h-4" />
                       GPU 数量
                     </span>
-                    <Badge variant="outline">{capabilities?.gpuCount || 0} 个</Badge>
+                    <Badge variant="outline">{resources?.gpuInfo?.length || 0} 个</Badge>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-border/50">
                     <span className="text-muted-foreground flex items-center gap-2">
@@ -551,7 +580,9 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
                       GPU 显存
                     </span>
                     <Badge variant="outline">
-                      {capabilities?.gpuMemory ? formatSize(capabilities.gpuMemory) : 'N/A'}
+                      {resources?.gpuInfo && resources.gpuInfo.length > 0
+                        ? formatSize(resources.gpuInfo.reduce((sum, gpu) => sum + gpu.totalMemory, 0))
+                        : 'N/A'}
                     </Badge>
                   </div>
                 </div>
@@ -578,7 +609,7 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
             </div>
           </TabsContent>
 
-          <TabsContent value="metadata" className="p-6 mt-0">
+          <TabsContent value="metadata" className="p-6 mt-0 flex-1 overflow-y-auto">
             {displayClient?.metadata && Object.keys(displayClient.metadata).length > 0 ? (
               <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-border flex items-center gap-2">
@@ -611,7 +642,7 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-2 p-4 border-t border-border bg-slate-50/50 dark:bg-slate-900/20">
+        <div className="flex justify-end gap-2 p-4 border-t border-border bg-slate-50/50 dark:bg-slate-900/20 flex-shrink-0">
           <Button onClick={onClose} variant="outline">
             关闭
           </Button>

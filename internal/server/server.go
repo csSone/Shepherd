@@ -552,6 +552,13 @@ func (s *Server) RegisterMasterHandler(handler interface{}) {
 func (s *Server) RegisterNodeAdapter(nodeAdapter *api.NodeAdapter) {
 	s.nodeAdapter = nodeAdapter
 
+	// 设置事件回调，将客户端资源更新广播到 WebSocket
+	nodeAdapter.SetEventCallback(func(eventType string, data interface{}) {
+		if s.wsHub != nil {
+			s.wsHub.Emit(eventType, data)
+		}
+	})
+
 	// 注册 Node API 路由
 	api := s.engine.Group("/api")
 	nodeAdapter.RegisterRoutes(api)
