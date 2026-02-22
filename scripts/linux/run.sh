@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shepherd Linux 运行脚本
-# 支持 standalone, master, client 三种模式
+# 支持 hybrid (默认), master, client 三种模式
 
 set -e
 
@@ -42,7 +42,7 @@ show_help() {
 用法: $0 [模式] [选项]
 
 模式:
-    standalone     单机模式 (默认)
+    (不填)         Hybrid 混合模式 (默认) - 既是 Master 又是 Client
     master         Master 模式 - 管理多个 Client 节点
     client         Client 模式 - 作为工作节点
 
@@ -58,8 +58,8 @@ Client 模式选项:
     --tags TAGS    Client 标签，逗号分隔 (可选)
 
 示例:
-    # 单机模式
-    $0 standalone
+    # Hybrid 混合模式 (默认)
+    $0
 
     # Master 模式
     $0 master
@@ -71,13 +71,10 @@ Client 模式选项:
     $0 client
 
     # 运行前先编译
-    $0 standalone -b
+    $0 -b
 
     # 使用自定义配置文件
-    $0 standalone --config config/node/standalone.config.yaml
-
-    # 使用示例配置
-    $0 master --config config/example/master.config.yaml
+    $0 --config config/custom.yaml
 
 EOF
 }
@@ -120,7 +117,7 @@ main() {
     # 解析参数
     while [[ $# -gt 0 ]]; do
         case $1 in
-            standalone|master|client)
+            master|client|hybrid)
                 MODE="$1"
                 shift
                 ;;
@@ -159,9 +156,9 @@ main() {
         esac
     done
 
-    # 默认模式
+    # 默认模式为 hybrid
     if [ -z "$MODE" ]; then
-        MODE="standalone"
+        MODE="hybrid"
     fi
 
     # 编译（如果需要）
@@ -174,10 +171,13 @@ main() {
     # 检查二进制文件
     check_binary
 
-    # 自动检测配置文件：node -> example -> 报错
+    # 自动检测配置文件：node -> example -> 使用 server.config.yaml (fallback)
     if [ -z "$CONFIG_PATH" ]; then
-        local NODE_CONFIG="${PROJECT_DIR}/config/node/${MODE}.config.yaml"
-        local EXAMPLE_CONFIG="${PROJECT_DIR}/config/example/${MODE}.config.yaml"
+        # 根据模式确定配置文件名
+        local CONFIG_NAME="${MODE}.config.yaml"
+        local NODE_CONFIG="${PROJECT_DIR}/config/node/${CONFIG_NAME}"
+        local EXAMPLE_CONFIG="${PROJECT_DIR}/config/example/${CONFIG_NAME}"
+        local SERVER_CONFIG="${PROJECT_DIR}/config/node/server.config.yaml"
         
         if [ -f "$NODE_CONFIG" ]; then
             CONFIG_PATH="$NODE_CONFIG"
@@ -185,10 +185,19 @@ main() {
         elif [ -f "$EXAMPLE_CONFIG" ]; then
             CONFIG_PATH="$EXAMPLE_CONFIG"
             print_info "使用 example 配置文件: ${CONFIG_PATH}"
+        elif [ -f "$SERVER_CONFIG" ]; then
+            # Fallback: 如果找不到特定模式的配置，使用 server.config.yaml
+            CONFIG_PATH="$SERVER_CONFIG"
+            print_warning "未找到 ${MODE}.config.yaml，使用 server.config.yaml 作为 fallback"
         else
-            print_error "未找到配置文件，请从 example 复制一份到 node 目录:"
-            print_error "  cp config/example/${MODE}.config.yaml config/node/${MODE}.config.yaml"
-            print_error "  然后按需修改配置"
+            print_error "未找到配置文件"
+            print_error "请确保以下文件之一存在："
+            print_error "  - ${NODE_CONFIG}"
+            print_error "  - ${EXAMPLE_CONFIG}"
+            print_error "  - ${SERVER_CONFIG} (fallback)"
+            print_error ""
+            print_error "可以从 example 复制配置文件："
+            print_error "  cp config/example/*.config.yaml config/node/"
             exit 1
         fi
     else
@@ -203,7 +212,7 @@ main() {
             fi
         fi
         print_info "使用自定义配置文件: ${CONFIG_PATH}"
-    fi
+        fi
 
     case "$MODE" in
         master)
@@ -228,8 +237,8 @@ main() {
                 export SHEPHERD_CLIENT_TAGS="$CLIENT_TAGS"
             fi
             ;;
-        standalone)
-            print_info "启动单机模式..."
+        hybrid)
+            print_info "启动 Hybrid 混合模式..."
             ;;
     esac
 
