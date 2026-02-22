@@ -5,6 +5,51 @@ All notable changes to Shepherd will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **HuggingFace SDK 集成**: 集成两个 HuggingFace Go SDK
+  - `github.com/gomlx/go-huggingface/hub` - 基础 Hub 操作和文件下载
+  - `github.com/bodaay/HuggingFaceModelDownloader` - 高级下载（分块/可恢复）
+  - 支持基础下载模式（Basic）和高级下载模式（Advanced）
+  - 添加下载进度回调支持（速度、ETA、百分比）
+  - 支持多种端点（官方 HuggingFace 和 HF-Mirror）
+- **配置验证测试**: 添加模式验证测试
+  - 验证所有有效模式（standalone, hybrid, master, client）
+  - 验证无效模式拒绝
+- **路径更新测试**: 添加 `TestHandler_UpdateLlamaCppPath` 测试
+  - 测试 originalPath 匹配策略
+  - 测试按名称匹配
+  - 测试错误场景
+
+### Changed
+- **路径更新逻辑改进**: 三级匹配策略
+  - 最高优先级：`originalPath` 精确匹配
+  - 中等优先级：按 `name` 匹配
+  - 最低优先级：按 `path` 精确匹配
+- **配置验证**: 添加 `standalone` 到有效模式列表
+  - 默认模式从 `hybrid` 改为 `standalone`
+  - 支持所有四种模式：standalone, hybrid, master, client
+- **配置废弃标记**: 为旧的 Client/Master 配置添加废弃注释
+  - `ClientConfig` 标记为废弃，建议使用 `Node.ClientRole`
+  - `MasterConfig` 标记为废弃，建议使用 `Node.MasterRole`
+
+### Fixed
+- **路径配置 500 错误**: 修复配置验证拒绝 `standalone` 模式的问题
+- **路径更新功能**: 修复 `UpdateModelPath` 和 `UpdateLlamaCppPath` 的匹配逻辑
+  - 改进路径规范化处理
+  - 添加更好的错误消息
+- **错误消息一致性**: 统一错误响应格式
+
+### Technical Details
+- **下载模式**:
+  - `DownloadModeBasic`: 使用 `go-huggingface/hub`（简单可靠）
+  - `DownloadModeAdvanced`: 使用 `bodaay/HuggingFaceModelDownloader`（分块、可恢复）
+- **路径匹配**: 使用规范化路径进行对比，避免符号链接等问题
+- **测试覆盖**: 新增 3 个测试函数，覆盖路径更新和配置验证
+
+---
+
 ## [v0.2.0] - 2026-02-22
 
 ### Breaking Changes
