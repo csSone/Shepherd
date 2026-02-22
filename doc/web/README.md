@@ -4,98 +4,199 @@
 
 ## 技术栈
 
-- **构建工具**: Vite
-- **框架**: React 19.2.0
-- **语言**: TypeScript 5
-- **路由**: React Router v6
-- **状态管理**: Zustand + React Query
-- **样式**: Tailwind CSS v4
-- **图标**: Lucide React
+- **框架**: React 19.2.0 + TypeScript 5 + Vite 7
+- **路由**: React Router v7
+- **状态**: Zustand + React Query
+- **样式**: Tailwind CSS v4 + shadcn/ui
 
 ## 快速开始
 
 ```bash
-# 使用项目脚本启动（推荐）
-./scripts/web.sh dev
+# 使用项目脚本（推荐）
+./scripts/linux/web.sh dev
 
-# 或进入 web 目录
+# 或直接运行
 cd web
 npm install
 npm run dev
-```bash
+```
 
 ## 配置
 
-前端配置文件位于 `config/web.config.yaml`（项目根目录）。
+前端配置文件位于 `web/config.yaml`（项目根目录）。
 
-### 修改配置后同步
-
-```bash
-# 方式 1: 使用启动脚本（自动同步）
-./scripts/web.sh dev
-
-# 方式 2: 手动同步
-./scripts/sync-web-config.sh
-
-# 方式 3: 自动热重载（开发时推荐）
-./scripts/watch-sync-config.sh
-```bash
-
-### 端口配置
-
-修改 `config/web.config.yaml` 中的 `server.port`，然后重启开发服务器。
-
-### 后端地址配置
-
-在 `config/web.config.yaml` 中配置后端地址，支持多后端切换：
+### 修改后端地址
 
 ```yaml
 backend:
   urls:
-    - "http://10.0.0.193:9190"  # 局域网地址
-    - "http://localhost:9190"   # 本地地址
-  currentIndex: 0                # 当前使用的后端索引
+    - "http://localhost:9190"
+    - "http://192.168.1.100:9190"
+  currentIndex: 0
+```
+
+### 同步配置
+
+修改 `config.yaml` 后运行：
+
 ```bash
+./scripts/sync-web-config.sh
+```
 
 ## 开发命令
 
 ```bash
-# 安装依赖
-npm install
-
-# 启动开发服务器
-npm run dev
-
-# 构建生产版本
-npm run build
-
-# 预览生产构建
-npm run preview
-
-# 类型检查
-npm run type-check
-
-# 代码检查
-npm run lint
-```bash
+npm run dev        # 开发服务器
+npm run build      # 生产构建
+npm run preview    # 预览构建
+npm run type-check # 类型检查
+npm run lint       # 代码检查
+```
 
 ## 项目结构
 
 ```
 src/
-├── components/          # 可复用组件
-│   ├── ui/              # 基础 UI 组件
-│   ├── layout/          # 布局组件
-├── pages/              # 路由页面
-├── features/           # 功能模块
-├── stores/             # Zustand 状态
-├── hooks/              # 自定义 Hooks
-├── lib/                # 工具库
-├── types/              # TypeScript 类型
+├── components/    # 可复用组件
+│   ├── ui/        # 基础 UI 组件
+│   └── layout/    # 布局组件
+├── pages/         # 路由页面
+├── features/      # 功能模块
+├── stores/        # Zustand 状态
+├── hooks/         # 自定义 Hooks
+├── lib/           # 工具库
+└── types/         # TypeScript 类型
 ```
 
-## 文档
+## 部署
 
-- [deployment.md](./deployment.md) - 部署指南
-- [development.md](./development.md) - 开发文档
-- [脚本总览](../scripts.md) - 项目脚本文档
+### 开发模式
+
+```bash
+# 终端 1: 启动后端
+./build/shepherd standalone
+
+# 终端 2: 启动前端
+npm run dev
+```
+
+### 生产模式
+
+```bash
+# 构建前端
+npm run build
+
+# 部署到 Nginx
+cp -r dist/* /var/www/html/
+```
+
+### 后端托管
+
+```bash
+# 构建并复制到后端
+npm run build
+cp -r dist/* ../internal/server/web/
+
+# 启动后端（同时托管前端）
+./build/shepherd standalone
+```
+
+## 开发规范
+
+### 文件命名
+
+- 组件: `PascalCase.tsx` (例: `ModelCard.tsx`)
+- 工具: `camelCase.ts` (例: `apiClient.ts`)
+- Hooks: `camelCase` with `use` 前缀 (例: `useSSE.ts`)
+
+### 导入顺序
+
+```typescript
+// 1. React 核心
+import { useState } from 'react';
+
+// 2. 第三方库
+import { useQuery } from '@tanstack/react-query';
+
+// 3. 内部导入
+import { Button } from '@/components/ui/button';
+```
+
+### TypeScript 规范
+
+- 优先使用 `type` 导入类型
+- 避免使用 `any`
+- 接口用于对象，类型别名用于联合类型
+
+## 架构说明
+
+### 前端独立架构
+
+Web 前端采用完全独立架构，可连接任意后端：
+
+```
+┌─────────────────────────────────────────────┐
+│            Web 前端 (独立运行)              │
+│                                             │
+│  web/config.yaml (前端配置)                 │
+│  ↓                                          │
+│  API Client (动态连接后端)                  │
+│  ↓                                          │
+│  HTTP 请求 (CORS)                           │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│          后端服务器 (9190)                   │
+│  /api/models, /api/events, /v1/*           │
+└─────────────────────────────────────────────┘
+```
+
+### API 集成
+
+开发环境下 Vite 自动代理 API 请求：
+
+```javascript
+// vite.config.ts
+server: {
+  proxy: {
+    '/api': 'http://localhost:9190',
+    '/v1': 'http://localhost:9190'
+  }
+}
+```
+
+### 数据获取
+
+```typescript
+// 使用 React Query Hook
+const { data, isLoading, error } = useModels();
+
+// 使用 Mutation
+const { mutate: loadModel } = useLoadModel();
+```
+
+## 故障排除
+
+### 端口被占用
+
+```bash
+npm run dev -- --port 4000
+```
+
+### 类型错误
+
+```bash
+rm -rf node_modules/.vite dist
+npm run build
+```
+
+### 依赖问题
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+## 更多文档
+
+- [部署指南](deployment.md)
