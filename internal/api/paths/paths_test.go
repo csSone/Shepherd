@@ -132,6 +132,101 @@ func TestHandler_AddLlamaCppPath(t *testing.T) {
 	}
 }
 
+func TestHandler_UpdateLlamaCppPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler, _, cleanup := setupTestHandler(t)
+	defer cleanup()
+
+	tempOldPath := t.TempDir()
+
+	// First add a path via POST
+	addRouter := gin.New()
+	addRouter.POST("/api/config/llamacpp/paths", handler.AddLlamaCppPath)
+
+	addBody, _ := json.Marshal(map[string]interface{}{
+		"path":        tempOldPath,
+		"name":        "OldLlamaPath",
+		"description": "Original llama.cpp path",
+	})
+	addReq := httptest.NewRequest("POST", "/api/config/llamacpp/paths", bytes.NewReader(addBody))
+	addReq.Header.Set("Content-Type", "application/json")
+	addW := httptest.NewRecorder()
+	addRouter.ServeHTTP(addW, addReq)
+
+	// Verify add succeeded
+	require.Equal(t, 200, addW.Code)
+
+	// Now test update
+	router := gin.New()
+	router.PUT("/api/config/llamacpp/paths", handler.UpdateLlamaCppPath)
+
+	tests := []struct {
+		name        string
+		reqBody     map[string]interface{}
+		wantStatus  int
+		wantSuccess bool
+	}{
+		{
+			name: "update existing path with originalPath",
+			reqBody: map[string]interface{}{
+				"originalPath": tempOldPath,
+				"path":         tempOldPath,
+				"name":         "UpdatedLlamaPath",
+				"description":  "Updated llama.cpp path",
+			},
+			wantStatus:  http.StatusOK,
+			wantSuccess: true,
+		},
+		{
+			name: "update existing path by name",
+			reqBody: map[string]interface{}{
+				"path":        tempOldPath,
+				"name":        "UpdatedLlamaPath",
+				"description": "Updated by name",
+			},
+			wantStatus:  http.StatusOK,
+			wantSuccess: true,
+		},
+		{
+			name: "update non-existent path",
+			reqBody: map[string]interface{}{
+				"path": t.TempDir(),
+				"name": "NonExistent",
+			},
+			wantStatus:  http.StatusNotFound,
+			wantSuccess: false,
+		},
+		{
+			name: "empty path",
+			reqBody: map[string]interface{}{
+				"name": "NoPath",
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantSuccess: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.reqBody)
+			req := httptest.NewRequest("PUT", "/api/config/llamacpp/paths", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+
+			var resp map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantSuccess, resp["success"])
+		})
+	}
+}
+
 func TestHandler_RemoveLlamaCppPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -332,6 +427,12 @@ func TestHandler_AddModelPath(t *testing.T) {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
+			// Debug: print response for 500 errors
+			if w.Code != tt.wantStatus {
+				t.Logf("Status: %d (expected %d)", w.Code, tt.wantStatus)
+				t.Logf("Response: %s", w.Body.String())
+			}
+
 			assert.Equal(t, tt.wantStatus, w.Code)
 
 			var resp map[string]interface{}
@@ -346,18 +447,29 @@ func TestHandler_AddModelPath(t *testing.T) {
 func TestHandler_UpdateModelPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler, cfgMgr, cleanup := setupTestHandler(t)
+	handler, _, cleanup := setupTestHandler(t)
 	defer cleanup()
 
 	tempOldPath := t.TempDir()
 
-	cfg := cfgMgr.Get()
-	cfg.Model.PathConfigs = append(cfg.Model.PathConfigs, config.ModelPath{
-		Path: tempOldPath,
-		Name: "OldPath",
-	})
-	cfgMgr.Save(cfg)
+	// First add a path via POST
+	addRouter := gin.New()
+	addRouter.POST("/api/config/models/paths", handler.AddModelPath)
 
+	addBody, _ := json.Marshal(map[string]interface{}{
+		"path":        tempOldPath,
+		"name":        "OldPath",
+		"description": "Original description",
+	})
+	addReq := httptest.NewRequest("POST", "/api/config/models/paths", bytes.NewReader(addBody))
+	addReq.Header.Set("Content-Type", "application/json")
+	addW := httptest.NewRecorder()
+	addRouter.ServeHTTP(addW, addReq)
+
+	// Verify add succeeded
+	require.Equal(t, 200, addW.Code)
+
+	// Now test update
 	router := gin.New()
 	router.PUT("/api/config/models/paths", handler.UpdateModelPath)
 
@@ -370,6 +482,7 @@ func TestHandler_UpdateModelPath(t *testing.T) {
 		{
 			name: "update existing path",
 			reqBody: map[string]interface{}{
+				"originalPath": tempOldPath, // Now we include originalPath
 				"path":        tempOldPath,
 				"name":        "UpdatedPath",
 				"description": "Updated description",
@@ -396,6 +509,9 @@ func TestHandler_UpdateModelPath(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
+
+			// Print response for debugging
+			t.Logf("Status: %d, Body: %s", w.Code, w.Body.String())
 
 			assert.Equal(t, tt.wantStatus, w.Code)
 

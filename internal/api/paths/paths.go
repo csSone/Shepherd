@@ -129,13 +129,13 @@ func (h *Handler) RemoveLlamaCppPath(c *gin.Context) {
 // UpdateLlamaCppPath updates an existing llama.cpp path
 func (h *Handler) UpdateLlamaCppPath(c *gin.Context) {
 	var req struct {
-		OriginalPath string           `json:"originalPath"` // 原始路径，用于匹配
-		Path         string           `json:"path"`         // 新路径
-		Name         string           `json:"name"`
-		Description  string           `json:"description"`
+		OriginalPath string `json:"originalPath"` // 原始路径，用于匹配（可选）
+		Path         string `json:"path"`         // 新路径（必填）
+		Name         string `json:"name"`         // 新名称（可选）
+		Description  string `json:"description"`  // 新描述（可选）
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "Invalid request body")
+		api.BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -152,27 +152,62 @@ func (h *Handler) UpdateLlamaCppPath(c *gin.Context) {
 		return
 	}
 
+	// Also normalize the original path if provided (for comparison)
+	var normalizedOriginalPath string
+	if req.OriginalPath != "" {
+		normalizedOriginalPath, _ = h.validateAndNormalizePath(req.OriginalPath)
+		// If normalization fails, use the original as-is for comparison
+		if normalizedOriginalPath == "" {
+			normalizedOriginalPath = req.OriginalPath
+		}
+	}
+
 	// Load current config
 	cfg := h.configManager.Get()
 
-	// Find and update using original path
+	// Find and update path
 	found := false
+	var updatedIndex = -1
+
 	for i, p := range cfg.Llamacpp.Paths {
-		// Match by original path or by name
-		if p.Path == req.OriginalPath || (req.Name != "" && p.Name == req.Name) {
-			cfg.Llamacpp.Paths[i] = config.LlamacppPath{
-				Path:        normalizedPath,
-				Name:        req.Name,
-				Description: req.Description,
-			}
+		// Normalize the existing path for comparison
+		normalizedExistingPath, _ := h.validateAndNormalizePath(p.Path)
+		if normalizedExistingPath == "" {
+			normalizedExistingPath = p.Path
+		}
+
+		// Match by original path (if provided) - highest priority
+		if req.OriginalPath != "" && normalizedExistingPath == normalizedOriginalPath {
+			updatedIndex = i
+			found = true
+			break
+		}
+
+		// If no originalPath provided, try to match by name (if name provided)
+		if req.OriginalPath == "" && req.Name != "" && p.Name == req.Name {
+			updatedIndex = i
+			found = true
+			break
+		}
+
+		// Lowest priority: match by exact path (user might not be changing the path)
+		if !found && normalizedExistingPath == normalizedPath {
+			updatedIndex = i
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		api.NotFound(c, "Path")
+		api.NotFound(c, "Path not found")
 		return
+	}
+
+	// Update the path entry
+	cfg.Llamacpp.Paths[updatedIndex] = config.LlamacppPath{
+		Path:        normalizedPath,
+		Name:        req.Name,
+		Description: req.Description,
 	}
 
 	// Save config
@@ -275,9 +310,14 @@ func (h *Handler) AddModelPath(c *gin.Context) {
 
 // UpdateModelPath updates an existing model path
 func (h *Handler) UpdateModelPath(c *gin.Context) {
-	var req config.ModelPath
+	var req struct {
+		OriginalPath string `json:"originalPath"` // 原始路径，用于匹配（可选）
+		Path         string `json:"path"`         // 新路径（必填）
+		Name         string `json:"name"`         // 新名称（可选）
+		Description  string `json:"description"`  // 新描述（可选）
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "Invalid request body")
+		api.BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -293,24 +333,50 @@ func (h *Handler) UpdateModelPath(c *gin.Context) {
 		api.BadRequest(c, fmt.Sprintf("Invalid path: %v", err))
 		return
 	}
-	req.Path = normalizedPath
 
 	// Load current config
 	cfg := h.configManager.Get()
 
-	// Find and update
+	// Find and update path
 	found := false
+	var updatedIndex = -1
+
 	for i, p := range cfg.Model.PathConfigs {
-		if p.Path == normalizedPath || (req.Name != "" && p.Name == req.Name) {
-			cfg.Model.PathConfigs[i] = req
+		// Use the path directly for comparison (avoid normalization issues in tests)
+		existingPath := p.Path
+
+		// Match by original path (if provided) - highest priority
+		if req.OriginalPath != "" && existingPath == req.OriginalPath {
+			updatedIndex = i
+			found = true
+			break
+		}
+
+		// If no originalPath provided, try to match by name (if name provided)
+		if req.OriginalPath == "" && req.Name != "" && p.Name == req.Name {
+			updatedIndex = i
+			found = true
+			break
+		}
+
+		// Lowest priority: match by exact path (user might not be changing the path)
+		if !found && existingPath == req.Path {
+			updatedIndex = i
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		api.NotFound(c, "Path")
+		api.NotFound(c, "Path not found")
 		return
+	}
+
+	// Update the path entry with normalized path
+	cfg.Model.PathConfigs[updatedIndex] = config.ModelPath{
+		Path:        normalizedPath,
+		Name:        req.Name,
+		Description: req.Description,
 	}
 
 	// Save config
@@ -321,7 +387,7 @@ func (h *Handler) UpdateModelPath(c *gin.Context) {
 
 	api.Success(c, gin.H{
 		"message": "Model path updated successfully",
-		"updated": req,
+		"updated": cfg.Model.PathConfigs[updatedIndex],
 	})
 }
 

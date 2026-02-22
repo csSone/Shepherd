@@ -25,7 +25,7 @@ const (
 
 // ConfigFileNames maps mode to config file name
 var ConfigFileNames = map[string]string{
-	"standalone": "server.config.yaml",
+	"hybrid":     "server.config.yaml",
 	"master":     "master.config.yaml",
 	"client":     "client.config.yaml",
 }
@@ -142,11 +142,12 @@ type LMStudioConfig struct {
 }
 
 // MasterConfig contains Master node configuration
+// Deprecated: Use Node.MasterRole instead. This type is kept for backward compatibility.
 type MasterConfig struct {
 	Enabled         bool                 `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
 	ClientConfigDir string               `mapstructure:"client_config_dir" yaml:"client_config_dir" json:"clientConfigDir"`
 	NetworkScan     NetworkScanConfig    `mapstructure:"network_scan" yaml:"network_scan" json:"networkScan"`
-	Scheduler       SchedulerConfig      `mapstructure:"scheduler" yaml:"scheduler" json:"scheduler"`
+	Scheduler       SchedulerConfig      `mapstructure:"scheduler" yaml:"scheduler" json:"scheduler"` // Deprecated: Use Node-specific scheduler
 	LogAggregation  LogAggregationConfig `mapstructure:"log_aggregation" yaml:"log_aggregation" json:"logAggregation"`
 }
 
@@ -177,29 +178,33 @@ type LogAggregationConfig struct {
 }
 
 // ClientConfig contains Client node configuration
+// Deprecated: Use Node.ClientRole instead. This type is kept for backward compatibility.
 type ClientConfig struct {
 	Enabled       bool             `mapstructure:"enabled" yaml:"enabled" json:"enabled"`
-	MasterAddress string           `mapstructure:"master_address" yaml:"master_address" json:"masterAddress"`
+	MasterAddress string           `mapstructure:"master_address" yaml:"master_address" json:"masterAddress"` // Deprecated: Use Node.ClientRole.MasterAddress
 	ClientInfo    ClientInfoConfig `mapstructure:"client_info" yaml:"client_info" json:"clientInfo"`
-	Heartbeat     HeartbeatConfig  `mapstructure:"heartbeat" yaml:"heartbeat" json:"heartbeat"`
+	Heartbeat     HeartbeatConfig  `mapstructure:"heartbeat" yaml:"heartbeat" json:"heartbeat"` // Deprecated: Use Node.ClientRole.HeartbeatInterval/Timeout
 	CondaEnv      CondaEnvConfig   `mapstructure:"conda_env" yaml:"conda_env" json:"condaEnv"`
 	// 注册和心跳配置
-	RegisterRetry     int `mapstructure:"register_retry" yaml:"register_retry" json:"registerRetry"`             // 注册重试次数
-	HeartbeatInterval int `mapstructure:"heartbeat_interval" yaml:"heartbeat_interval" json:"heartbeatInterval"` // 心跳间隔（秒）
-	HeartbeatTimeout  int `mapstructure:"heartbeat_timeout" yaml:"heartbeat_timeout" json:"heartbeatTimeout"`    // 心跳超时（秒）
+	RegisterRetry     int `mapstructure:"register_retry" yaml:"register_retry" json:"registerRetry"`             // Deprecated: Use Node.ClientRole.RegisterRetry
+	HeartbeatInterval int `mapstructure:"heartbeat_interval" yaml:"heartbeat_interval" json:"heartbeatInterval"` // Deprecated: Use Node.ClientRole.HeartbeatInterval
+	HeartbeatTimeout  int `mapstructure:"heartbeat_timeout" yaml:"heartbeat_timeout" json:"heartbeatTimeout"`    // Deprecated: Use Node.ClientRole.HeartbeatTimeout
 }
 
 // NodeConfig contains node configuration for the new distributed architecture
 type NodeConfig struct {
-	ID   string `mapstructure:"id" yaml:"id" json:"id"`       // 节点ID，auto表示自动生成
-	Name string `mapstructure:"name" yaml:"name" json:"name"` // 节点名称
-	Role string `mapstructure:"role" yaml:"role" json:"role"` // 节点角色: standalone/master/client/hybrid
+	ID       string            `mapstructure:"id" yaml:"id" json:"id"`             // 节点ID，auto表示自动生成
+	Name     string            `mapstructure:"name" yaml:"name" json:"name"`       // 节点名称
+	Role     string            `mapstructure:"role" yaml:"role" json:"role"`       // 节点角色: standalone/master/client/hybrid
+	Tags     []string          `mapstructure:"tags" yaml:"tags" json:"tags"`       // 节点标签
+	Metadata map[string]string `mapstructure:"metadata" yaml:"metadata" json:"metadata"` // 节点元数据
 	// 各角色配置
 	MasterRole NodeMasterRoleConfig `mapstructure:"master_role" yaml:"master_role" json:"masterRole"` // Master角色配置
 	ClientRole NodeClientRoleConfig `mapstructure:"client_role" yaml:"client_role" json:"clientRole"` // Client角色配置
 	// 资源和执行器配置
-	Resources NodeResourceConfig `mapstructure:"resources" yaml:"resources" json:"resources"` // 资源监控配置
-	Executor  NodeExecutorConfig `mapstructure:"executor" yaml:"executor" json:"executor"`    // 命令执行器配置
+	Resources   NodeResourceConfig    `mapstructure:"resources" yaml:"resources" json:"resources"`       // 资源监控配置
+	Executor    NodeExecutorConfig    `mapstructure:"executor" yaml:"executor" json:"executor"`          // 命令执行器配置
+	Capabilities NodeCapabilitiesConfig `mapstructure:"capabilities" yaml:"capabilities" json:"capabilities"` // 能力配置
 }
 
 // NodeMasterRoleConfig contains Master role specific configuration
@@ -240,6 +245,13 @@ type NodeExecutorConfig struct {
 	TaskTimeout     int      `mapstructure:"task_timeout" yaml:"task_timeout" json:"taskTimeout"`               // 任务超时（秒）
 	AllowRemoteStop bool     `mapstructure:"allow_remote_stop" yaml:"allow_remote_stop" json:"allowRemoteStop"` // 是否允许远程停止
 	AllowedCommands []string `mapstructure:"allowed_commands" yaml:"allowed_commands" json:"allowedCommands"`   // 允许的命令白名单
+}
+
+// NodeCapabilitiesConfig contains node capabilities configuration
+type NodeCapabilitiesConfig struct {
+	PythonEnabled     bool              `mapstructure:"python_enabled" yaml:"python_enabled" json:"pythonEnabled"`           // 是否启用 Python 支持
+	CondaPath         string            `mapstructure:"conda_path" yaml:"conda_path" json:"condaPath"`                       // Conda 可执行文件路径
+	CondaEnvironments map[string]string `mapstructure:"conda_environments" yaml:"conda_environments" json:"condaEnvironments"` // Conda 环境列表 (name -> path)
 }
 
 // ClientInfoConfig contains client identification information
@@ -453,9 +465,14 @@ func DefaultConfig() *Config {
 		},
 		// Node 节点配置
 		Node: NodeConfig{
-			ID:   "auto",
-			Name: "",
-			Role: "standalone",
+			ID:       "auto",
+			Name:     "",
+			Role:     "standalone",
+			Tags:     []string{},
+			Metadata: map[string]string{
+				"os":   "linux",
+				"arch": "amd64",
+			},
 			MasterRole: NodeMasterRoleConfig{
 				Enabled: false,
 				Port:    9190,
@@ -492,6 +509,13 @@ func DefaultConfig() *Config {
 					"collect_logs",
 				},
 			},
+			Capabilities: NodeCapabilitiesConfig{
+				PythonEnabled:     false,
+				CondaPath:         "",
+				CondaEnvironments: map[string]string{
+					"shepherd": "",
+				},
+			},
 		},
 		ModelRepo: ModelRepoConfig{
 			Endpoint: "huggingface.co",
@@ -517,15 +541,94 @@ func DefaultLaunchConfig() *LaunchConfig {
 	}
 }
 
+// syncLegacyConfig 将旧的 Client/Master 配置同步到新的 Node 配置
+// 此方法确保向后兼容，旧配置会自动同步到新配置
+func (c *Config) syncLegacyConfig() {
+	// 如果 Node.Role 为空，尝试从 mode 字段同步，或默认为 standalone
+	if c.Node.Role == "" {
+		if c.Mode != "" {
+			c.Node.Role = c.Mode
+		} else {
+			// 如果 mode 也是空，默认为 standalone
+			c.Node.Role = "standalone"
+			c.Mode = "standalone"
+		}
+	}
+
+	// 同步 Client 配置 -> Node.ClientRole 和 Node.Capabilities
+	if c.Client.Enabled {
+		// 同步 ClientRole 配置
+		if !c.Node.ClientRole.Enabled {
+			c.Node.ClientRole.Enabled = true
+		}
+		if c.Client.MasterAddress != "" && c.Node.ClientRole.MasterAddress == "" {
+			c.Node.ClientRole.MasterAddress = c.Client.MasterAddress
+		}
+		if c.Client.RegisterRetry != 0 && c.Node.ClientRole.RegisterRetry == 0 {
+			c.Node.ClientRole.RegisterRetry = c.Client.RegisterRetry
+		}
+		// 优先使用较新的心跳间隔配置（heartbeat_interval 字段）
+		if c.Client.HeartbeatInterval != 0 && c.Node.ClientRole.HeartbeatInterval == 0 {
+			c.Node.ClientRole.HeartbeatInterval = c.Client.HeartbeatInterval
+		}
+		if c.Client.HeartbeatTimeout != 0 && c.Node.ClientRole.HeartbeatTimeout == 0 {
+			c.Node.ClientRole.HeartbeatTimeout = c.Client.HeartbeatTimeout
+		}
+		// 如果 heartbeat 块中的值更大，优先使用
+		if c.Client.Heartbeat.Interval > c.Node.ClientRole.HeartbeatInterval {
+			c.Node.ClientRole.HeartbeatInterval = c.Client.Heartbeat.Interval
+		}
+		if c.Client.Heartbeat.Timeout > c.Node.ClientRole.HeartbeatTimeout {
+			c.Node.ClientRole.HeartbeatTimeout = c.Client.Heartbeat.Timeout
+		}
+
+		// 同步 ClientInfo -> Node
+		if len(c.Client.ClientInfo.Tags) > 0 && len(c.Node.Tags) == 0 {
+			c.Node.Tags = c.Client.ClientInfo.Tags
+		}
+		if len(c.Client.ClientInfo.Metadata) > 0 && len(c.Node.Metadata) == 0 {
+			// 合并 metadata，保留系统信息
+			if c.Node.Metadata == nil {
+				c.Node.Metadata = make(map[string]string)
+			}
+			for k, v := range c.Client.ClientInfo.Metadata {
+				c.Node.Metadata[k] = v
+			}
+		}
+
+		// 同步 CondaEnv -> Node.Capabilities
+		if c.Client.CondaEnv.Enabled && !c.Node.Capabilities.PythonEnabled {
+			c.Node.Capabilities.PythonEnabled = true
+			c.Node.Capabilities.CondaPath = c.Client.CondaEnv.CondaPath
+			if c.Node.Capabilities.CondaEnvironments == nil {
+				c.Node.Capabilities.CondaEnvironments = make(map[string]string)
+			}
+			for name, path := range c.Client.CondaEnv.Environments {
+				c.Node.Capabilities.CondaEnvironments[name] = path
+			}
+		}
+	}
+
+	// 同步 Master 配置 -> Node.MasterRole
+	if c.Master.Enabled && !c.Node.MasterRole.Enabled {
+		c.Node.MasterRole.Enabled = true
+		// Scheduler 配置保留，但不再直接映射到 Node 配置
+		// Scheduler 是 Master 专用配置，将在运行时从 Master 读取
+	}
+}
+
 // Validate validates the configuration
 func (c *Config) Validate() error {
-	// Validate mode (向后兼容: 空字符串默认为 standalone)
+	// 同步旧配置到新配置（向后兼容）
+	c.syncLegacyConfig()
+
+	// Validate mode
 	if c.Mode == "" {
 		c.Mode = "standalone"
 	}
-	validModes := map[string]bool{"standalone": true, "master": true, "client": true}
+	validModes := map[string]bool{"standalone": true, "hybrid": true, "master": true, "client": true}
 	if !validModes[c.Mode] {
-		return fmt.Errorf("invalid mode: %s (must be standalone, master, or client)", c.Mode)
+		return fmt.Errorf("invalid mode: %s (must be standalone, hybrid, master, or client)", c.Mode)
 	}
 
 	// Validate server ports

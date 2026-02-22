@@ -105,6 +105,10 @@ node:
     id: auto
     name: ""
     role: standalone
+    tags: []
+    metadata:
+        arch: amd64
+        os: linux
     master_role:
         enabled: false
         port: 9190
@@ -135,3 +139,8 @@ node:
             - stop_process
             - scan_models
             - collect_logs
+    capabilities:
+        python_enabled: false
+        conda_path: ""
+        conda_environments:
+            shepherd: ""

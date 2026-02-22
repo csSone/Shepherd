@@ -287,3 +287,66 @@ func (m *Migrator) AutoMigrate(configPath string, mode string) error {
 func timestamp() string {
 	return time.Now().Format("20060102_150405")
 }
+
+// MigrateToNodeConfig 将旧的 master/client 配置迁移到新的 node 配置
+// 此方法在运行时调用，自动将旧配置同步到新配置结构
+func (m *Migrator) MigrateToNodeConfig(cfg *Config) error {
+	m.log("开始配置迁移：旧格式 -> 新 Node 格式")
+
+	// 如果 node 配置已经设置且不是默认值，跳过
+	if cfg.Node.Role != "" && cfg.Node.Role != "standalone" {
+		m.log("Node 配置已存在，跳过迁移")
+		return nil
+	}
+
+	// 根据 mode 设置 node.role
+	if cfg.Mode != "" {
+		cfg.Node.Role = cfg.Mode
+		m.log("设置 Node.Role = %s (来自 mode)", cfg.Mode)
+	}
+
+	// 迁移 Client 配置
+	if cfg.Client.Enabled {
+		m.log("检测到旧的 Client 配置，开始迁移...")
+		cfg.Node.ClientRole.Enabled = true
+		if cfg.Node.ClientRole.MasterAddress == "" {
+			cfg.Node.ClientRole.MasterAddress = cfg.Client.MasterAddress
+			m.log("  迁移 MasterAddress: %s", cfg.Client.MasterAddress)
+		}
+		if cfg.Node.ClientRole.RegisterRetry == 0 {
+			cfg.Node.ClientRole.RegisterRetry = cfg.Client.RegisterRetry
+			m.log("  迁移 RegisterRetry: %d", cfg.Client.RegisterRetry)
+		}
+		// 优先使用较新的心跳间隔配置
+		if cfg.Client.HeartbeatInterval > 0 {
+			cfg.Node.ClientRole.HeartbeatInterval = cfg.Client.HeartbeatInterval
+			m.log("  迁移 HeartbeatInterval: %d", cfg.Client.HeartbeatInterval)
+		}
+		if cfg.Client.HeartbeatTimeout > 0 {
+			cfg.Node.ClientRole.HeartbeatTimeout = cfg.Client.HeartbeatTimeout
+			m.log("  迁移 HeartbeatTimeout: %d", cfg.Client.HeartbeatTimeout)
+		}
+		// 检查 heartbeat 块配置
+		if cfg.Client.Heartbeat.Interval > cfg.Node.ClientRole.HeartbeatInterval {
+			cfg.Node.ClientRole.HeartbeatInterval = cfg.Client.Heartbeat.Interval
+			m.log("  使用 heartbeat.interval: %d (更大)", cfg.Client.Heartbeat.Interval)
+		}
+		if cfg.Client.Heartbeat.Timeout > cfg.Node.ClientRole.HeartbeatTimeout {
+			cfg.Node.ClientRole.HeartbeatTimeout = cfg.Client.Heartbeat.Timeout
+			m.log("  使用 heartbeat.timeout: %d (更大)", cfg.Client.Heartbeat.Timeout)
+		}
+		m.log("Client 配置迁移完成")
+	}
+
+	// 迁移 Master 配置
+	if cfg.Master.Enabled {
+		m.log("检测到旧的 Master 配置，开始迁移...")
+		cfg.Node.MasterRole.Enabled = true
+		// Master Scheduler 配置保持不变
+		// Scheduler 是 Master 专用配置，将在运行时从 Master 读取
+		m.log("Master 配置迁移完成")
+	}
+
+	m.log("配置迁移成功")
+	return nil
+}

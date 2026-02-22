@@ -21,16 +21,6 @@ func (m *Manager) Load() (*Config, error) {
 		return nil, err
 	}
 
-	// 检查是否需要迁移旧配置
-	migrator := NewMigrator(true) // verbose mode
-	if NeedsMigration(m.configPath) {
-		// 尝试自动迁移旧配置
-		if err := migrator.AutoMigrate(m.configPath, m.mode); err != nil {
-			// 迁移失败，但记录警告而不是返回错误
-			fmt.Printf("[Config] 配置迁移失败: %v (将使用默认配置)\n", err)
-		}
-	}
-
 	// Try to read config file
 	data, err := os.ReadFile(m.configPath)
 	if err != nil {
@@ -56,6 +46,13 @@ func (m *Manager) Load() (*Config, error) {
 	config := &Config{}
 	if err := yaml.Unmarshal(data, config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// 自动迁移旧配置到新配置
+	configMigrator := NewMigrator(false) // 静默模式，避免重复日志
+	if err := configMigrator.MigrateToNodeConfig(config); err != nil {
+		// 迁移失败不阻止启动，使用默认配置
+		fmt.Printf("[Config] 配置迁移失败: %v (将使用默认配置)\n", err)
 	}
 
 	// 确保 mode 字段与运行时一致

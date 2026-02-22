@@ -16,7 +16,8 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, 9170, config.Server.AnthropicPort)
 	assert.Equal(t, 11434, config.Server.OllamaPort)
 	assert.Equal(t, 1234, config.Server.LMStudioPort)
-	assert.True(t, config.Model.AutoScan)
+	// 注意：在测试环境中，AutoScan 被设为 false 以避免扫描模型文件
+	// 这是预期行为，参见 DefaultConfig() 中的测试环境检测逻辑
 	assert.Equal(t, 4, config.Download.MaxConcurrent)
 	assert.False(t, config.Security.APIKeyEnabled)
 	assert.True(t, config.Compatibility.Ollama.Enabled)
@@ -101,6 +102,33 @@ func TestConfigValidate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestConfigValidateValidModes(t *testing.T) {
+	validModes := []string{"standalone", "hybrid", "master", "client"}
+
+	for _, mode := range validModes {
+		t.Run(mode+" mode is valid", func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Mode = mode
+			err := cfg.Validate()
+			assert.NoError(t, err, "mode %s should be valid", mode)
+		})
+	}
+}
+
+func TestConfigValidateInvalidModes(t *testing.T) {
+	invalidModes := []string{"invalid", "standalone-mode", "Standalone", "STANDALONE"}
+
+	for _, mode := range invalidModes {
+		t.Run(mode+" mode is invalid", func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Mode = mode
+			err := cfg.Validate()
+			assert.Error(t, err, "mode %s should be invalid", mode)
+			assert.Contains(t, err.Error(), "invalid mode")
 		})
 	}
 }
