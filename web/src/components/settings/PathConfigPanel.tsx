@@ -122,10 +122,10 @@ export function PathConfigPanel({ type }: PathConfigPanelProps) {
     try {
       const response = await llamacppPathsApi.test(path.path);
 
-      if (response.valid) {
-        toast.success('测试成功', 'llama.cpp 路径测试通过');
+      if (response.success && response.data?.valid) {
+        toast.success('测试成功', response.data.message || 'llama.cpp 路径测试通过');
       } else {
-        toast.error('测试失败', response.error || '未知错误');
+        toast.error('测试失败', response.data?.error || '未知错误');
       }
     } catch (error) {
       console.error('测试路径失败:', error);

@@ -85,27 +85,27 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
   }
 
   return (
-    <div className="group relative bg-card rounded-lg border border-border p-4 hover:shadow-lg transition-all duration-200" >
+    <div className="group relative bg-card rounded-lg border border-border p-3 sm:p-4 hover:shadow-lg transition-all duration-200 overflow-visible" >
       {/* 收藏按钮 */}
       <Button
         onClick={onToggleFavourite}
         variant="ghost"
         size="icon"
         className={cn(
-          'absolute top-3 right-3 h-8 w-8 rounded-full',
+          'absolute top-2 right-2 sm:top-3 sm:right-3 h-7 w-7 sm:h-8 sm:w-8 rounded-full',
           model.favourite && 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
         )}
       >
-        <Star className={cn('w-5 h-5', model.favourite && 'fill-current')} />
+        <Star className={cn('w-4 h-4 sm:w-5 sm:h-5', model.favourite && 'fill-current')} />
       </Button>
 
       {/* 模型图标和名称 */}
-      <div className="flex items-start gap-3 mb-3">
-        <div className="p-2 bg-muted rounded-lg">
+      <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3 pr-7 sm:pr-9">
+        <div className="p-1.5 sm:p-2 bg-muted rounded-lg shrink-0">
           {getModelIcon(model.metadata.architecture)}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate">
+          <h3 className="font-semibold text-sm sm:text-base text-foreground truncate">
             {model.alias || model.displayName || model.name}
           </h3>
           {model.pathPrefix && (
@@ -117,17 +117,17 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
       </div>
 
       {/* 模型元数据 */}
-      <div className="space-y-2 mb-3">
+      <div className="space-y-1.5 sm:space-y-2 mb-2 sm:mb-3">
         {/* 架构 */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Cpu className="w-4 h-4" />
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+          <Cpu className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
           <span className="truncate">{model.metadata.architecture}</span>
         </div>
 
         {/* 大小 - 优先使用 totalSize（分卷模型的总大小） */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <HardDrive className="w-4 h-4" />
-          <span>
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+          <HardDrive className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+          <span className="truncate">
             {formatSize(model.totalSize ?? model.size)}
             {model.shardCount && model.shardCount > 1 && (
               <span className="ml-1 text-xs text-muted-foreground">
@@ -139,25 +139,25 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
 
         {/* 量化 - 优先使用 fileTypeDescriptor（更详细的描述） */}
         {(model.metadata.fileTypeDescriptor || model.metadata.quantization) && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground truncate">
             量化: {model.metadata.fileTypeDescriptor || model.metadata.quantization}
           </div>
         )}
 
         {/* 上下文长度 - 只有大于 0 时才显示 */}
         {model.metadata.contextLength && model.metadata.contextLength > 0 && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground">
             上下文: {model.metadata.contextLength?.toString()}
           </div>
         )}
       </div>
 
       {/* 状态和标签 */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className={cn('px-2 py-1 rounded-md text-xs font-medium', statusColor)}>
+      <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3 flex-wrap">
+        <span className={cn('px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-xs font-medium', statusColor)}>
           {isLoading ? (
             <>
-              <Loader2 className="w-3 h-3 inline mr-1 animate-spin" />
+              <Loader2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 inline mr-0.5 sm:mr-1 animate-spin" />
               {statusLabel}
             </>
           ) : (
@@ -166,13 +166,13 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
         </span>
 
         {model.isMultimodal && (
-          <span className="px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-md text-xs font-medium">
+          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-md text-xs font-medium">
             多模态
           </span>
         )}
 
         {isLoaded && model.port && (
-          <span className="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-md text-xs font-medium">
+          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-md text-xs font-medium">
             端口: {model.port}
           </span>
         )}
@@ -180,14 +180,14 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
 
       {/* 槽位信息 */}
       {isLoaded && model.slots && model.slots.length > 0 && (
-        <div className="mb-3 p-2 bg-muted rounded-md">
+        <div className="mb-2 sm:mb-3 p-1.5 sm:p-2 bg-muted rounded-md">
           <div className="text-xs text-muted-foreground mb-1">处理槽位</div>
           <div className="flex gap-1 flex-wrap">
             {model.slots.map((slot) => (
               <div
                 key={slot.id}
                 className={cn(
-                  'w-6 h-6 rounded flex items-center justify-center text-xs',
+                  'w-5 h-5 sm:w-6 sm:h-6 rounded flex items-center justify-center text-xs',
                   slot.isProcessing
                     ? 'bg-green-500 text-white'
                     : 'bg-muted text-muted-foreground'
@@ -200,54 +200,63 @@ export function ModelCard({ model, onLoad, onUnload, onToggleFavourite, actions 
         </div>
       )}
 
-      {/* 操作按钮 */}
-      <div className="flex items-center gap-2">
-        {!isLoaded ? (
-          <Button
-            onClick={onLoad}
-            disabled={isLoading}
-            variant="default"
-            className="flex-1"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                加载中...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                加载模型
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            onClick={onUnload}
-            disabled={model.status === 'unloading'}
-            variant="destructive"
-            className="flex-1"
-          >
-            {model.status === 'unloading' ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                卸载中...
-              </>
-            ) : (
-              <>
-                <Square className="w-4 h-4" />
-                卸载模型
-              </>
-            )}
-          </Button>
-        )}
+      {/* 操作按钮 - 响应式布局确保在任何缩放下都可见 */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {/* 主要操作按钮 */}
+        <div className="flex-1 min-w-[120px]">
+          {!isLoaded ? (
+            <Button
+              onClick={onLoad}
+              disabled={isLoading}
+              variant="default"
+              className="w-full justify-center text-xs sm:text-sm px-2 sm:px-4 h-8 sm:h-9"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                  <span className="ml-1">加载中...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="ml-1 hidden sm:inline">加载模型</span>
+                  <span className="ml-1 sm:hidden">加载</span>
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={onUnload}
+              disabled={model.status === 'unloading'}
+              variant="destructive"
+              className="w-full justify-center text-xs sm:text-sm px-2 sm:px-4 h-8 sm:h-9"
+            >
+              {model.status === 'unloading' ? (
+                <>
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                  <span className="ml-1">卸载中...</span>
+                </>
+              ) : (
+                <>
+                  <Square className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="ml-1 hidden sm:inline">卸载模型</span>
+                  <span className="ml-1 sm:hidden">卸载</span>
+                </>
+              )}
+            </Button>
+          )}
+        </div>
 
-        {actions}
+        {/* 次要操作按钮 */}
+        <div className="flex items-center gap-1 flex-wrap">
+          {actions}
+        </div>
       </div>
 
       {/* 扫描时间 */}
-      <div className="mt-2 text-xs text-muted-foreground">
-        扫描于: {new Date(model.scannedAt).toLocaleString('zh-CN')}
+      <div className="mt-1.5 sm:mt-2 text-xs text-muted-foreground">
+        <span className="hidden sm:inline">扫描于: {new Date(model.scannedAt).toLocaleString('zh-CN')}</span>
+        <span className="sm:hidden">{new Date(model.scannedAt).toLocaleDateString('zh-CN')}</span>
       </div>
     </div>
   );

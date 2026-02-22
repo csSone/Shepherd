@@ -10,18 +10,22 @@ import (
 
 // MemoryStore implements Store interface with in-memory storage
 type MemoryStore struct {
-	mu            sync.RWMutex
-	conversations map[string]*Conversation
-	messages      map[string][]*Message // conversation_id -> messages
-	messagesByID  map[string]*Message
+	mu               sync.RWMutex
+	conversations    map[string]*Conversation
+	messages         map[string][]*Message // conversation_id -> messages
+	messagesByID     map[string]*Message
+	benchmarks       map[string]*Benchmark
+	benchmarkConfigs map[string]*BenchmarkConfig
 }
 
 // NewMemoryStore creates a new in-memory store
 func NewMemoryStore() (*MemoryStore, error) {
 	return &MemoryStore{
-		conversations: make(map[string]*Conversation),
-		messages:      make(map[string][]*Message),
-		messagesByID:  make(map[string]*Message),
+		conversations:    make(map[string]*Conversation),
+		messages:         make(map[string][]*Message),
+		messagesByID:     make(map[string]*Message),
+		benchmarks:       make(map[string]*Benchmark),
+		benchmarkConfigs: make(map[string]*BenchmarkConfig),
 	}, nil
 }
 
@@ -191,6 +195,160 @@ func (s *MemoryStore) DeleteMessages(ctx context.Context, conversationID string)
 		conv.UpdatedAt = time.Now()
 	}
 
+	return nil
+}
+
+// Benchmark operations (MemoryStore implementation)
+
+func (s *MemoryStore) CreateBenchmark(ctx context.Context, benchmark *Benchmark) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if benchmark.ID == "" {
+		benchmark.ID = generateID("bench")
+	}
+
+	if benchmark.CreatedAt.IsZero() {
+		benchmark.CreatedAt = time.Now()
+	}
+
+	s.benchmarks[benchmark.ID] = benchmark
+	return nil
+}
+
+func (s *MemoryStore) GetBenchmark(ctx context.Context, id string) (*Benchmark, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	b, exists := s.benchmarks[id]
+	if !exists {
+		return nil, ErrBenchmarkNotFound
+	}
+
+	bCopy := *b
+	return &bCopy, nil
+}
+
+func (s *MemoryStore) ListBenchmarks(ctx context.Context, modelID string, limit, offset int) ([]*Benchmark, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*Benchmark
+	for _, b := range s.benchmarks {
+		if modelID == "" || b.ModelID == modelID {
+			result = append(result, b)
+		}
+	}
+
+	if offset >= len(result) {
+		return []*Benchmark{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
+}
+
+func (s *MemoryStore) UpdateBenchmark(ctx context.Context, benchmark *Benchmark) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.benchmarks[benchmark.ID]; !exists {
+		return ErrBenchmarkNotFound
+	}
+
+	s.benchmarks[benchmark.ID] = benchmark
+	return nil
+}
+
+func (s *MemoryStore) DeleteBenchmark(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.benchmarks[id]; !exists {
+		return ErrBenchmarkNotFound
+	}
+
+	delete(s.benchmarks, id)
+	return nil
+}
+
+// BenchmarkConfig operations (MemoryStore implementation)
+
+func (s *MemoryStore) CreateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if config.Name == "" {
+		return fmt.Errorf("config name cannot be empty")
+	}
+
+	if config.CreatedAt.IsZero() {
+		config.CreatedAt = time.Now()
+	}
+
+	s.benchmarkConfigs[config.Name] = config
+	return nil
+}
+
+func (s *MemoryStore) GetBenchmarkConfig(ctx context.Context, name string) (*BenchmarkConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	c, exists := s.benchmarkConfigs[name]
+	if !exists {
+		return nil, ErrBenchmarkConfigNotFound
+	}
+
+	cCopy := *c
+	return &cCopy, nil
+}
+
+func (s *MemoryStore) ListBenchmarkConfigs(ctx context.Context, limit, offset int) ([]*BenchmarkConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*BenchmarkConfig
+	for _, c := range s.benchmarkConfigs {
+		result = append(result, c)
+	}
+
+	if offset >= len(result) {
+		return []*BenchmarkConfig{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
+}
+
+func (s *MemoryStore) UpdateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.benchmarkConfigs[config.Name]; !exists {
+		return ErrBenchmarkConfigNotFound
+	}
+
+	s.benchmarkConfigs[config.Name] = config
+	return nil
+}
+
+func (s *MemoryStore) DeleteBenchmarkConfig(ctx context.Context, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.benchmarkConfigs[name]; !exists {
+		return ErrBenchmarkConfigNotFound
+	}
+
+	delete(s.benchmarkConfigs, name)
 	return nil
 }
 

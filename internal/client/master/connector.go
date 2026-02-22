@@ -12,31 +12,35 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/client"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/cluster"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/gpu"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/netutil"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 // Connector manages the connection to the master node
 type Connector struct {
-	config     *config.ClientConfig
-	clientInfo *client.ClientInfo
-	httpClient *http.Client
-	connected  bool
-	mu         sync.RWMutex
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
-	log        *logger.Logger
+	config      *config.ClientConfig
+	clientInfo  *client.ClientInfo
+	httpClient  *http.Client
+	connected   bool
+	mu          sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	log         *logger.Logger
+	gpuDetector *gpu.Detector
 }
 
 // NewConnector creates a new master connector
@@ -50,15 +54,16 @@ func NewConnector(cfg *config.ClientConfig, log *logger.Logger) (*Connector, err
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Connector{
-		config:     cfg,
-		clientInfo: clientInfo,
-		httpClient: &http.Client{
+		config:      cfg,
+		clientInfo:  clientInfo,
+		httpClient:  &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		connected: false,
-		ctx:       ctx,
-		cancel:    cancel,
-		log:       log,
+		connected:   false,
+		ctx:         ctx,
+		cancel:      cancel,
+		log:         log,
+		gpuDetector: gpu.NewDetector(&gpu.Config{Logger: log}),
 	}, nil
 }
 
@@ -175,11 +180,13 @@ func (c *Connector) heartbeatLoop() {
 
 // sendHeartbeat sends a heartbeat to the master
 func (c *Connector) sendHeartbeat() error {
-	heartbeat := &cluster.Heartbeat{
-		ClientID:  c.clientInfo.ID,
+	resources := c.getNodeResources()
+
+	heartbeat := &node.HeartbeatMessage{
+		NodeID:    c.clientInfo.ID,
 		Timestamp: time.Now(),
-		Status:    cluster.ClientStatusOnline,
-		Resources: c.getResourceUsage(),
+		Status:    node.NodeStatusOnline,
+		Resources: resources,
 	}
 
 	url := fmt.Sprintf("%s/api/master/heartbeat", c.config.MasterAddress)
@@ -209,153 +216,188 @@ func (c *Connector) sendHeartbeat() error {
 	return nil
 }
 
-// getResourceUsage gets current resource usage
-func (c *Connector) getResourceUsage() *cluster.ResourceUsage {
+// getNodeResources gets current resource usage in NodeResources format
+func (c *Connector) getNodeResources() *node.NodeResources {
 	vmStat, _ := mem.VirtualMemory()
 	hostInfo, _ := host.Info()
 
-	// 获取磁盘使用率
-	diskPercent := c.getDiskUsage()
-
-	// 获取 GPU 使用率
-	gpuPercent, gpuMemUsed, gpuMemTotal := c.getGPUUsage()
-
-	return &cluster.ResourceUsage{
-		CPUPercent:     float64(runtime.NumCPU()), // Simplified
-		MemoryUsed:     int64(vmStat.Used),
-		MemoryTotal:    int64(vmStat.Total),
-		GPUPercent:     float64(gpuPercent),
-		GPUMemoryUsed:  gpuMemUsed,
-		GPUMemoryTotal: gpuMemTotal,
-		DiskPercent:    diskPercent,
-		Uptime:         int64(hostInfo.Uptime),
+	// 获取CPU使用率
+	var cpuPercent float64
+	if cpuPercents, err := cpu.Percent(0, false); err == nil && len(cpuPercents) > 0 {
+		cpuPercent = cpuPercents[0]
 	}
-}
 
-// getDiskUsage 获取磁盘使用率
-func (c *Connector) getDiskUsage() float64 {
-	// 获取根分区使用率
+	// 获取CPU核心数并计算millicores
+	cpuCores := runtime.NumCPU()
+	cpuTotal := int64(cpuCores * 1000) // millicores
+	cpuUsed := int64(cpuPercent * float64(cpuTotal) / 100.0)
+
+	// 获取磁盘使用情况
+	var diskUsed, diskTotal int64
 	if diskStat, err := disk.Usage("/"); err == nil {
-		return diskStat.UsedPercent
-	}
-	return 0
-}
-
-// getGPUUsage 获取 GPU 使用率和内存使用情况
-func (c *Connector) getGPUUsage() (percent, memUsed, memTotal int64) {
-	// 尝试检测 NVIDIA GPU
-	if nvidiaSMI := c.detectNvidiaGPU(); nvidiaSMI {
-		return c.getNvidiaGPUUsage()
+		diskUsed = int64(diskStat.Used)
+		diskTotal = int64(diskStat.Total)
 	}
 
-	// 尝试检测 AMD GPU (ROCm)
-	if radeonSMI := c.detectAmdGPU(); radeonSMI {
-		return c.getAmdGPUUsage()
-	}
-
-	return 0, 0, 0
-}
-
-// detectNvidiaGPU 检测是否存在 NVIDIA GPU
-func (c *Connector) detectNvidiaGPU() bool {
-	_, err := exec.LookPath("nvidia-smi")
-	return err == nil
-}
-
-// detectAmdGPU 检测是否存在 AMD GPU
-func (c *Connector) detectAmdGPU() bool {
-	// 检查 ROCm SMI 工具
-	_, err := exec.LookPath("rocm-smi")
-	if err == nil {
-		return true
-	}
-
-	// 检查 sysfs 中的 AMD GPU
-	_, err = os.Stat("/sys/class/drm/card0/device/vendor")
-	if err == nil {
-		// 读取 vendor ID
-		data, err := os.ReadFile("/sys/class/drm/card0/device/vendor")
-		if err == nil && strings.Contains(string(data), "0x1002") {
-			return true // AMD vendor ID
+	// 获取 GPU 信息 (使用新的 gpu 包)
+	var gpuInfo []gpu.Info
+	if c.gpuDetector != nil {
+		if gpus, err := c.gpuDetector.DetectAll(c.ctx); err == nil {
+			gpuInfo = gpus
 		}
 	}
 
-	return false
+	return &node.NodeResources{
+		CPUUsed:       cpuUsed,
+		CPUTotal:      cpuTotal,
+		MemoryUsed:    int64(vmStat.Used),
+		MemoryTotal:   int64(vmStat.Total),
+		DiskUsed:      diskUsed,
+		DiskTotal:     diskTotal,
+		GPUInfo:       gpuInfo,
+		Uptime:        int64(hostInfo.Uptime),
+		KernelVersion: hostInfo.KernelVersion,
+		ROCmVersion:   c.detectROCmVersion(),
+	}
 }
 
-// getNvidiaGPUUsage 获取 NVIDIA GPU 使用率
-func (c *Connector) getNvidiaGPUUsage() (percent, memUsed, memTotal int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+// detectROCmVersion detects ROCm version
+func (c *Connector) detectROCmVersion() string {
+	// Try multiple methods to detect ROCm version
+	// Priority: version file > hipcc path > rocm-smi-lib version > rocm-smi tool version
 
-	cmd := exec.CommandContext(ctx, "nvidia-smi",
-		"--query-gpu=utilization.gpu,memory.used,memory.total",
-		"--format=csv,noheader,nounits")
-
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, 0, 0
+	// Method 1: Check /opt/rocm/.info/version (most reliable for ROCm platform version)
+	if data, err := os.ReadFile("/opt/rocm/.info/version"); err == nil {
+		version := strings.TrimSpace(string(data))
+		if version != "" {
+			return version
+		}
 	}
-
-	// 解析输出: "85, 1024, 8192"
-	parts := strings.Split(strings.TrimSpace(string(output)), ",")
-	if len(parts) >= 3 {
-		if p, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64); err == nil {
-			percent = p
-		}
-		if u, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64); err == nil {
-			memUsed = u
-		}
-		if t, err := strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64); err == nil {
-			memTotal = t
+	if data, err := os.ReadFile("/opt/rocm/bin/.info/version"); err == nil {
+		version := strings.TrimSpace(string(data))
+		if version != "" {
+			return version
 		}
 	}
 
-	return percent, memUsed, memTotal
-}
-
-// getAmdGPUUsage 获取 AMD GPU 使用率 (ROCm)
-func (c *Connector) getAmdGPUUsage() (percent, memUsed, memTotal int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "rocm-smi",
-		"--showuse",
-		"--showmem",
-		"--csv")
-
-	output, err := cmd.Output()
-	if err != nil {
-		// 回退到基本的 GPU 检测
-		return c.getAmdGPUBasic()
-	}
-
-	// 解析 ROCm SMI 输出
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "GPU use") {
-			// 提取使用率百分比
-			parts := strings.Fields(line)
-			for i, part := range parts {
-				if part == "%" && i > 0 {
-					if p, err := strconv.ParseInt(strings.TrimSuffix(parts[i-1], "%"), 10, 64); err == nil {
-						percent = p
+	// Method 2: Extract ROCm version from hipcc path (e.g., /opt/rocm-7.2.0/)
+	cmd := exec.Command("hipcc", "--version")
+	if output, err := cmd.Output(); err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			// Look for "InstalledDir: /opt/rocm-7.2.0/..."
+			if idx := strings.Index(line, "InstalledDir:"); idx != -1 {
+				pathPart := line[idx+13:]
+				// Extract version from path like /opt/rocm-7.2.0/
+				if rocmIdx := strings.Index(pathPart, "rocm-"); rocmIdx != -1 {
+					versionPart := pathPart[rocmIdx+5:]
+					// Remove trailing path components
+					if slashIdx := strings.IndexAny(versionPart, "/\t\n"); slashIdx != -1 {
+						versionPart = versionPart[:slashIdx]
 					}
-					break
+					versionPart = strings.TrimSpace(versionPart)
+					if versionPart != "" && isValidVersion(versionPart) {
+						return versionPart
+					}
 				}
 			}
 		}
 	}
 
-	// 获取 VRAM 使用情况（简化版）
-	return percent, 0, 0
+	// Method 3: rocm-smi --showversion (look for ROCM-SMI-LIB version which is more accurate)
+	cmd = exec.Command("rocm-smi", "--showversion")
+	if output, err := cmd.Output(); err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			// Look for "ROCM-SMI-LIB version:" which is closer to ROCm platform version
+			if strings.Contains(line, "ROCM-SMI-LIB version:") {
+				parts := strings.Split(line, "ROCM-SMI-LIB version:")
+				if len(parts) >= 2 {
+					version := strings.TrimSpace(parts[1])
+					if version != "" {
+						return version
+					}
+				}
+			}
+		}
+	}
+
+	// Method 4: rocm-smi --version (tool version - least preferred)
+	cmd = exec.Command("rocm-smi", "--version")
+	if output, err := cmd.Output(); err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "ROCM-SMI version:") {
+				parts := strings.Split(line, "ROCM-SMI version:")
+				if len(parts) >= 2 {
+					return strings.TrimSpace(parts[1])
+				}
+			}
+		}
+	}
+
+	return ""
 }
 
-// getAmdGPUBasic 获取基本的 AMD GPU 信息（回退方法）
-func (c *Connector) getAmdGPUBasic() (percent, memUsed, memTotal int64) {
-	// 尝试从 sysfs 读取基本信息
-	// 这只返回有限的信息，但至少能检测到 GPU
-	return 0, 0, 0
+// isValidVersion checks if a string looks like a valid version number
+func isValidVersion(s string) bool {
+	// Must contain at least one dot (e.g., "7.2.0")
+	if !strings.Contains(s, ".") {
+		return false
+	}
+	// Must start with a digit
+	if len(s) == 0 || s[0] < '0' || s[0] > '9' {
+		return false
+	}
+	return true
+}
+
+// parseROCmVersionOutput parses ROCm version from rocm-smi --showversion output
+func parseROCmVersionOutput(output string) string {
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Look for version patterns like "6.1.0" or "5.7.0-1234"
+		if matched := extractVersionNumber(line); matched != "" {
+			return matched
+		}
+	}
+	return ""
+}
+
+// extractVersionNumber extracts a version number from a string
+func extractVersionNumber(line string) string {
+	// Match patterns like "6.1.0", "5.7.0-1234", "5.4.3+build"
+	parts := strings.Fields(line)
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		// Check if it looks like a version (contains digits and dots)
+		if strings.Contains(part, ".") {
+			digitCount := 0
+			dotCount := 0
+			for _, ch := range part {
+				if ch >= '0' && ch <= '9' {
+					digitCount++
+				} else if ch == '.' {
+					dotCount++
+				} else if ch == '-' || ch == '+' {
+					// Allow these in version strings
+					continue
+				} else if ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' {
+					// If we hit a letter that's not part of the version pattern, stop
+					if digitCount > 0 {
+						break
+					}
+				}
+			}
+			// Valid version has at least 2 digits and 1 dot (e.g., "6.1")
+			if digitCount >= 2 && dotCount >= 1 {
+				return part
+			}
+		}
+	}
+	return ""
 }
 
 // generateClientInfo generates client information
@@ -369,7 +411,6 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 	// Generate client ID if not provided
 	clientID := cfg.ClientInfo.ID
 	if clientID == "" {
-		// Use MAC address or hostname as ID
 		interfaces, _ := net.Interfaces()
 		for _, iface := range interfaces {
 			if iface.HardwareAddr != nil && len(iface.HardwareAddr) > 0 {
@@ -388,28 +429,49 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 		clientName = hostname
 	}
 
-	// Get local IP address
-	localIP := "127.0.0.1"
-	addrs, _ := net.InterfaceAddrs()
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				localIP = ipnet.IP.String()
-				break
-			}
-		}
-	}
+	// Get local IP address - 优先使用对外可访问的IP
+	localIP := netutil.GetBestLocalIP()
 
 	// Get system info
 	hostInfo, _ := host.Info()
 	vmStat, _ := mem.VirtualMemory()
-
+	
+	// 检测 GPU 信息
+	gpuDetector := gpu.NewDetector(&gpu.Config{})
+	var gpuCount int
+	var gpuMemory int64
+	var hasGPU bool
+	var gpuList []gpu.Info
+	
+	if gpus, err := gpuDetector.DetectAll(context.Background()); err == nil {
+		gpuList = gpus
+		gpuCount = len(gpus)
+		hasGPU = gpuCount > 0
+		for _, g := range gpus {
+			gpuMemory += g.TotalMemory
+		}
+		fmt.Printf("[DEBUG] GPU detection succeeded: found %d GPUs\n", gpuCount)
+		for i, g := range gpus {
+			fmt.Printf("[DEBUG] GPU[%d]: %s (%s), Memory: %d MB\n", i, g.Name, g.Vendor, g.TotalMemory/1024/1024)
+		}
+	} else {
+		fmt.Printf("[DEBUG] GPU detection failed: %v\n", err)
+	}
+	
 	// Build capabilities
 	capabilities := &cluster.Capabilities{
+		GPU:            hasGPU,
+		GPUCount:       gpuCount,
 		CPUCount:       runtime.NumCPU(),
 		Memory:         int64(vmStat.Total),
+		GPUMemory:      gpuMemory,
 		SupportsLlama:  true,
 		SupportsPython: cfg.CondaEnv.Enabled,
+	}
+	
+	// 添加 GPU 名称（如果有）
+	if hasGPU && len(gpuList) > 0 {
+		capabilities.GPUName = gpuList[0].Name
 	}
 
 	if cfg.CondaEnv.Enabled {
@@ -433,13 +495,15 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 	metadata["kernelArch"] = hostInfo.KernelArch
 
 	return &client.ClientInfo{
-		ID:      clientID,
-		Name:    clientName,
-		Address: localIP,
-		Port:    9191, // Default client port
-		Tags:    cfg.ClientInfo.Tags,
+		ID:           clientID,
+		Name:         clientName,
+		Address:      localIP,
+		Port:         9191, // Default client port
+		Tags:         cfg.ClientInfo.Tags,
 		Capabilities: capabilities,
-		Version: "0.1.0-alpha",
-		Metadata: metadata,
+		Version:      "0.1.0-alpha",
+		Metadata:     metadata,
 	}, nil
 }
+
+

@@ -7,11 +7,9 @@ server:
     read_timeout: 60
     write_timeout: 60
 model:
-    paths:
-        - /home/user/workspace/Shepherd/internal/api/storage/models
-        - /home/user/.cache/huggingface/hub
+    paths: []
     path_configs: []
-    auto_scan: true
+    auto_scan: false
     scan_interval: 0
 llamacpp:
     paths:

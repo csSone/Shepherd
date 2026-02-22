@@ -63,6 +63,32 @@ type Conversation struct {
 	Metadata    map[string]interface{} `json:"metadata,omitempty" db:"metadata"` // JSON encoded
 }
 
+// Benchmark represents a benchmark task
+type Benchmark struct {
+	ID         string                 `json:"id" db:"id"`
+	ModelID    string                 `json:"modelId" db:"model_id"`
+	ModelName  string                 `json:"modelName" db:"model_name"`
+	Status     string                 `json:"status" db:"status"` // running, completed, failed, cancelled
+	Command    string                 `json:"command" db:"command"`
+	Config     map[string]interface{} `json:"config,omitempty" db:"config"` // JSON encoded
+	Metrics    map[string]interface{} `json:"metrics,omitempty" db:"metrics"` // JSON encoded
+	Error      string                 `json:"error,omitempty" db:"error"`
+	CreatedAt  time.Time              `json:"createdAt" db:"created_at"`
+	StartedAt  *time.Time             `json:"startedAt,omitempty" db:"started_at"`
+	FinishedAt *time.Time             `json:"finishedAt,omitempty" db:"finished_at"`
+}
+
+// BenchmarkConfig represents a saved benchmark configuration
+type BenchmarkConfig struct {
+	Name        string                 `json:"name" db:"name"`
+	ModelID     string                 `json:"modelId" db:"model_id"`
+	ModelName   string                 `json:"modelName" db:"model_name"`
+	LlamaCppPath string                `json:"llamaCppPath" db:"llamacpp_path"`
+	Devices     []string               `json:"devices" db:"devices"` // JSON array
+	Params      map[string]string      `json:"params" db:"params"` // JSON encoded
+	CreatedAt   time.Time              `json:"createdAt" db:"created_at"`
+}
+
 // Store defines the storage interface
 type Store interface {
 	// Conversation operations
@@ -76,6 +102,20 @@ type Store interface {
 	CreateMessage(ctx context.Context, msg *Message) error
 	GetMessages(ctx context.Context, conversationID string, limit, offset int) ([]*Message, error)
 	DeleteMessages(ctx context.Context, conversationID string) error
+
+	// Benchmark operations
+	CreateBenchmark(ctx context.Context, benchmark *Benchmark) error
+	GetBenchmark(ctx context.Context, id string) (*Benchmark, error)
+	ListBenchmarks(ctx context.Context, modelID string, limit, offset int) ([]*Benchmark, error)
+	UpdateBenchmark(ctx context.Context, benchmark *Benchmark) error
+	DeleteBenchmark(ctx context.Context, id string) error
+
+	// BenchmarkConfig operations
+	CreateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error
+	GetBenchmarkConfig(ctx context.Context, name string) (*BenchmarkConfig, error)
+	ListBenchmarkConfigs(ctx context.Context, limit, offset int) ([]*BenchmarkConfig, error)
+	UpdateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error
+	DeleteBenchmarkConfig(ctx context.Context, name string) error
 
 	// Cleanup
 	Close() error
@@ -133,11 +173,13 @@ func (m *Manager) Close() error {
 
 // Errors
 var (
-	ErrInvalidStorageType   = &StorageError{Code: "INVALID_TYPE", Message: "Invalid storage type"}
-	ErrMissingSQLiteConfig  = &StorageError{Code: "MISSING_CONFIG", Message: "Missing SQLite configuration"}
+	ErrInvalidStorageType    = &StorageError{Code: "INVALID_TYPE", Message: "Invalid storage type"}
+	ErrMissingSQLiteConfig   = &StorageError{Code: "MISSING_CONFIG", Message: "Missing SQLite configuration"}
 	ErrPostgreSQLNotSupported = &StorageError{Code: "NOT_SUPPORTED", Message: "PostgreSQL support is not yet implemented"}
-	ErrConversationNotFound = &StorageError{Code: "NOT_FOUND", Message: "Conversation not found"}
-	ErrMessageNotFound      = &StorageError{Code: "NOT_FOUND", Message: "Message not found"}
+	ErrConversationNotFound  = &StorageError{Code: "NOT_FOUND", Message: "Conversation not found"}
+	ErrMessageNotFound       = &StorageError{Code: "NOT_FOUND", Message: "Message not found"}
+	ErrBenchmarkNotFound     = &StorageError{Code: "NOT_FOUND", Message: "Benchmark not found"}
+	ErrBenchmarkConfigNotFound = &StorageError{Code: "NOT_FOUND", Message: "Benchmark config not found"}
 )
 
 // StorageError represents a storage error

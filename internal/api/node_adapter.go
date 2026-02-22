@@ -137,8 +137,9 @@ func convertNodeCapabilitiesToCluster(cap *node.NodeCapabilities) *cluster.Capab
 
 	return &cluster.Capabilities{
 		GPU:            cap.GPU,
-		GPUName:        "", // 简化实现
-		GPUMemory:      cap.Memory,
+		GPUCount:       cap.GPUCount,
+		GPUName:        cap.GPUName,
+		GPUMemory:      cap.GPUMemory,
 		CPUCount:       cap.CPUCount,
 		Memory:         cap.Memory,
 		SupportsLlama:  cap.SupportsLlama,
@@ -228,9 +229,100 @@ func (a *NodeAdapter) GetNode(c *gin.Context) {
 		return
 	}
 
+	// 转换资源格式为前端期望的格式
+	response := a.convertNodeToFrontendFormat(client)
+
 	Success(c, gin.H{
-		"node": client,
+		"client": response,
+		"node":   response,
 	})
+}
+
+// convertNodeToFrontendFormat 将NodeInfo转换为前端期望的格式
+func (a *NodeAdapter) convertNodeToFrontendFormat(client *node.NodeInfo) gin.H {
+	// 计算 GPU 相关信息
+	var gpuMemoryTotal int64 = 0
+	var gpuMemoryUsed int64 = 0
+	var gpuPercent float64 = 0
+	gpuInfoList := make([]gin.H, 0)
+
+	if client.Resources != nil && len(client.Resources.GPUInfo) > 0 {
+		for _, gpu := range client.Resources.GPUInfo {
+			gpuMemoryTotal += gpu.TotalMemory
+			gpuMemoryUsed += gpu.UsedMemory
+			gpuPercent += gpu.Utilization
+
+			gpuInfoList = append(gpuInfoList, gin.H{
+				"index":         gpu.Index,
+				"name":          gpu.Name,
+				"vendor":        gpu.Vendor,
+				"totalMemory":   gpu.TotalMemory,
+				"usedMemory":    gpu.UsedMemory,
+				"temperature":   gpu.Temperature,
+				"utilization":   gpu.Utilization,
+				"powerUsage":    gpu.PowerUsage,
+				"driverVersion": gpu.DriverVersion,
+			})
+		}
+		gpuPercent = gpuPercent / float64(len(client.Resources.GPUInfo))
+	}
+
+	// 计算CPU使用率百分比
+	var cpuPercent float64 = 0
+	if client.Resources != nil && client.Resources.CPUTotal > 0 {
+		cpuPercent = float64(client.Resources.CPUUsed) / float64(client.Resources.CPUTotal) * 100
+	}
+
+	// 构建 capabilities 信息，处理 nil 情况
+	capabilities := gin.H{
+		"cpuCount":       0,
+		"memory":         int64(0),
+		"gpuCount":       0,
+		"gpuMemory":      gpuMemoryTotal,
+		"supportsLlama":  false,
+		"supportsPython": false,
+	}
+	if client.Capabilities != nil {
+		capabilities = gin.H{
+			"cpuCount":       client.Capabilities.CPUCount,
+			"memory":         client.Capabilities.Memory,
+			"gpuCount":       client.Capabilities.GPUCount,
+			"gpuMemory":      gpuMemoryTotal,
+			"supportsLlama":  client.Capabilities.SupportsLlama,
+			"supportsPython": client.Capabilities.SupportsPython,
+		}
+	}
+
+	result := gin.H{
+		"id":          client.ID,
+		"name":        client.Name,
+		"address":     client.Address,
+		"port":        client.Port,
+		"tags":        client.Tags,
+		"status":      client.Status,
+		"lastSeen":    client.LastSeen.Format(time.RFC3339),
+		"connected":   client.Status == "online",
+		"metadata":    client.Metadata,
+		"capabilities": capabilities,
+	}
+
+	if client.Resources != nil {
+		result["resources"] = gin.H{
+			"cpuPercent":     cpuPercent,
+			"memoryUsed":     client.Resources.MemoryUsed,
+			"memoryTotal":    client.Resources.MemoryTotal,
+			"gpuPercent":     gpuPercent,
+			"gpuMemoryUsed":  gpuMemoryUsed,
+			"gpuMemoryTotal": gpuMemoryTotal,
+			"diskUsed":       client.Resources.DiskUsed,
+			"diskTotal":      client.Resources.DiskTotal,
+			"gpuInfo":        gpuInfoList,
+			"rocmVersion":    client.Resources.ROCmVersion,
+			"kernelVersion":  client.Resources.KernelVersion,
+		}
+	}
+
+	return result
 }
 
 // UnregisterNode 注销节点
@@ -443,6 +535,7 @@ func (a *NodeAdapter) RegisterRoutes(router *gin.RouterGroup) {
 			nodes.DELETE("/:id", a.UnregisterNode)
 			nodes.POST("/:id/command", a.SendCommand)
 			nodes.GET("/:id/commands", a.GetCommands)
+			nodes.POST("/:id/heartbeat", a.HandleHeartbeat)
 		}
 
 		// 心跳
@@ -648,10 +741,36 @@ func (a *NodeAdapter) ListClients(c *gin.Context) {
 	for i, client := range clients {
 		// 计算 GPU 内存总量
 		var gpuMemoryTotal int64 = 0
+		var gpuMemoryUsed int64 = 0
+		var gpuPercent float64 = 0
+		gpuInfoList := make([]gin.H, 0)
+
 		if client.Resources != nil && len(client.Resources.GPUInfo) > 0 {
 			for _, gpu := range client.Resources.GPUInfo {
 				gpuMemoryTotal += gpu.TotalMemory
+				gpuMemoryUsed += gpu.UsedMemory
+				gpuPercent += gpu.Utilization
+
+				gpuInfoList = append(gpuInfoList, gin.H{
+					"index":         gpu.Index,
+					"name":          gpu.Name,
+					"vendor":        gpu.Vendor,
+					"totalMemory":   gpu.TotalMemory,
+					"usedMemory":    gpu.UsedMemory,
+					"temperature":   gpu.Temperature,
+					"utilization":   gpu.Utilization,
+					"powerUsage":    gpu.PowerUsage,
+					"driverVersion": gpu.DriverVersion,
+				})
 			}
+			// 平均GPU使用率
+			gpuPercent = gpuPercent / float64(len(client.Resources.GPUInfo))
+		}
+
+		// 计算CPU使用率百分比
+		var cpuPercent float64 = 0
+		if client.Resources != nil && client.Resources.CPUTotal > 0 {
+			cpuPercent = float64(client.Resources.CPUUsed) / float64(client.Resources.CPUTotal) * 100
 		}
 
 		clientList[i] = gin.H{
@@ -672,6 +791,23 @@ func (a *NodeAdapter) ListClients(c *gin.Context) {
 				"supportsLlama":  client.Capabilities.SupportsLlama,
 				"supportsPython": client.Capabilities.SupportsPython,
 			},
+		}
+
+		// 添加资源信息（如果存在）
+		if client.Resources != nil {
+			clientList[i]["resources"] = gin.H{
+				"cpuPercent":     cpuPercent,
+				"memoryUsed":     client.Resources.MemoryUsed,
+				"memoryTotal":    client.Resources.MemoryTotal,
+				"gpuPercent":     gpuPercent,
+				"gpuMemoryUsed":  gpuMemoryUsed,
+				"gpuMemoryTotal": gpuMemoryTotal,
+				"diskUsed":       client.Resources.DiskUsed,
+				"diskTotal":      client.Resources.DiskTotal,
+				"gpuInfo":        gpuInfoList,
+				"rocmVersion":    client.Resources.ROCmVersion,
+				"kernelVersion":  client.Resources.KernelVersion,
+			}
 		}
 	}
 

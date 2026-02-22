@@ -85,9 +85,36 @@ func (s *SQLiteStore) initSchema(config *SQLiteConfig) error {
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS benchmarks (
+		id TEXT PRIMARY KEY,
+		model_id TEXT NOT NULL,
+		model_name TEXT NOT NULL,
+		status TEXT NOT NULL,
+		command TEXT,
+		config TEXT,
+		metrics TEXT,
+		error TEXT,
+		created_at INTEGER NOT NULL,
+		started_at INTEGER,
+		finished_at INTEGER
+	);
+
+	CREATE TABLE IF NOT EXISTS benchmark_configs (
+		name TEXT PRIMARY KEY,
+		model_id TEXT NOT NULL,
+		model_name TEXT NOT NULL,
+		llamacpp_path TEXT NOT NULL,
+		devices TEXT,
+		params TEXT,
+		created_at INTEGER NOT NULL
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at);
 	CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at);
+	CREATE INDEX IF NOT EXISTS idx_benchmarks_model_id ON benchmarks(model_id);
+	CREATE INDEX IF NOT EXISTS idx_benchmarks_status ON benchmarks(status);
+	CREATE INDEX IF NOT EXISTS idx_benchmarks_created ON benchmarks(created_at);
 	`
 
 	if _, err := s.db.Exec(schema); err != nil {
@@ -431,6 +458,318 @@ func (s *SQLiteStore) DeleteMessages(ctx context.Context, conversationID string)
 	return err
 }
 
+// Benchmark operations
+
+// CreateBenchmark creates a new benchmark task
+func (s *SQLiteStore) CreateBenchmark(ctx context.Context, benchmark *Benchmark) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	configJSON, err := json.Marshal(benchmark.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal benchmark config: %w", err)
+	}
+
+	metricsJSON, err := json.Marshal(benchmark.Metrics)
+	if err != nil {
+		return fmt.Errorf("failed to marshal benchmark metrics: %w", err)
+	}
+
+	query := `
+		INSERT INTO benchmarks (id, model_id, model_name, status, command, config, metrics, error, created_at, started_at, finished_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err = s.db.ExecContext(ctx, query,
+		benchmark.ID,
+		benchmark.ModelID,
+		benchmark.ModelName,
+		benchmark.Status,
+		benchmark.Command,
+		string(configJSON),
+		string(metricsJSON),
+		benchmark.Error,
+		benchmark.CreatedAt.Unix(),
+		timeToUnix(benchmark.StartedAt),
+		timeToUnix(benchmark.FinishedAt),
+	)
+
+	return err
+}
+
+// GetBenchmark retrieves a benchmark by ID
+func (s *SQLiteStore) GetBenchmark(ctx context.Context, id string) (*Benchmark, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var b Benchmark
+	var configJSON, metricsJSON sql.NullString
+	var startedAt, finishedAt sql.NullInt64
+
+	query := `
+		SELECT id, model_id, model_name, status, command, config, metrics, error, created_at, started_at, finished_at
+		FROM benchmarks WHERE id = ?
+	`
+
+	err := s.db.QueryRowContext(ctx, query, id).Scan(
+		&b.ID, &b.ModelID, &b.ModelName, &b.Status, &b.Command,
+		&configJSON, &metricsJSON, &b.Error,
+		&b.CreatedAt, &startedAt, &finishedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrBenchmarkNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if len(configJSON.String) > 0 {
+		if err := json.Unmarshal([]byte(configJSON.String), &b.Config); err != nil {
+			// 配置可能是空的，这是正常情况
+			b.Config = make(map[string]interface{})
+		}
+	}
+
+	if len(metricsJSON.String) > 0 {
+		if err := json.Unmarshal([]byte(metricsJSON.String), &b.Metrics); err != nil {
+			// 指标可能是空的，这是正常情况
+			b.Metrics = make(map[string]interface{})
+		}
+	}
+
+	b.StartedAt = unixToTime(startedAt)
+	b.FinishedAt = unixToTime(finishedAt)
+
+	return &b, nil
+}
+
+// ListBenchmarks lists benchmarks with optional filtering
+func (s *SQLiteStore) ListBenchmarks(ctx context.Context, modelID string, limit, offset int) ([]*Benchmark, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	query := `
+		SELECT id, model_id, model_name, status, command, config, metrics, error, created_at, started_at, finished_at
+		FROM benchmarks
+	`
+	args := []interface{}{}
+
+	if modelID != "" {
+		query += " WHERE model_id = ?"
+		args = append(args, modelID)
+	}
+
+	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var benchmarks []*Benchmark
+	for rows.Next() {
+		var b Benchmark
+		var configJSON, metricsJSON sql.NullString
+		var startedAt, finishedAt sql.NullInt64
+
+		err := rows.Scan(
+			&b.ID, &b.ModelID, &b.ModelName, &b.Status, &b.Command,
+			&configJSON, &metricsJSON, &b.Error,
+			&b.CreatedAt, &startedAt, &finishedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(configJSON.String) > 0 {
+			if err := json.Unmarshal([]byte(configJSON.String), &b.Config); err != nil {
+				b.Config = make(map[string]interface{})
+			}
+		}
+
+		if len(metricsJSON.String) > 0 {
+			if err := json.Unmarshal([]byte(metricsJSON.String), &b.Metrics); err != nil {
+				b.Metrics = make(map[string]interface{})
+			}
+		}
+
+		b.StartedAt = unixToTime(startedAt)
+		b.FinishedAt = unixToTime(finishedAt)
+
+		benchmarks = append(benchmarks, &b)
+	}
+
+	return benchmarks, nil
+}
+
+// UpdateBenchmark updates an existing benchmark
+func (s *SQLiteStore) UpdateBenchmark(ctx context.Context, benchmark *Benchmark) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	configJSON, err := json.Marshal(benchmark.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal benchmark config: %w", err)
+	}
+
+	metricsJSON, err := json.Marshal(benchmark.Metrics)
+	if err != nil {
+		return fmt.Errorf("failed to marshal benchmark metrics: %w", err)
+	}
+
+	query := `
+		UPDATE benchmarks
+		SET model_id = ?, model_name = ?, status = ?, command = ?, config = ?, metrics = ?, error = ?, started_at = ?, finished_at = ?
+		WHERE id = ?
+	`
+
+	_, err = s.db.ExecContext(ctx, query,
+		benchmark.ModelID, benchmark.ModelName, benchmark.Status, benchmark.Command,
+		string(configJSON), string(metricsJSON), benchmark.Error,
+		timeToUnix(benchmark.StartedAt), timeToUnix(benchmark.FinishedAt),
+		benchmark.ID,
+	)
+
+	return err
+}
+
+// DeleteBenchmark deletes a benchmark by ID
+func (s *SQLiteStore) DeleteBenchmark(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM benchmarks WHERE id = ?", id)
+	return err
+}
+
+// BenchmarkConfig operations
+
+// CreateBenchmarkConfig creates a new benchmark configuration
+func (s *SQLiteStore) CreateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	devicesJSON, _ := json.Marshal(config.Devices)
+	paramsJSON, _ := json.Marshal(config.Params)
+
+	query := `
+		INSERT INTO benchmark_configs (name, model_id, model_name, llamacpp_path, devices, params, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		config.Name, config.ModelID, config.ModelName, config.LlamaCppPath,
+		string(devicesJSON), string(paramsJSON), config.CreatedAt.Unix(),
+	)
+
+	return err
+}
+
+// GetBenchmarkConfig retrieves a benchmark config by name
+func (s *SQLiteStore) GetBenchmarkConfig(ctx context.Context, name string) (*BenchmarkConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var c BenchmarkConfig
+	var devicesJSON, paramsJSON sql.NullString
+
+	query := `
+		SELECT name, model_id, model_name, llamacpp_path, devices, params, created_at
+		FROM benchmark_configs WHERE name = ?
+	`
+
+	err := s.db.QueryRowContext(ctx, query, name).Scan(
+		&c.Name, &c.ModelID, &c.ModelName, &c.LlamaCppPath,
+		&devicesJSON, &paramsJSON, &c.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrBenchmarkConfigNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal([]byte(devicesJSON.String), &c.Devices)
+	json.Unmarshal([]byte(paramsJSON.String), &c.Params)
+
+	return &c, nil
+}
+
+// ListBenchmarkConfigs lists all benchmark configurations
+func (s *SQLiteStore) ListBenchmarkConfigs(ctx context.Context, limit, offset int) ([]*BenchmarkConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	query := `
+		SELECT name, model_id, model_name, llamacpp_path, devices, params, created_at
+		FROM benchmark_configs
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var configs []*BenchmarkConfig
+	for rows.Next() {
+		var c BenchmarkConfig
+		var devicesJSON, paramsJSON sql.NullString
+
+		err := rows.Scan(
+			&c.Name, &c.ModelID, &c.ModelName, &c.LlamaCppPath,
+			&devicesJSON, &paramsJSON, &c.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		json.Unmarshal([]byte(devicesJSON.String), &c.Devices)
+		json.Unmarshal([]byte(paramsJSON.String), &c.Params)
+
+		configs = append(configs, &c)
+	}
+
+	return configs, nil
+}
+
+// UpdateBenchmarkConfig updates an existing benchmark configuration
+func (s *SQLiteStore) UpdateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	devicesJSON, _ := json.Marshal(config.Devices)
+	paramsJSON, _ := json.Marshal(config.Params)
+
+	query := `
+		UPDATE benchmark_configs
+		SET model_id = ?, model_name = ?, llamacpp_path = ?, devices = ?, params = ?
+		WHERE name = ?
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		config.ModelID, config.ModelName, config.LlamaCppPath,
+		string(devicesJSON), string(paramsJSON), config.Name,
+	)
+
+	return err
+}
+
+// DeleteBenchmarkConfig deletes a benchmark configuration by name
+func (s *SQLiteStore) DeleteBenchmarkConfig(ctx context.Context, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM benchmark_configs WHERE name = ?", name)
+	return err
+}
+
 // Close closes the database connection
 func (s *SQLiteStore) Close() error {
 	s.mu.Lock()
@@ -469,4 +808,19 @@ func (s *SQLiteStore) Stats() (map[string]interface{}, error) {
 
 func timeNow() time.Time {
 	return time.Now().UTC()
+}
+
+func timeToUnix(t *time.Time) sql.NullInt64 {
+	if t == nil {
+		return sql.NullInt64{Valid: false}
+	}
+	return sql.NullInt64{Int64: t.Unix(), Valid: true}
+}
+
+func unixToTime(t sql.NullInt64) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	u := time.Unix(t.Int64, 0).UTC()
+	return &u
 }

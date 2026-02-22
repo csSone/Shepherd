@@ -1,10 +1,12 @@
 package node
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 	"time"
 
+	"github.com/shepherd-project/shepherd/Shepherd/internal/gpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/stretchr/testify/assert"
@@ -84,7 +86,7 @@ func TestResourceMonitor_StartStop(t *testing.T) {
 
 	// Test stop when not running
 	err = rm.Stop()
-	assert.NoError(t, err) // Should not error
+	require.NoError(t, err) // Should not error
 }
 
 func TestResourceMonitor_GetSnapshot(t *testing.T) {
@@ -257,37 +259,132 @@ func TestResourceMonitor_TestLlamacppPath(t *testing.T) {
 	assert.Nil(t, info)
 }
 
+// TestResourceMonitor_DetectNvidiaGPUs tests NVIDIA GPU detection using the new gpu.Detector
 func TestResourceMonitor_DetectNvidiaGPUs(t *testing.T) {
 	// 跳过测试如果 nvidia-smi 不可用
 	if _, err := exec.LookPath("nvidia-smi"); err != nil {
 		t.Skip("nvidia-smi 不可用，跳过 NVIDIA GPU 检测测试")
 	}
 
-	rm := NewResourceMonitor(nil)
-	gpus := rm.detectNvidiaGPUs()
-	// GPUs should be a slice, may be empty if no NVIDIA GPUs are present
+	// Create a GPU detector with NVIDIA provider
+	logger := &testLogger{}
+	detector := gpu.NewDetector(&gpu.Config{Logger: logger})
+
+	// Check if NVIDIA provider is available
+	availableProviders := detector.GetAvailableProviders()
+	hasNvidia := false
+	for _, provider := range availableProviders {
+		if provider == "nvidia" {
+			hasNvidia = true
+			break
+		}
+	}
+
+	if !hasNvidia {
+		t.Skip("NVIDIA provider 不可用")
+	}
+
+	// Detect GPUs
+	ctx := context.Background()
+	gpus, err := detector.DetectAll(ctx)
+	assert.NoError(t, err)
 	assert.NotNil(t, gpus)
+
+	// Check if any NVIDIA GPUs were detected and log them
+	for _, gpuInfo := range gpus {
+		if gpuInfo.Vendor == "NVIDIA" {
+			assert.NotEqual(t, -1, gpuInfo.Index)
+			assert.NotEmpty(t, gpuInfo.Name)
+			t.Logf("检测到 NVIDIA GPU: %s (索引: %d)", gpuInfo.Name, gpuInfo.Index)
+		}
+	}
 }
 
+// TestResourceMonitor_DetectAMDGPUs tests AMD GPU detection using the new gpu.Detector
 func TestResourceMonitor_DetectAMDGPUs(t *testing.T) {
-	rm := NewResourceMonitor(nil)
+	// 跳过测试如果 rocm-smi 不可用
+	if _, err := exec.LookPath("rocm-smi"); err != nil {
+		t.Skip("rocm-smi 不可用，跳过 AMD GPU 检测测试")
+	}
 
-	// This test will only pass if rocm-smi is available
-	gpus := rm.detectAMDGPUs()
+	// Create a GPU detector with AMD provider
+	logger := &testLogger{}
+	detector := gpu.NewDetector(&gpu.Config{Logger: logger})
+
+	// Check if AMD provider is available
+	availableProviders := detector.GetAvailableProviders()
+	hasAMD := false
+	for _, provider := range availableProviders {
+		if provider == "amd" {
+			hasAMD = true
+			break
+		}
+	}
+
+	if !hasAMD {
+		t.Skip("AMD provider 不可用")
+	}
+
+	// Detect GPUs
+	ctx := context.Background()
+	gpus, err := detector.DetectAll(ctx)
+	assert.NoError(t, err)
 	assert.NotNil(t, gpus)
+
+	// Check if any AMD GPUs were detected and log them
+	amdGPUCount := 0
+	for _, gpuInfo := range gpus {
+		if gpuInfo.Vendor == "AMD" {
+			amdGPUCount++
+			assert.NotEqual(t, -1, gpuInfo.Index)
+			assert.NotEmpty(t, gpuInfo.Name)
+			t.Logf("检测到 AMD GPU: %s (索引: %d, 内存: %d MB)", gpuInfo.Name, gpuInfo.Index, gpuInfo.TotalMemory/(1024*1024))
+		}
+	}
+
+	if amdGPUCount > 0 {
+		t.Logf("成功检测到 %d 个 AMD GPU", amdGPUCount)
+	}
 }
 
+// TestResourceMonitor_DetectIntelGPUs tests Intel GPU detection using the new gpu.Detector
 func TestResourceMonitor_DetectIntelGPUs(t *testing.T) {
 	// 跳过测试如果系统有 AMD GPU（当前系统是 AMD）
 	if _, err := exec.LookPath("rocm-smi"); err == nil {
 		t.Skip("系统检测到 AMD GPU，跳过 Intel GPU 检测测试")
 	}
 
-	rm := NewResourceMonitor(nil)
-	gpus := rm.detectIntelGPUs()
-	// GPUs should be a slice, may be empty or nil if no Intel GPUs are present
-	if gpus != nil {
-		assert.NotNil(t, gpus)
+	// Create a GPU detector with Intel provider
+	logger := &testLogger{}
+	detector := gpu.NewDetector(&gpu.Config{Logger: logger})
+
+	// Check if Intel provider is available
+	availableProviders := detector.GetAvailableProviders()
+	hasIntel := false
+	for _, provider := range availableProviders {
+		if provider == "intel" {
+			hasIntel = true
+			break
+		}
+	}
+
+	if !hasIntel {
+		t.Skip("Intel provider 不可用")
+	}
+
+	// Detect GPUs
+	ctx := context.Background()
+	gpus, err := detector.DetectAll(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, gpus)
+
+	// Check if any Intel GPUs were detected and log them
+	for _, gpuInfo := range gpus {
+		if gpuInfo.Vendor == "Intel" {
+			assert.NotEqual(t, -1, gpuInfo.Index)
+			assert.NotEmpty(t, gpuInfo.Name)
+			t.Logf("检测到 Intel GPU: %s (索引: %d)", gpuInfo.Name, gpuInfo.Index)
+		}
 	}
 }
 
@@ -345,4 +442,62 @@ func TestResourceMonitor_ConcurrentAccess(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		<-done
 	}
+}
+
+// testLogger is a simple logger implementation for testing
+type testLogger struct{}
+
+func (l *testLogger) Debugf(format string, args ...interface{}) {
+	// Suppress debug output in tests
+}
+
+func (l *testLogger) Infof(format string, args ...interface{}) {
+	// Suppress info output in tests
+}
+
+func (l *testLogger) Errorf(format string, args ...interface{}) {
+	// Suppress error output in tests
+}
+
+// TestResourceMonitor_DetectROCmVersion tests ROCm version detection
+func TestResourceMonitor_DetectROCmVersion(t *testing.T) {
+	rm := NewResourceMonitor(nil)
+
+	// Skip if rocm-smi is not available
+	if _, err := exec.LookPath("rocm-smi"); err != nil {
+		t.Skip("rocm-smi 不可用，跳过 ROCm 版本检测测试")
+	}
+
+	version := rm.detectROCmVersion()
+	t.Logf("检测到的 ROCm 版本: %s", version)
+
+	// If version is detected, verify it matches expected format
+	if version != "" {
+		// ROCm version should contain numbers (e.g., "4.0.0+fc0010cf6a" or "5.4.0")
+		assert.Regexp(t, `\d+\.\d+`, version, "ROCm 版本应该包含版本号格式")
+	}
+}
+
+// TestResourceMonitor_DetectKernelVersion tests kernel version detection
+func TestResourceMonitor_DetectKernelVersion(t *testing.T) {
+	rm := NewResourceMonitor(nil)
+
+	version := rm.detectKernelVersion()
+	assert.NotEmpty(t, version, "应该能检测到内核版本")
+	t.Logf("检测到的内核版本: %s", version)
+}
+
+// TestResourceMonitor_InitializeResources tests resource initialization
+func TestResourceMonitor_InitializeResources(t *testing.T) {
+	rm := NewResourceMonitor(nil)
+
+	err := rm.initializeResources()
+	assert.NoError(t, err)
+
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
+	assert.True(t, rm.resources.MemoryTotal > 0, "内存总量应该大于0")
+	assert.True(t, rm.resources.DiskTotal > 0, "磁盘总量应该大于0")
+	assert.NotNil(t, rm.resources.LoadAverage, "负载平均值应该初始化")
 }

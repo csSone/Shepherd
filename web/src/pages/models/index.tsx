@@ -1,26 +1,31 @@
 import { useState } from 'react';
-import { Search, RefreshCw, Filter, Grid3X3, List, Pencil, MessageSquare } from 'lucide-react';
-import { useModels, useLoadModel, useUnloadModel, useSetModelFavourite, useUpdateModelAlias, useScanModels, useFilteredModels } from '@/features/models/hooks';
+import { Search, RefreshCw, Filter, Grid3X3, List, Pencil, MessageSquare, Gauge, FileText } from 'lucide-react';
+import { useModels, useLoadModel, useUnloadModel, useSetModelFavourite, useUpdateModelAlias, useScanModels, useFilteredModels, useCreateBenchmark } from '@/features/models/hooks';
 import { ModelCard } from '@/components/models/ModelCard';
 import { LoadModelDialog } from '@/components/models/LoadModelDialog';
 import { EditAliasDialog } from '@/components/models/EditAliasDialog';
 import { TestModelDialog } from '@/components/models/TestModelDialog';
+import { BenchmarkDialog } from '@/components/models/BenchmarkDialog';
+import { BenchmarkResultsDialog } from '@/components/models/BenchmarkResultsDialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { Model, ModelStatus } from '@/types';
+import type { Model, ModelStatus, BenchmarkConfig } from '@/types';
 import { useAlertDialog } from '@/hooks/useAlertDialog';
+import { useToast } from '@/hooks/useToast';
 
 /**
  * 模型管理页面
  */
 export function ModelsPage() {
   const alertDialog = useAlertDialog();
+  const toast = useToast();
   const { data: models = [], isLoading } = useModels();
   const loadModel = useLoadModel();
   const unloadModel = useUnloadModel();
   const setFavourite = useSetModelFavourite();
   const updateAlias = useUpdateModelAlias();
   const scanModels = useScanModels();
+  const createBenchmark = useCreateBenchmark();
 
   // UI 状态
   const [search, setSearch] = useState('');
@@ -36,6 +41,12 @@ export function ModelsPage() {
 
   // 测试模型对话框状态
   const [testModel, setTestModel] = useState<Model | null>(null);
+
+  // 压测对话框状态
+  const [benchmarkModel, setBenchmarkModel] = useState<Model | null>(null);
+
+  // 压测结果对话框状态
+  const [benchmarkResultsModel, setBenchmarkResultsModel] = useState<Model | null>(null);
 
   // 过滤模型
   const filteredModels = useFilteredModels(models, {
@@ -99,6 +110,58 @@ export function ModelsPage() {
   // 处理测试模型
   const handleTestModel = (model: Model) => {
     setTestModel(model);
+  };
+
+  // 处理压测模型
+  const handleBenchmarkModel = (model: Model) => {
+    setBenchmarkModel(model);
+  };
+
+  // 处理压测确认
+  const handleBenchmarkConfirm = (config: BenchmarkConfig) => {
+    // 构建命令字符串
+    const cmdParts: string[] = [];
+    Object.entries(config.params).forEach(([key, value]) => {
+      if (value === 'true') {
+        cmdParts.push(key);
+      } else if (value !== 'false' && value !== '') {
+        cmdParts.push(key, String(value));
+      }
+    });
+    // 添加设备参数
+    if (config.devices && config.devices.length > 0 && config.devices.length < 999) {
+      cmdParts.push('-dev', config.devices.join('/'));
+    }
+    const cmd = cmdParts.join(' ');
+
+    createBenchmark.mutate(
+      {
+        modelId: config.modelId,
+        llamaBinPath: config.llamaCppPath,
+        cmd,
+      },
+      {
+        onSuccess: (data) => {
+          if (data) {
+            toast.success('压测任务已创建', '正在运行...');
+            setBenchmarkModel(null);
+            // 打开结果查看对话框
+            const currentModel = models.find(m => m.id === config.modelId);
+            if (currentModel) {
+              setBenchmarkResultsModel(currentModel);
+            }
+          }
+        },
+        onError: (error) => {
+          toast.error('创建压测任务失败', error.message);
+        },
+      }
+    );
+  };
+
+  // 处理查看压测结果
+  const handleViewBenchmarkResults = (model: Model) => {
+    setBenchmarkResultsModel(model);
   };
 
   return (
@@ -203,9 +266,9 @@ export function ModelsPage() {
       ) : (
         <div
           className={cn(
-            'gap-4',
+            'gap-3 sm:gap-4',
             viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
               : 'flex flex-col'
           )}
         >
@@ -217,24 +280,44 @@ export function ModelsPage() {
               onUnload={() => handleUnloadClick(model.id)}
               onToggleFavourite={() => handleToggleFavourite(model.id, model.favourite)}
               actions={
-                <div className="flex items-center gap-1">
+                <>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => handleEditAlias(model)}
                     title="编辑别名"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
                   >
-                    <Pencil className="w-4 h-4" />
+                    <Pencil className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => handleTestModel(model)}
                     title="测试模型"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
                   >
-                    <MessageSquare className="w-4 h-4" />
+                    <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
-                </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleBenchmarkModel(model)}
+                    title="性能测试"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
+                  >
+                    <Gauge className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleViewBenchmarkResults(model)}
+                    title="查看测试结果"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
+                  >
+                    <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                </>
               }
             />
           ))}
@@ -278,6 +361,28 @@ export function ModelsPage() {
             setTestModel(null);
             handleLoadClick(testModel);
           }}
+        />
+      )}
+
+      {/* Benchmark Dialog */}
+      {benchmarkModel && (
+        <BenchmarkDialog
+          isOpen={!!benchmarkModel}
+          onClose={() => setBenchmarkModel(null)}
+          onConfirm={handleBenchmarkConfirm}
+          modelId={benchmarkModel.id}
+          modelName={benchmarkModel.alias || benchmarkModel.name}
+          isLoading={createBenchmark.isPending}
+        />
+      )}
+
+      {/* Benchmark Results Dialog */}
+      {benchmarkResultsModel && (
+        <BenchmarkResultsDialog
+          isOpen={!!benchmarkResultsModel}
+          onClose={() => setBenchmarkResultsModel(null)}
+          modelId={benchmarkResultsModel.id}
+          modelName={benchmarkResultsModel.alias || benchmarkResultsModel.name}
         />
       )}
     </div>

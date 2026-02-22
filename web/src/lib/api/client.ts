@@ -58,8 +58,10 @@ export class ApiClient {
 
 /**
  * API客户端单例实例
+ * 使用相对路径通过 Vite 开发服务器代理访问后端 API
+ * 在生产环境中，需要在 nginx 或其他反向代理中配置 /api 路由
  */
-export const apiClient = new ApiClient('http://localhost:9190/api');
+export const apiClient = new ApiClient('/api');
 
 /**
  * 更新API客户端的基础URL

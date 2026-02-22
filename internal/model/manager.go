@@ -463,17 +463,26 @@ func (m *Manager) findMmproj(modelPath string) string {
 }
 
 // getScanPaths returns the list of scan paths (from PathConfigs or Paths)
+// 从配置管理器获取最新配置，而不是使用初始化时的静态快照
 func (m *Manager) getScanPaths() []string {
-	if len(m.config.Model.PathConfigs) > 0 {
-		paths := make([]string, 0, len(m.config.Model.PathConfigs))
-		for _, pc := range m.config.Model.PathConfigs {
+	// 获取配置:优先使用 configMgr,如果为 nil 则使用传入的 config
+	var cfg *config.Config
+	if m.configMgr != nil {
+		cfg = m.configMgr.Get()
+	} else {
+		cfg = m.config
+	}
+
+	if len(cfg.Model.PathConfigs) > 0 {
+		paths := make([]string, 0, len(cfg.Model.PathConfigs))
+		for _, pc := range cfg.Model.PathConfigs {
 			paths = append(paths, pc.Path)
 		}
 		fmt.Printf("[DEBUG] getScanPaths: 从 PathConfigs 返回 %d 个路径: %v\n", len(paths), paths)
 		return paths
 	}
-	fmt.Printf("[DEBUG] getScanPaths: 从 Paths 返回 %d 个路径: %v\n", len(m.config.Model.Paths), m.config.Model.Paths)
-	return m.config.Model.Paths
+	fmt.Printf("[DEBUG] getScanPaths: 从 Paths 返回 %d 个路径: %v\n", len(cfg.Model.Paths), cfg.Model.Paths)
+	return cfg.Model.Paths
 }
 
 // calculatePathPrefix calculates a short path prefix for display
@@ -1112,9 +1121,13 @@ func (m *Manager) saveModels() {
 }
 
 // findLlamaCppBinary finds the llama.cpp binary
+// 从配置管理器获取最新配置，而不是使用初始化时的静态快照
 func (m *Manager) findLlamaCppBinary() string {
+	// 从配置管理器获取最新配置
+	cfg := m.configMgr.Get()
+
 	// Check configured paths
-	for _, llamacppPath := range m.config.Llamacpp.Paths {
+	for _, llamacppPath := range cfg.Llamacpp.Paths {
 		binaryPath := filepath.Join(llamacppPath.Path, "llama-server")
 		if _, err := os.Stat(binaryPath); err == nil {
 			return llamacppPath.Path

@@ -175,9 +175,23 @@ func TestNodeAdapter_GetNode(t *testing.T) {
 				n.RegisterClient(
 					&node.NodeInfo{
 						ID:      "test-client",
+						Name:    "Test Client",
 						Address: "192.168.1.100",
 						Port:    8080,
 						Role:    node.NodeRoleClient,
+						Status:  node.NodeStatusOnline,
+						Tags:    []string{"test"},
+						Capabilities: &node.NodeCapabilities{
+							CPUCount:       8,
+							Memory:         16 * 1024 * 1024 * 1024, // 16GB
+							GPUCount:       1,
+							GPUMemory:      24 * 1024 * 1024 * 1024, // 24GB
+							SupportsLlama:  true,
+							SupportsPython: true,
+						},
+						Metadata: map[string]string{
+							"version": "1.0.0",
+						},
 					})
 			},
 			wantStatus: http.StatusOK,

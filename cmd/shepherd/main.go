@@ -15,6 +15,7 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/netutil"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/process"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/server"
@@ -23,7 +24,7 @@ import (
 
 // 版本信息（编译时注入）
 var (
-	Version   = "dev"
+	Version   = "v0.1.4"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
 )
@@ -416,10 +417,16 @@ func (app *App) buildNodeConfig() *node.NodeConfig {
 		nodeName = nodeID
 	}
 
+	// 如果地址是0.0.0.0或空，自动检测最佳本地IP
+	address := cfg.Server.Host
+	if address == "0.0.0.0" || address == "" {
+		address = netutil.GetBestLocalIP()
+	}
+
 	return &node.NodeConfig{
 		ID:                nodeID,
 		Name:              nodeName,
-		Address:           cfg.Server.Host,
+		Address:           address,
 		Port:              cfg.Server.WebPort,
 		HeartbeatInterval: time.Duration(cfg.Node.ClientRole.HeartbeatInterval) * time.Second,
 		Timeout:           time.Duration(cfg.Node.ClientRole.HeartbeatTimeout) * time.Second,

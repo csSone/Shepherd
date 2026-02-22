@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useModels } from '@/features/models/hooks';
+import { useDownloads, useDownloadStats } from '@/features/downloads/hooks';
+import { useClients, useFilteredClients } from '@/features/cluster/hooks';
 import { formatBytes } from '@/lib/utils';
 import { Package, Download, Network, Activity } from 'lucide-react';
 import type { Model } from '@/types';
@@ -10,6 +12,10 @@ import type { Model } from '@/types';
  */
 export function DashboardPage() {
   const { data: models = [], isLoading } = useModels();
+  const { data: downloads = [], isLoading: downloadsLoading } = useDownloads();
+  const downloadStats = useDownloadStats(downloads);
+  const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const onlineClients = useFilteredClients(clients, { status: 'online' });
 
   // 按扫描时间排序，获取最近 5 个模型（稳定的排序）
   const recentModels = useMemo(() => {
@@ -38,19 +44,19 @@ export function DashboardPage() {
     },
     {
       title: '下载任务',
-      value: 0,
+      value: downloadStats.active,
       icon: Download,
       description: '活跃的下载任务',
     },
     {
       title: '集群节点',
-      value: 0,
+      value: onlineClients.length,
       icon: Network,
       description: '在线的客户端',
     },
   ];
 
-  if (isLoading) {
+  if (isLoading || downloadsLoading || clientsLoading) {
     return <div className="flex items-center justify-center h-full">加载中...</div>;
   }
 

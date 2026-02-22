@@ -1,16 +1,16 @@
-// Package node provides distributed node management implementation.
 package node
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/shepherd-project/shepherd/Shepherd/internal/gpu"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -37,8 +37,11 @@ type ResourceMonitor struct {
 
 	// 资源数据
 	resources    *NodeResources
-	gpuInfo      []GPUInfo
+	gpuInfo      []gpu.Info
 	llamacppInfo *LlamacppInfo
+
+	// GPU检测器 (使用新的gpu包)
+	gpuDetector *gpu.Detector
 
 	// 日志
 	log *logger.Logger
@@ -69,7 +72,7 @@ func NewResourceMonitor(config *ResourceMonitorConfig) *ResourceMonitor {
 		CPUTotal:    int64(runtime.NumCPU()) * 1000, // 转换为 millicores
 		MemoryTotal: 0,                              // 将在初始化时设置
 		DiskTotal:   0,                              // 将在初始化时设置
-		GPUInfo:     make([]GPUInfo, 0),
+		GPUInfo:     make([]gpu.Info, 0),
 		LoadAverage: make([]float64, 3),
 	}
 
@@ -80,8 +83,9 @@ func NewResourceMonitor(config *ResourceMonitorConfig) *ResourceMonitor {
 		ctx:           ctx,
 		cancel:        cancel,
 		resources:     resources,
-		gpuInfo:       make([]GPUInfo, 0),
+		gpuInfo:       make([]gpu.Info, 0),
 		llamacppInfo:  nil,
+		gpuDetector:   gpu.NewDetector(&gpu.Config{}),
 		log:           config.Logger,
 		startTime:     time.Now(),
 	}
@@ -152,7 +156,7 @@ func (rm *ResourceMonitor) GetSnapshot() *NodeResources {
 
 	snapshot := *rm.resources
 	if len(rm.gpuInfo) > 0 {
-		snapshot.GPUInfo = make([]GPUInfo, len(rm.gpuInfo))
+		snapshot.GPUInfo = make([]gpu.Info, len(rm.gpuInfo))
 		copy(snapshot.GPUInfo, rm.gpuInfo)
 	}
 
@@ -160,11 +164,11 @@ func (rm *ResourceMonitor) GetSnapshot() *NodeResources {
 }
 
 // GetGPUInfo 获取GPU信息
-func (rm *ResourceMonitor) GetGPUInfo() []GPUInfo {
+func (rm *ResourceMonitor) GetGPUInfo() []gpu.Info {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	gpuInfo := make([]GPUInfo, len(rm.gpuInfo))
+	gpuInfo := make([]gpu.Info, len(rm.gpuInfo))
 	copy(gpuInfo, rm.gpuInfo)
 	return gpuInfo
 }
@@ -276,7 +280,7 @@ func (rm *ResourceMonitor) updateResources() {
 		resourcesCopy = &NodeResources{}
 		*resourcesCopy = *rm.resources
 		if len(rm.gpuInfo) > 0 {
-			resourcesCopy.GPUInfo = make([]GPUInfo, len(rm.gpuInfo))
+			resourcesCopy.GPUInfo = make([]gpu.Info, len(rm.gpuInfo))
 			copy(resourcesCopy.GPUInfo, rm.gpuInfo)
 		}
 	}
@@ -327,8 +331,12 @@ func (rm *ResourceMonitor) updateDiskUsage() {
 	}
 }
 
-// updateGPUInfo 更新GPU信息
+// updateGPUInfo 更新GPU信息 (使用新的gpu包)
 func (rm *ResourceMonitor) updateGPUInfo() {
+	if rm.gpuDetector == nil {
+		return
+	}
+
 	// 定期重新检测GPU（每分钟）
 	if len(rm.gpuInfo) == 0 || time.Since(rm.lastUpdate) > time.Minute {
 		rm.detectGPUs()
@@ -336,13 +344,10 @@ func (rm *ResourceMonitor) updateGPUInfo() {
 
 	// 更新现有GPU的使用情况
 	for i := range rm.gpuInfo {
-		switch rm.gpuInfo[i].Vendor {
-		case "NVIDIA":
-			rm.updateNvidiaGPU(&rm.gpuInfo[i])
-		case "AMD":
-			rm.updateAMDGPU(&rm.gpuInfo[i])
-		case "Intel":
-			rm.updateIntelGPU(&rm.gpuInfo[i])
+		if err := rm.gpuDetector.Update(rm.ctx, &rm.gpuInfo[i]); err != nil {
+			if rm.log != nil {
+				rm.log.Debugf("更新GPU[%d]信息失败: %v", rm.gpuInfo[i].Index, err)
+			}
 		}
 	}
 }
@@ -359,223 +364,21 @@ func (rm *ResourceMonitor) updateLoadAverage() {
 	}
 }
 
-// detectGPUs 检测GPU
+// detectGPUs 检测GPU (使用新的gpu包)
 func (rm *ResourceMonitor) detectGPUs() {
-	rm.gpuInfo = rm.gpuInfo[:0] // 清空现有数据
-
-	// 检测NVIDIA GPU
-	if nvidiaGPUs := rm.detectNvidiaGPUs(); len(nvidiaGPUs) > 0 {
-		rm.gpuInfo = append(rm.gpuInfo, nvidiaGPUs...)
-	}
-
-	// 检测AMD GPU
-	if amdGPUs := rm.detectAMDGPUs(); len(amdGPUs) > 0 {
-		rm.gpuInfo = append(rm.gpuInfo, amdGPUs...)
-	}
-
-	// 检测Intel GPU
-	if intelGPUs := rm.detectIntelGPUs(); len(intelGPUs) > 0 {
-		rm.gpuInfo = append(rm.gpuInfo, intelGPUs...)
-	}
-
-	if len(rm.gpuInfo) > 0 && rm.log != nil {
-		rm.log.Infof("检测到 %d 个GPU", len(rm.gpuInfo))
-	}
-}
-
-// detectNvidiaGPUs 检测NVIDIA GPU
-func (rm *ResourceMonitor) detectNvidiaGPUs() []GPUInfo {
-	var gpus []GPUInfo
-
-	// 尝试使用 nvidia-smi
-	cmd := exec.Command("nvidia-smi", "--query-gpu=index,name,memory.total,memory.used,temperature.gpu,utilization.gpu,power.draw,driver_version", "--format=csv,noheader,nounits")
-	output, err := cmd.Output()
-	if err != nil {
-		if rm.log != nil {
-			rm.log.Debugf("未检测到NVIDIA GPU或nvidia-smi不可用: %v", err)
-		}
-		return gpus
-	}
-
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		fields := strings.Split(line, ",")
-		if len(fields) < 8 {
-			continue
-		}
-
-		// 解析字段
-		index, _ := strconv.Atoi(strings.TrimSpace(fields[0]))
-		name := strings.TrimSpace(fields[1])
-		totalMemory, _ := strconv.ParseInt(strings.TrimSpace(fields[2]), 10, 64)
-		usedMemory, _ := strconv.ParseInt(strings.TrimSpace(fields[3]), 10, 64)
-		temperature, _ := strconv.ParseFloat(strings.TrimSpace(fields[4]), 64)
-		utilization, _ := strconv.ParseFloat(strings.TrimSpace(fields[5]), 64)
-		powerUsage, _ := strconv.ParseFloat(strings.TrimSpace(fields[6]), 64)
-		driverVersion := strings.TrimSpace(fields[7])
-
-		gpus = append(gpus, GPUInfo{
-			Index:         index,
-			Name:          name,
-			Vendor:        "NVIDIA",
-			TotalMemory:   totalMemory * 1024 * 1024, // MB to bytes
-			UsedMemory:    usedMemory * 1024 * 1024,  // MB to bytes
-			Temperature:   temperature,
-			Utilization:   utilization,
-			PowerUsage:    powerUsage,
-			DriverVersion: driverVersion,
-		})
-
-		if rm.log != nil {
-			rm.log.Debugf("检测到NVIDIA GPU[%d]: %s", index, name)
-		}
-	}
-
-	return gpus
-}
-
-// detectAMDGPUs 检测AMD GPU
-func (rm *ResourceMonitor) detectAMDGPUs() []GPUInfo {
-	var gpus []GPUInfo
-
-	// 尝试使用 rocm-smi
-	cmd := exec.Command("rocm-smi", "--showproductname")
-	output, err := cmd.Output()
-	if err != nil {
-		if rm.log != nil {
-			rm.log.Debugf("未检测到AMD GPU或rocm-smi不可用: %v", err)
-		}
-		return gpus
-	}
-
-	// 解析AMD GPU信息（简化实现）
-	lines := strings.Split(string(output), "\n")
-	index := 0
-	for _, line := range lines {
-		if strings.Contains(line, "Card series") || strings.Contains(line, "GPU") {
-			name := strings.TrimSpace(line)
-			if name != "" {
-				gpus = append(gpus, GPUInfo{
-					Index:       index,
-					Name:        name,
-					Vendor:      "AMD",
-					TotalMemory: 0, // ROCM-SMI 不提供这些信息
-					UsedMemory:  0,
-					Temperature: 0,
-					Utilization: 0,
-				})
-				if rm.log != nil {
-					rm.log.Debugf("检测到AMD GPU[%d]: %s", index, name)
-				}
-				index++
-			}
-		}
-	}
-
-	return gpus
-}
-
-// detectIntelGPUs 检测Intel GPU
-func (rm *ResourceMonitor) detectIntelGPUs() []GPUInfo {
-	var gpus []GPUInfo
-
-	// Intel GPU 检测通常通过系统信息
-	// 这里提供一个简化实现
-	if hostStat, err := host.Info(); err == nil {
-		// 检查是否包含Intel集成显卡
-		if strings.Contains(strings.ToLower(hostStat.KernelVersion), "i915") ||
-			strings.Contains(strings.ToLower(hostStat.KernelVersion), "intel") {
-			gpus = append(gpus, GPUInfo{
-				Index:       0,
-				Name:        "Intel Integrated Graphics",
-				Vendor:      "Intel",
-				TotalMemory: 0, // 集成显卡使用系统内存
-				UsedMemory:  0,
-				Temperature: 0,
-				Utilization: 0,
-			})
-			if rm.log != nil {
-				rm.log.Debugf("检测到Intel集成显卡")
-			}
-		}
-	}
-
-	return gpus
-}
-
-// updateNvidiaGPU 更新NVIDIA GPU信息
-func (rm *ResourceMonitor) updateNvidiaGPU(gpu *GPUInfo) {
-	cmd := exec.Command("nvidia-smi", "--query-gpu=memory.used,temperature.gpu,utilization.gpu,power.draw", "--format=csv,noheader,nounits", fmt.Sprintf("--id=%d", gpu.Index))
-	output, err := cmd.Output()
-	if err != nil {
+	if rm.gpuDetector == nil {
 		return
 	}
 
-	fields := strings.Split(strings.TrimSpace(string(output)), ",")
-	if len(fields) < 4 {
-		return
-	}
-
-	if usedMemory, err := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64); err == nil {
-		gpu.UsedMemory = usedMemory * 1024 * 1024 // MB to bytes
-	}
-	if temperature, err := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64); err == nil {
-		gpu.Temperature = temperature
-	}
-	if utilization, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64); err == nil {
-		gpu.Utilization = utilization
-	}
-	if powerUsage, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64); err == nil {
-		gpu.PowerUsage = powerUsage
-	}
-}
-
-// updateAMDGPU 更新AMD GPU信息
-func (rm *ResourceMonitor) updateAMDGPU(gpu *GPUInfo) {
-	// 使用 rocm-smi 获取详细信息
-	cmd := exec.Command("rocm-smi", "--showmeminfo", "vram", "--showtemp", "--showuse", fmt.Sprintf("--gpu=%d", gpu.Index))
-	output, err := cmd.Output()
+	gpus, err := rm.gpuDetector.DetectAll(rm.ctx)
 	if err != nil {
+		if rm.log != nil {
+			rm.log.Errorf("GPU检测失败: %v", err)
+		}
 		return
 	}
 
-	// 解析 rocm-smi 输出
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		// 解析显存使用 (格式: GPU[0] : VRAM Total: X MiB)
-		if strings.Contains(line, "VRAM Total:") {
-			fields := strings.Fields(line)
-			for i, field := range fields {
-				if field == "Total:" && i+1 < len(fields) {
-					if val, err := strconv.ParseInt(fields[i+1], 10, 64); err == nil {
-						gpu.TotalMemory = val * 1024 * 1024 // MiB to bytes
-					}
-				}
-			}
-		}
-		// 解析温度
-		if strings.Contains(line, "Temperature") {
-			fields := strings.Fields(line)
-			for i, field := range fields {
-				if field == "Sensor" && i+2 < len(fields) {
-					if val, err := strconv.ParseFloat(fields[i+2], 64); err == nil {
-						gpu.Temperature = val
-					}
-				}
-			}
-		}
-	}
-}
-
-// updateIntelGPU 更新Intel GPU信息
-func (rm *ResourceMonitor) updateIntelGPU(gpu *GPUInfo) {
-	// Intel GPU 监控的具体实现
-	// 这里提供一个占位符实现
+	rm.gpuInfo = gpus
 }
 
 // detectLlamacpp 检测llama.cpp
@@ -657,41 +460,93 @@ func (rm *ResourceMonitor) testLlamacppPath(path string) *LlamacppInfo {
 
 // detectROCmVersion 检测ROCm版本
 func (rm *ResourceMonitor) detectROCmVersion() string {
-	// 尝试使用 rocm-smi 获取版本
-	cmd := exec.Command("rocm-smi", "--showversion")
-	output, err := cmd.Output()
-	if err == nil {
+	// 检测优先级：version文件 > hipcc路径 > rocm-smi-lib版本 > rocm-smi工具版本
+
+	// 方法1: 读取 /opt/rocm/.info/version (最可靠的ROCm平台版本)
+	if data, err := os.ReadFile("/opt/rocm/.info/version"); err == nil {
+		version := strings.TrimSpace(string(data))
+		if version != "" {
+			return version
+		}
+	}
+	if data, err := os.ReadFile("/opt/rocm/bin/.info/version"); err == nil {
+		version := strings.TrimSpace(string(data))
+		if version != "" {
+			return version
+		}
+	}
+
+	// 方法2: 从 hipcc 路径提取版本 (例如 /opt/rocm-7.2.0/)
+	cmd := exec.Command("hipcc", "--version")
+	if output, err := cmd.Output(); err == nil {
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
-			if strings.Contains(line, "ROCm") {
-				fields := strings.Fields(line)
-				for i, field := range fields {
-					if strings.Contains(field, "ROCm") && i+1 < len(fields) {
-						return strings.TrimSpace(fields[i+1])
+			// 查找 "InstalledDir: /opt/rocm-7.2.0/..."
+			if idx := strings.Index(line, "InstalledDir:"); idx != -1 {
+				pathPart := line[idx+13:]
+				// 从路径中提取版本，如 /opt/rocm-7.2.0/
+				if rocmIdx := strings.Index(pathPart, "rocm-"); rocmIdx != -1 {
+					versionPart := pathPart[rocmIdx+5:]
+					// 移除后续路径组件
+					if slashIdx := strings.IndexAny(versionPart, "/\t\n"); slashIdx != -1 {
+						versionPart = versionPart[:slashIdx]
+					}
+					versionPart = strings.TrimSpace(versionPart)
+					if versionPart != "" && isValidROCmVersion(versionPart) {
+						return versionPart
 					}
 				}
 			}
 		}
 	}
 
-	// 尝试通过 hipcc 获取版本
-	cmd = exec.Command("hipcc", "--version")
-	output, err = cmd.Output()
-	if err == nil {
+	// 方法3: rocm-smi --showversion (查找 ROCM-SMI-LIB 版本，更接近平台版本)
+	cmd = exec.Command("rocm-smi", "--showversion")
+	if output, err := cmd.Output(); err == nil {
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
-			if strings.Contains(line, "HIP version") {
-				fields := strings.Fields(line)
-				for i, field := range fields {
-					if field == "version" && i+1 < len(fields) {
-						return strings.TrimSpace(fields[i+1])
+			// 查找 "ROCM-SMI-LIB version:"，这个更接近ROCm平台版本
+			if strings.Contains(line, "ROCM-SMI-LIB version:") {
+				parts := strings.Split(line, "ROCM-SMI-LIB version:")
+				if len(parts) >= 2 {
+					version := strings.TrimSpace(parts[1])
+					if version != "" {
+						return version
 					}
+				}
+			}
+		}
+	}
+
+	// 方法4: rocm-smi --version (工具版本 - 最低优先级)
+	cmd = exec.Command("rocm-smi", "--version")
+	if output, err := cmd.Output(); err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "ROCM-SMI version:") {
+				parts := strings.Split(line, "ROCM-SMI version:")
+				if len(parts) >= 2 {
+					return strings.TrimSpace(parts[1])
 				}
 			}
 		}
 	}
 
 	return ""
+}
+
+// isValidROCmVersion 检查字符串是否是有效的版本号
+func isValidROCmVersion(s string) bool {
+	// 必须包含至少一个点 (例如 "7.2.0")
+	if !strings.Contains(s, ".") {
+		return false
+	}
+	// 必须以数字开头
+	if len(s) == 0 || s[0] < '0' || s[0] > '9' {
+		return false
+	}
+	return true
 }
 
 // detectKernelVersion 检测Linux内核版本

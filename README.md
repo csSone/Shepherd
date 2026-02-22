@@ -857,6 +857,7 @@ make clean
 - [x] v0.1.1 - Master-Client 分布式管理
 - [x] v0.1.2 - Web UI 前端独立架构
 - [x] v0.1.3 - 配置/下载/进程管理 API + 脚本重组
+- [x] v0.1.4 - 模型压测 UI 优化和设备检测修复
 - [ ] v0.2.0 - MCP (Model Context Protocol) 支持
 - [ ] v0.3.0 - 系统托盘和桌面应用
 - [ ] v1.0.0 - 生产就绪

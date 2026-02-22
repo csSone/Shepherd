@@ -59,14 +59,15 @@ type Client struct {
 
 // Capabilities describes what a client can do
 type Capabilities struct {
-	GPU           bool     `json:"gpu"`
-	GPUName       string   `json:"gpuName,omitempty"`
-	GPUMemory     int64    `json:"gpuMemory,omitempty"` // bytes
-	CPUCount      int      `json:"cpuCount"`
-	Memory        int64    `json:"memory"`        // bytes
-	SupportsLlama bool     `json:"supportsLlama"`
-	SupportsPython bool    `json:"supportsPython"`
-	CondaEnvs     []string `json:"condaEnvs,omitempty"`
+	GPU            bool     `json:"gpu"`
+	GPUCount       int      `json:"gpuCount,omitempty"`
+	GPUName        string   `json:"gpuName,omitempty"`
+	GPUMemory      int64    `json:"gpuMemory,omitempty"` // bytes
+	CPUCount       int      `json:"cpuCount"`
+	Memory         int64    `json:"memory"`        // bytes
+	SupportsLlama  bool     `json:"supportsLlama"`
+	SupportsPython bool     `json:"supportsPython"`
+	CondaEnvs      []string `json:"condaEnvs,omitempty"`
 }
 
 // Task represents a distributed task

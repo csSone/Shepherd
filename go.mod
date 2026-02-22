@@ -14,6 +14,8 @@ require (
 )
 
 require (
+	github.com/ROCm/amdsmi v0.0.0-20251117232548-b5522cc8141a // indirect
+	github.com/amd/go_amd_smi v2.0.0+incompatible // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect

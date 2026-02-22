@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	api "github.com/shepherd-project/shepherd/Shepherd/internal/api"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/anthropic"
+	benchmarkapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/benchmark"
 	compatibilityapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/compatibility"
 	filesystemapi "github.com/shepherd-project/shepherd/Shepherd/internal/api/filesystem"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/api/ollama"
@@ -123,6 +124,7 @@ type Handlers struct {
 	Storage       *storageapi.Handler
 	Compatibility *compatibilityapi.Handler
 	Filesystem    *filesystemapi.Handler
+	Benchmark     *benchmarkapi.Handler
 }
 
 // NewServer creates a new HTTP server
@@ -176,6 +178,8 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 	s.handlers.Storage = storageapi.NewHandler(config.ConfigMgr, storageMgr)
 	s.handlers.Compatibility = compatibilityapi.NewHandler(config.ConfigMgr, compatServerManager)
 	s.handlers.Filesystem = filesystemapi.NewHandler()
+	// 压测 handler 使用存储层管理数据
+	s.handlers.Benchmark = benchmarkapi.NewHandler(logger.GetLogger(), storageMgr.GetStore())
 
 	// Setup Gin engine
 	if config.WebUIPath == "" {
@@ -282,6 +286,20 @@ func (s *Server) setupRoutes() {
 			// 显存估算（必须在 :id 路由之前）
 			models.POST("/vram/estimate", s.handleEstimateVRAM)
 
+			// Benchmark 压测路由（必须在 :id 路由之前）
+			benchmark := models.Group("/benchmark")
+			{
+				benchmark.POST("", s.handlers.Benchmark.Create)
+				benchmark.GET("/tasks", s.handlers.Benchmark.List)
+				benchmark.GET("/tasks/:benchmarkId", s.handlers.Benchmark.Get)
+				benchmark.POST("/tasks/:benchmarkId/cancel", s.handlers.Benchmark.Cancel)
+				// 配置管理
+				benchmark.GET("/configs", s.handlers.Benchmark.ListConfigs)
+				benchmark.POST("/configs", s.handlers.Benchmark.SaveConfig)
+				benchmark.GET("/configs/:name", s.handlers.Benchmark.GetConfig)
+				benchmark.DELETE("/configs/:name", s.handlers.Benchmark.DeleteConfig)
+			}
+
 			// 模型具体操作（包含 :id 参数的路由必须在最后）
 			models.GET("/:id", s.handleGetModel)
 			models.POST("/:id/load", s.handleLoadModel)
@@ -296,6 +314,15 @@ func (s *Server) setupRoutes() {
 			modelScan.POST("", s.handleScanModels)
 			modelScan.GET("/status", s.handleGetScanStatus)
 		}
+
+		// Model device routes
+		api.GET("/model/device/list", s.handlers.Benchmark.GetDevices)
+
+		// Model parameter routes
+		api.GET("/models/param/benchmark/list", s.handlers.Benchmark.GetParams)
+
+		// Llama.cpp routes
+		api.GET("/llamacpp/list", s.handlers.Paths.GetLlamaCppPaths)
 
 		// Download routes
 		downloads := api.Group("/downloads")

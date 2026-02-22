@@ -29,9 +29,11 @@ interface PathMutationResponse {
  */
 interface PathTestResponse {
   success: boolean;
-  valid: boolean;
-  message?: string;
-  error?: string;
+  data?: {
+    valid: boolean;
+    message?: string;
+    error?: string;
+  };
 }
 
 /**

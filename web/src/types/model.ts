@@ -174,3 +174,199 @@ export interface ModelCapabilitiesResponse {
   success?: boolean;
   error?: string;
 }
+
+/**
+ * 压测参数类型
+ */
+export type BenchmarkParamType = 'STRING' | 'INTEGER' | 'FLOAT' | 'LOGIC';
+
+/**
+ * 压测参数定义
+ */
+export interface BenchmarkParam {
+  fullName: string;        // 完整参数名，如 -t
+  name: string;            // 显示名称
+  abbreviation: string;    // 缩写
+  description: string;     // 描述
+  type: BenchmarkParamType; // 参数类型
+  defaultValue: string;    // 默认值
+  values?: string[];       // 可选值列表（枚举类型）
+  sort?: number;           // 排序序号
+}
+
+/**
+ * 压测参数配置响应
+ */
+export interface BenchmarkParamsResponse {
+  success: boolean;
+  params?: BenchmarkParam[];
+  error?: string;
+}
+
+/**
+ * 计算设备信息
+ */
+export interface ComputeDevice {
+  id: string;              // 设备标识
+  name: string;            // 设备名称
+  type: 'CPU' | 'GPU' | 'Accelerator'; // 设备类型
+  selected?: boolean;      // 是否已选择
+}
+
+/**
+ * Llama.cpp 版本信息
+ */
+export interface LlamaCppVersion {
+  path: string;            // 可执行文件路径
+  name?: string;           // 显示名称
+  description?: string;    // 描述
+}
+
+/**
+ * 压测配置
+ */
+export interface BenchmarkConfig {
+  modelId: string;         // 模型 ID
+  modelName: string;       // 模型名称
+  llamaCppPath: string;    // llama.cpp 路径
+  devices?: string[];      // 选择的设备列表（为空表示使用 auto）
+  params: Record<string, string | number | boolean>; // 压测参数键值对
+  configName?: string;     // 配置名称（用于保存配置）
+}
+
+/**
+ * 压测状态
+ */
+export type BenchmarkStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * 压测任务
+ */
+export interface Benchmark {
+  id: string;              // 压测 ID
+  modelId: string;         // 模型 ID
+  modelName: string;       // 模型名称
+  status: BenchmarkStatus; // 状态
+  config: BenchmarkConfig; // 压测配置
+  createdAt: string;       // 创建时间
+  startedAt?: string;      // 开始时间
+  completedAt?: string;    // 完成时间
+  result?: BenchmarkResult; // 压测结果
+  error?: string;          // 错误信息
+}
+
+/**
+ * 压测结果
+ */
+export interface BenchmarkResult {
+  id: string;              // 结果 ID
+  benchmarkId: string;     // 关联的压测 ID
+  modelId: string;         // 模型 ID
+  modelName: string;       // 模型名称
+  command: string[];       // 执行的命令
+  commandStr: string;      // 命令字符串
+  exitCode: number;        // 退出码
+  rawOutput: string;       // 原始输出
+  fileName: string;        // 保存的文件名
+  savedPath: string;       // 保存路径
+  timestamp: string;       // 时间戳
+  // 解析后的性能指标
+  metrics?: {
+    tps?: number;          // Tokens per second
+    promptTps?: number;    // Prompt processing speed
+    totalTokens?: number;  // Total tokens processed
+    loadTime?: number;     // Model load time (ms)
+    memoryUsage?: number;  // Memory usage (MB)
+  };
+}
+
+/**
+ * 压测结果列表项
+ */
+export interface BenchmarkResultFile {
+  name: string;            // 文件名
+  size: number;            // 文件大小
+  modified: string;        // 修改时间
+}
+
+/**
+ * 压测结果列表响应
+ */
+export interface BenchmarkListResponse {
+  success: boolean;
+  data?: {
+    files: BenchmarkResultFile[];
+  };
+  error?: string;
+}
+
+/**
+ * 压测结果详情响应
+ */
+export interface BenchmarkResultResponse {
+  success: boolean;
+  data?: BenchmarkResult;
+  error?: string;
+}
+
+/**
+ * 创建压测请求
+ */
+export interface CreateBenchmarkRequest {
+  modelId: string;
+  llamaBinPath: string;
+  cmd: string;             // 压测命令字符串
+  configName?: string;     // 可选的配置名称
+}
+
+/**
+ * 创建压测响应
+ */
+export interface CreateBenchmarkResponse {
+  success: boolean;
+  data?: BenchmarkResult;
+  error?: string;
+}
+
+/**
+ * 保存压测配置请求
+ */
+export interface SaveBenchmarkConfigRequest {
+  name: string;            // 配置名称
+  config: BenchmarkConfig;
+}
+
+/**
+ * 保存压测配置响应
+ */
+export interface SaveBenchmarkConfigResponse {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * 加载压测配置响应
+ */
+export interface LoadBenchmarkConfigResponse {
+  success: boolean;
+  data?: {
+    configs: Array<{
+      name: string;
+      config: BenchmarkConfig;
+      createdAt: string;
+    }>;
+  };
+  error?: string;
+}
+
+/**
+ * 压测列表响应
+ */
+export interface BenchmarkListDataResponse {
+  success: boolean;
+  data?: {
+    benchmarks: Benchmark[];
+    total: number;
+  };
+  error?: string;
+}

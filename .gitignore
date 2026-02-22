@@ -78,3 +78,6 @@ AGENTS.md
 config/node
 config.local
 /internal/model/config 
+
+
+CLAUDE.md

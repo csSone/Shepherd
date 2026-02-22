@@ -1,3 +1,7 @@
+github.com/ROCm/amdsmi v0.0.0-20251117232548-b5522cc8141a h1:pb+d4MaGohsm8Ao9RaoS7cpWoLTYWOKY4Oioa0NBljA=
+github.com/ROCm/amdsmi v0.0.0-20251117232548-b5522cc8141a/go.mod h1:c2lzyLAghhTO+y/c3JjKl59JHJliIHwNZOroUfmBQxc=
+github.com/amd/go_amd_smi v2.0.0+incompatible h1:CH6Cc2xRTVZv3jl21jQNTPzLyHAl9zCZMx5X02qlWv8=
+github.com/amd/go_amd_smi v2.0.0+incompatible/go.mod h1:I/fF16IWfA1mDczl3IqeLnFEiuydTxoYboMfKxUqc6o=
 github.com/bytedance/sonic v1.14.0 h1:/OfKt8HFw0kh2rj8N0F6C/qPGRESq0BbaNZgcNXXzQQ=
 github.com/bytedance/sonic v1.14.0/go.mod h1:WoEbx8WTcFJfzCe0hbmyTGrfjt8PzNEBdxlNUO24NhA=
 github.com/bytedance/sonic/loader v0.3.0 h1:dskwH8edlzNMctoruo8FPTJDF3vLtDT0sXZwvZJyqeA=

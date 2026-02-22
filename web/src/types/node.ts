@@ -19,6 +19,7 @@ export interface GPUInfo {
   usedMemory: number;
   temperature: number;
   utilization: number;
+  powerUsage: number;
   driverVersion?: string;
 }
 

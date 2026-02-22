@@ -4,6 +4,7 @@ package node
 import (
 	"time"
 
+	"github.com/shepherd-project/shepherd/Shepherd/internal/gpu"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
 )
 
@@ -37,7 +38,9 @@ const (
 type NodeCapabilities struct {
 	GPU            bool     `json:"gpu"`
 	GPUCount       int      `json:"gpuCount"`
+	GPUName        string   `json:"gpuName,omitempty"`
 	GPUNames       []string `json:"gpuNames,omitempty"`
+	GPUMemory      int64    `json:"gpuMemory,omitempty"`
 	CPUCount       int      `json:"cpuCount"`
 	Memory         int64    `json:"memory"` // bytes
 	SupportsLlama  bool     `json:"supportsLlama"`
@@ -54,7 +57,7 @@ type NodeResources struct {
 	MemoryTotal   int64     `json:"memoryTotal"` // bytes
 	DiskUsed      int64     `json:"diskUsed"`    // bytes
 	DiskTotal     int64     `json:"diskTotal"`   // bytes
-	GPUInfo       []GPUInfo `json:"gpuInfo,omitempty"`
+	GPUInfo       []gpu.Info `json:"gpuInfo,omitempty"`
 	NetworkRx     int64     `json:"networkRx"`               // bytes per second
 	NetworkTx     int64     `json:"networkTx"`               // bytes per second
 	Uptime        int64     `json:"uptime"`                  // seconds
@@ -63,18 +66,9 @@ type NodeResources struct {
 	KernelVersion string    `json:"kernelVersion,omitempty"` // Linux kernel version
 }
 
-// GPUInfo contains information about a GPU
-type GPUInfo struct {
-	Index         int     `json:"index"`
-	Name          string  `json:"name"`
-	Vendor        string  `json:"vendor"`
-	TotalMemory   int64   `json:"totalMemory"` // bytes
-	UsedMemory    int64   `json:"usedMemory"`  // bytes
-	Temperature   float64 `json:"temperature"` // celsius
-	Utilization   float64 `json:"utilization"` // percentage 0-100
-	PowerUsage    float64 `json:"powerUsage"`  // watts
-	DriverVersion string  `json:"driverVersion,omitempty"`
-}
+// GPUInfo is an alias for gpu.Info for backward compatibility.
+// Deprecated: Use gpu.Info directly instead.
+type GPUInfo = gpu.Info
 
 // LlamacppInfo contains information about llama.cpp installation
 type LlamacppInfo struct {

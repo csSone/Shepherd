@@ -7,17 +7,19 @@ server:
     read_timeout: 60
     write_timeout: 60
 model:
-    paths: []
+    paths:
+        - /home/user/workspace/Shepherd/models
+        - /home/user/.cache/huggingface/hub
     path_configs: []
-    auto_scan: false
+    auto_scan: true
     scan_interval: 0
 llamacpp:
     paths:
-        - path: /home/user/workspace/Shepherd/internal/api/paths/llama.cpp
+        - path: /home/user/workspace/Shepherd/llama.cpp
           name: Default
           description: ""
 download:
-    directory: /home/user/workspace/Shepherd/internal/api/paths/downloads
+    directory: /home/user/workspace/Shepherd/downloads
     max_concurrent: 4
     chunk_size: 1048576
     retry_count: 3
@@ -43,7 +45,7 @@ log:
     level: info
     format: json
     output: both
-    directory: /home/user/workspace/Shepherd/internal/api/paths/logs
+    directory: /home/user/workspace/Shepherd/logs
     max_size: 100
     max_backups: 3
     max_age: 7
@@ -51,16 +53,16 @@ log:
 storage:
     type: memory
     sqlite:
-        path: /home/user/workspace/Shepherd/internal/api/paths/Shepherd/data/shepherd.db
+        path: /home/user/workspace/Shepherd/Shepherd/data/shepherd.db
         pragmas:
             cache_size: "-64000"
             synchronous: NORMAL
         enable_wal: true
     postgresql: null
-mode: standalone
+mode: client
 master:
     enabled: false
-    client_config_dir: /home/user/workspace/Shepherd/internal/api/paths/config/clients
+    client_config_dir: /home/user/workspace/Shepherd/config/clients
     network_scan:
         enabled: false
         subnets:
