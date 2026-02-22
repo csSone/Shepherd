@@ -1,3 +1,6 @@
+# Shepherd 单机模式配置
+# 此配置文件用于单机模式（standalone mode）
+
 server:
     web_port: 9190
     anthropic_port: 9170
@@ -6,6 +9,7 @@ server:
     host: 0.0.0.0
     read_timeout: 60
     write_timeout: 60
+
 model:
     paths:
         - /home/user/workspace/Shepherd/models
@@ -13,27 +17,32 @@ model:
     path_configs: []
     auto_scan: true
     scan_interval: 0
+
 llamacpp:
     paths:
         - path: /home/user/workspace/Shepherd/llama.cpp
           name: Default
           description: ""
+
 download:
     directory: /home/user/workspace/Shepherd/downloads
     max_concurrent: 4
     chunk_size: 1048576
     retry_count: 3
     timeout: 300
+
 model_repo:
     endpoint: huggingface.co
     token: ""
     timeout: 30
+
 security:
     api_key_enabled: false
     api_key: ""
     cors_enabled: true
     allowed_origins:
         - '*'
+
 compatibility:
     ollama:
         enabled: true
@@ -41,6 +50,7 @@ compatibility:
     lmstudio:
         enabled: false
         port: 1234
+
 log:
     level: info
     format: json
@@ -50,6 +60,7 @@ log:
     max_backups: 3
     max_age: 7
     compress: true
+
 storage:
     type: memory
     sqlite:
@@ -59,7 +70,67 @@ storage:
             synchronous: NORMAL
         enable_wal: true
     postgresql: null
-mode: client
+
+# 运行模式
+mode: standalone
+
+# 节点配置（推荐使用）
+node:
+    id: auto
+    name: ""
+    role: standalone
+    tags: []              # 节点标签，例如: ["gpu", "high-memory"]
+    metadata:             # 节点元数据
+        os: linux
+        arch: amd64
+
+    # Master 角色配置
+    master_role:
+        enabled: false  # 单机模式禁用 Master 角色
+        port: 9190
+        api_key: ""
+        ssl:
+            enabled: false
+            cert_path: ""
+            key_path: ""
+
+    # Client 角色配置
+    client_role:
+        enabled: false  # 单机模式禁用 Client 角色
+        master_address: ""
+        register_retry: 3
+        heartbeat_interval: 5
+        heartbeat_timeout: 15
+
+    # 资源监控配置
+    resources:
+        monitor_interval: 5
+        report_gpu: true
+        report_temperature: true
+        gpu_backend: auto
+
+    # 命令执行器配置
+    executor:
+        max_concurrent: 4
+        task_timeout: 3600
+        allow_remote_stop: true
+        allowed_commands:
+            - load_model
+            - unload_model
+            - run_llamacpp
+            - stop_process
+            - scan_models
+            - collect_logs
+
+    # 能力配置（Python 支持）
+    capabilities:
+        python_enabled: false
+        conda_path: ""       # 例如: /home/user/miniconda3/bin/conda
+        conda_environments:  # Conda 环境列表
+            shepherd: ""
+
+# 以下配置已废弃，仅为向后兼容保留
+# 新配置请使用上面的 node 块
 master:
     enabled: false
     client_config_dir: /home/user/workspace/Shepherd/config/clients
@@ -82,6 +153,7 @@ master:
         enabled: true
         max_buffer_size: 1048576
         flush_interval: 10
+
 client:
     enabled: false
     master_address: ""
@@ -103,37 +175,3 @@ client:
     register_retry: 3
     heartbeat_interval: 5
     heartbeat_timeout: 15
-node:
-    id: auto
-    name: ""
-    role: standalone
-    master_role:
-        enabled: false
-        port: 9190
-        api_key: ""
-        ssl:
-            enabled: false
-            cert_path: ""
-            key_path: ""
-    client_role:
-        enabled: false
-        master_address: ""
-        register_retry: 3
-        heartbeat_interval: 5
-        heartbeat_timeout: 15
-    resources:
-        monitor_interval: 5
-        report_gpu: true
-        report_temperature: true
-        gpu_backend: auto
-    executor:
-        max_concurrent: 4
-        task_timeout: 3600
-        allow_remote_stop: true
-        allowed_commands:
-            - load_model
-            - unload_model
-            - run_llamacpp
-            - stop_process
-            - scan_models
-            - collect_logs
