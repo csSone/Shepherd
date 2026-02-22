@@ -9,7 +9,7 @@ import { BenchmarkDialog } from '@/components/models/BenchmarkDialog';
 import { BenchmarkResultsDialog } from '@/components/models/BenchmarkResultsDialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { Model, ModelStatus, BenchmarkConfig } from '@/types';
+import type { Model, ModelStatus, BenchmarkConfig, LoadModelParams } from '@/types';
 import { useAlertDialog } from '@/hooks/useAlertDialog';
 import { useToast } from '@/hooks/useToast';
 
@@ -60,8 +60,8 @@ export function ModelsPage() {
     setDialogModel(model);
   };
 
-  const handleLoadConfirm = (params: { modelId: string }) => {
-    loadModel.mutate(params as any, {
+  const handleLoadConfirm = (params: LoadModelParams) => {
+    loadModel.mutate(params, {
       onSuccess: () => {
         setDialogModel(null);
       },

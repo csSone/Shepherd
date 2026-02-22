@@ -10,6 +10,10 @@ import type {
   ScanStatus,
   ClientStatus,
   ScheduleStrategy,
+  UnifiedNode,
+  NodeStatus,
+  NodeConfigInfo,
+  LlamacppTestResult,
 } from '@/types';
 
 /**
@@ -330,5 +334,77 @@ export function useFilteredTasks(
     if (filters.assignedTo && task.assignedTo !== filters.assignedTo) return false;
 
     return true;
+  });
+}
+
+
+/**
+ * 获取在线节点列表 Hook（用于节点选择）
+ * 返回所有在线状态的节点，包含资源信息
+ */
+export function useOnlineNodes() {
+  const mode = useClusterMode();
+
+  return useQuery<UnifiedNode[]>({
+    queryKey: ['cluster', 'nodes', 'online'],
+    queryFn: async () => {
+      // 使用 /nodes 端点获取所有节点
+      const response = await apiClient.get<{
+        success: boolean;
+        data: {
+          nodes: UnifiedNode[];
+        };
+      }>('/nodes');
+      // 只返回在线节点
+      return response.data.nodes.filter(
+        (node) => node.status === ('online' as NodeStatus)
+      );
+    },
+    staleTime: 10 * 1000, // 10 秒缓存
+    refetchInterval: 5000, // 每 5 秒刷新
+    enabled: mode === 'master', // 仅在 Master 模式下启用
+  });
+}
+
+
+
+/**
+ * 获取节点配置信息 Hook
+ */
+export function useNodeConfig(nodeId: string, options?: { enabled?: boolean }) {
+  return useQuery<NodeConfigInfo>({
+    queryKey: ['cluster', 'nodes', nodeId, 'config'],
+    queryFn: async () => {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: NodeConfigInfo;
+      }>(`/nodes/${nodeId}/config`);
+      return response.data;
+    },
+    enabled: !!nodeId && options?.enabled !== false,
+    staleTime: 60 * 1000, // 1 分钟缓存
+  });
+}
+
+/**
+ * 测试节点 llama.cpp Hook
+ */
+export function useTestNodeLlamacpp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (nodeId: string) => {
+      const response = await apiClient.post<{
+        success: boolean;
+        data: LlamacppTestResult;
+      }>(`/nodes/${nodeId}/test`);
+      return response.data;
+    },
+    onSuccess: (_, nodeId) => {
+      // 使节点配置缓存失效，以便获取最新状态
+      queryClient.invalidateQueries({
+        queryKey: ['cluster', 'nodes', nodeId, 'config'],
+      });
+    },
   });
 }

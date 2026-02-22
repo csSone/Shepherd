@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import yaml from 'js-yaml';
 import type { AppConfig } from './configTypes';
 
 /**
@@ -68,45 +69,6 @@ const DEFAULT_CONFIG: AppConfig = {
 };
 
 export class ConfigLoader {
-  // Naive YAML parser for simple key: value + nesting by indentation
-  static parseYaml(yaml: string): any {
-    const lines = yaml.split(/\r?\n/).filter((l) => l.trim().length > 0)
-    const root: any = {}
-    const stack: any[] = [root]
-    const indentStack: number[] = [-1]
-
-    for (const rawLine of lines) {
-      const line = rawLine
-      const indent = line.match(/^\s*/)?.[0].length ?? 0
-      const content = line.trim()
-      const colonIndex = content.indexOf(':')
-      if (colonIndex === -1) continue
-      const key = content.substring(0, colonIndex).trim()
-      const value = content.substring(colonIndex + 1).trim()
-
-      // Adjust current context according to indentation
-      while (indent <= indentStack[indentStack.length - 1] && stack.length > 0) {
-        stack.pop()
-        indentStack.pop()
-      }
-
-      if (value === '' || value === undefined) {
-        const obj: any = {}
-        stack[stack.length - 1][key] = obj
-        stack.push(obj)
-        indentStack.push(indent)
-      } else {
-        let val: any = value
-        if (/^-?\d+$/.test(value)) val = Number(value)
-        else if (value === 'true') val = true
-        else if (value === 'false') val = false
-        stack[stack.length - 1][key] = val
-      }
-    }
-
-    return root
-  }
-
   /**
    * 加载配置文件
    */
@@ -117,7 +79,7 @@ export class ConfigLoader {
         throw new Error(`Failed to load config: ${response.status}`)
       }
       const yamlText = await response.text()
-      const parsed = ConfigLoader.parseYaml(yamlText)
+      const parsed = yaml.load(yamlText) as any
       
       // 合并默认配置和解析的配置
       return this.mergeConfig(DEFAULT_CONFIG, parsed)
@@ -131,8 +93,21 @@ export class ConfigLoader {
    * 合并配置
    */
   private mergeConfig(defaults: AppConfig, loaded: any): AppConfig {
+    // 处理 backend.urls 数组格式 -> api.baseUrl 单值格式
+    let apiBaseUrl = defaults.api.baseUrl;
+    if (loaded?.backend?.urls && Array.isArray(loaded.backend.urls)) {
+      const index = loaded.backend.currentIndex ?? 0;
+      apiBaseUrl = loaded.backend.urls[index] || loaded.backend.urls[0] || defaults.api.baseUrl;
+    } else if (loaded?.api?.baseUrl) {
+      apiBaseUrl = loaded.api.baseUrl;
+    }
+
     return {
-      api: { ...defaults.api, ...loaded?.api },
+      api: {
+        ...defaults.api,
+        ...loaded?.api,
+        baseUrl: apiBaseUrl,
+      },
       sse: { ...defaults.sse, ...loaded?.sse },
       features: { ...defaults.features, ...loaded?.features },
       ui: { ...defaults.ui, ...loaded?.ui },

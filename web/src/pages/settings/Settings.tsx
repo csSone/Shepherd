@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { PathConfigPanel } from '@/components/settings/PathConfigPanel';
 import { ApiConfigCard, type ApiConfig } from '@/components/settings/ApiConfigCard';
 import { compatibilityApi } from '@/lib/api/compatibility';
+import { systemApi } from '@/lib/api/system';
 import { useToast } from '@/hooks/useToast';
 
 /**
@@ -345,6 +346,65 @@ function McpPanel() {
  * 关于面板
  */
 function AboutPanel() {
+  const [serverInfo, setServerInfo] = useState<{
+    version: string;
+    buildTime: string;
+    gitCommit: string;
+    mode: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchServerInfo = async () => {
+      try {
+        const response = await systemApi.getInfo();
+        if (response.success && response.data) {
+          setServerInfo({
+            version: response.data.version,
+            buildTime: response.data.buildTime,
+            gitCommit: response.data.gitCommit,
+            mode: response.data.mode,
+          });
+        }
+      } catch (error) {
+        console.error('获取服务器信息失败:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServerInfo();
+  }, []);
+
+  // 格式化构建时间
+  const formatBuildTime = (buildTime: string | undefined) => {
+    if (!buildTime || buildTime === 'unknown') return '未知';
+    try {
+      const date = new Date(buildTime);
+      return date.toISOString().split('T')[0];
+    } catch {
+      return buildTime;
+    }
+  };
+
+  // 格式化 Git Commit
+  const formatGitCommit = (commit: string | undefined) => {
+    if (!commit || commit === 'unknown') return '未知';
+    return commit.length > 8 ? commit.substring(0, 8) : commit;
+  };
+
+  // 格式化运行模式
+  const formatMode = (mode: string | undefined) => {
+    if (!mode) return '未知';
+    const modeMap: Record<string, string> = {
+      standalone: '单机模式',
+      master: '主节点',
+      client: '工作节点',
+      hybrid: '混合节点',
+    };
+    return modeMap[mode] || mode;
+  };
+
   return (
     <div className="max-w-2xl mx-auto text-foreground">
       <div className="text-center mb-6">
@@ -356,26 +416,50 @@ function AboutPanel() {
       </div>
 
       <div className="rounded-lg border bg-card p-4 space-y-2">
-        <div className="flex items-center justify-between py-1.5 border-b">
-          <span className="text-sm text-muted-foreground">版本</span>
-          <span className="font-mono text-sm font-medium">v0.1.3</span>
-        </div>
-        <div className="flex items-center justify-between py-1.5 border-b">
-          <span className="text-sm text-muted-foreground">构建时间</span>
-          <span className="font-mono text-xs">2026-02-19</span>
-        </div>
-        <div className="flex items-center justify-between py-1.5 border-b">
-          <span className="text-sm text-muted-foreground">Go 版本</span>
-          <span className="font-mono text-xs">1.25+</span>
-        </div>
-        <div className="flex items-center justify-between py-1.5 border-b">
-          <span className="text-sm text-muted-foreground">React 版本</span>
-          <span className="font-mono text-xs">19.x</span>
-        </div>
-        <div className="flex items-center justify-between py-1.5">
-          <span className="text-sm text-muted-foreground">许可证</span>
-          <span className="text-xs">Apache 2.0</span>
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-sm text-muted-foreground">版本</span>
+              <span className="font-mono text-sm font-medium">
+                {serverInfo?.version || '未知'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-sm text-muted-foreground">构建时间</span>
+              <span className="font-mono text-xs">
+                {formatBuildTime(serverInfo?.buildTime)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-sm text-muted-foreground">Git Commit</span>
+              <span className="font-mono text-xs">
+                {formatGitCommit(serverInfo?.gitCommit)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-sm text-muted-foreground">运行模式</span>
+              <span className="font-mono text-xs">
+                {formatMode(serverInfo?.mode)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-sm text-muted-foreground">Go 版本</span>
+              <span className="font-mono text-xs">1.25+</span>
+            </div>
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-sm text-muted-foreground">React 版本</span>
+              <span className="font-mono text-xs">19.x</span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-sm text-muted-foreground">许可证</span>
+              <span className="text-xs">Apache 2.0</span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mt-4 text-center text-xs text-muted-foreground">

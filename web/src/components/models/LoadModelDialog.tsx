@@ -3,6 +3,133 @@ import { X, HelpCircle, Loader2, ChevronDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LoadModelParams, ModelCapabilities } from '@/types';
 import { useGPUs, useModelCapabilities, useSetModelCapabilities, useLlamacppBackends, useEstimateVRAM, type SystemGPUInfo, type LlamacppBackend } from '@/features/models/hooks';
+import { useOnlineNodes } from '@/features/cluster/hooks';
+import type { UnifiedNode } from '@/types';
+
+// NumberInput 组件 - 数字输入框
+interface NumberInputProps {
+  value: number | undefined;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  placeholder?: string;
+  className?: string;
+  allowNegative?: boolean;
+  allowMinusOne?: boolean;
+}
+
+const NumberInput = ({
+  value,
+  onChange,
+  disabled,
+  min,
+  max,
+  step = 1,
+  placeholder,
+  className = '',
+  allowNegative = false,
+  allowMinusOne = false,
+}: NumberInputProps) => {
+  const [inputValue, setInputValue] = useState(String(value ?? ''));
+  const [error, setError] = useState('');
+
+  // 同步外部 value 变化
+  useEffect(() => {
+    if (value !== undefined && String(value) !== inputValue) {
+      setInputValue(String(value));
+      setError('');
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+
+    // 空值处理
+    if (newValue === '') {
+      setError('');
+      return;
+    }
+
+    // 验证数字
+    const num = Number(newValue);
+    if (isNaN(num)) {
+      setError('请输入有效数字');
+      return;
+    }
+
+    // 验证范围
+    if (min !== undefined && num < min && !(allowMinusOne && num === -1) && !(allowNegative && num < 0)) {
+      setError(`最小值为 ${min}`);
+      return;
+    }
+    if (max !== undefined && num > max) {
+      setError(`最大值为 ${max}`);
+      return;
+    }
+
+    // 特殊值验证
+    if (allowMinusOne && num === -1) {
+      setError('');
+      onChange(-1);
+      return;
+    }
+
+    if (allowNegative && num < 0) {
+      setError('');
+      onChange(num);
+      return;
+    }
+
+    if (!allowNegative && !allowMinusOne && num < 0) {
+      setError('不允许负值');
+      return;
+    }
+
+    setError('');
+    onChange(num);
+  };
+
+  const handleBlur = () => {
+    if (inputValue === '' && value !== undefined) {
+      setInputValue(String(value));
+      setError('');
+    }
+  };
+
+  return (
+    <div>
+      <input
+        type="number"
+        value={inputValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        disabled={disabled}
+        min={allowMinusOne ? -1 : min}
+        max={max}
+        step={step}
+        placeholder={placeholder}
+        className={cn(
+          "w-full px-2 py-1.5 text-sm",
+          "border-2 rounded-md",
+          error ? "border-red-500 dark:border-red-500" : "border-border",
+          "bg-input",
+          "text-foreground",
+          "focus:outline-none focus:ring-2",
+          error ? "focus:ring-red-500 focus:border-red-500" : "focus:ring-blue-500 focus:border-blue-500",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "transition-colors",
+          className
+        )}
+      />
+      {error && (
+        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </div>
+  );
+};
 
 interface LoadModelDialogProps {
   isOpen: boolean;
@@ -101,6 +228,9 @@ export function LoadModelDialog({
   const gpus = gpuData?.gpus || [];
   const gpuDevices = gpuData?.devices || [];
 
+  // 获取在线节点列表（用于节点选择）
+  const { data: onlineNodes = [] } = useOnlineNodes();
+
   // 获取 llama.cpp 后端列表
   const { data: llamacppBackends = [] } = useLlamacppBackends();
 
@@ -116,7 +246,7 @@ export function LoadModelDialog({
   const [params, setParams] = useState<LoadModelParams>({
     modelId,
     ctxSize: 8192,
-    batchSize: 512,
+    batchSize: 4096,
     threads: 4,
     gpuLayers: 99,
     temperature: 0.7,
@@ -125,12 +255,10 @@ export function LoadModelDialog({
     repeatPenalty: 1.1,
     seed: -1,
     nPredict: -1,
-
-    // 新参数默认值
-    llamaCppPath: '/home/user/workspace/llama.cpp/build-rocm/bin',
+    llamaCppPath: '/usr/local/bin',
     mainGpu: 'default',
     capabilities: {
-      thinking: false,  // 默认关闭，由用户根据模型类型手动启用
+      thinking: false,
       tools: false,
       translation: false,
       embedding: false,
@@ -285,7 +413,10 @@ export function LoadModelDialog({
     const handleMouseLeave = (e: React.MouseEvent) => {
       // 检查鼠标是否移动到了 tooltip 上
       const relatedTarget = e.relatedTarget as HTMLElement;
-      if (relatedTarget && tooltipRef.current && tooltipRef.current.contains(relatedTarget)) {
+      if (relatedTarget &&
+          relatedTarget.nodeType === Node.ELEMENT_NODE &&
+          tooltipRef.current &&
+          tooltipRef.current.contains(relatedTarget)) {
         return; // 鼠标移到了 tooltip 上，不隐藏
       }
       handleTooltipLeave();
@@ -302,7 +433,10 @@ export function LoadModelDialog({
           onBlur={(e) => {
             // 检查焦点是否移动到了 tooltip 上
             const relatedTarget = e.relatedTarget as HTMLElement;
-            if (relatedTarget && tooltipRef.current && tooltipRef.current.contains(relatedTarget)) {
+            if (relatedTarget &&
+                relatedTarget.nodeType === Node.ELEMENT_NODE &&
+                tooltipRef.current &&
+                tooltipRef.current.contains(relatedTarget)) {
               return; // 焦点移到了 tooltip 上，不隐藏
             }
             handleTooltipLeave();
@@ -370,120 +504,6 @@ export function LoadModelDialog({
   };
 
   const renderHelpButton = (paramKey: string) => <HelpIconButton paramKey={paramKey} />;
-
-  // 带验证的数字输入组件
-  const NumberInput = ({
-    value,
-    onChange,
-    disabled,
-    min,
-    max,
-    step = 1,
-    placeholder,
-    className = '',
-    allowNegative = false,
-    allowMinusOne = false, // -1 表示自动/特殊值
-  }: {
-    value: number | undefined;
-    onChange: (value: number) => void;
-    disabled?: boolean;
-    min?: number;
-    max?: number;
-    step?: number;
-    placeholder?: string;
-    className?: string;
-    allowNegative?: boolean;
-    allowMinusOne?: boolean;
-  }) => {
-    const [inputValue, setInputValue] = useState(String(value ?? ''));
-    const [error, setError] = useState('');
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = e.target.value;
-      setInputValue(newValue);
-
-      // 空值处理
-      if (newValue === '') {
-        setError('');
-        return;
-      }
-
-      // 验证数字
-      const num = Number(newValue);
-      if (isNaN(num)) {
-        setError('请输入有效数字');
-        return;
-      }
-
-      // 验证范围
-      if (min !== undefined && num < min && !(allowMinusOne && num === -1) && !(allowNegative && num < 0)) {
-        setError(`最小值为 ${min}`);
-        return;
-      }
-      if (max !== undefined && num > max) {
-        setError(`最大值为 ${max}`);
-        return;
-      }
-
-      // 特殊值验证
-      if (allowMinusOne && num === -1) {
-        setError('');
-        onChange(-1);
-        return;
-      }
-
-      if (allowNegative && num < 0) {
-        setError('');
-        onChange(num);
-        return;
-      }
-
-      if (!allowNegative && !allowMinusOne && num < 0) {
-        setError('不允许负值');
-        return;
-      }
-
-      setError('');
-      onChange(num);
-    };
-
-    const handleBlur = () => {
-      if (inputValue === '' && value !== undefined) {
-        setInputValue(String(value));
-      }
-    };
-
-    return (
-      <div>
-        <input
-          type="number"
-          value={inputValue}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          disabled={disabled}
-          min={allowMinusOne ? -1 : min}
-          max={max}
-          step={step}
-          placeholder={placeholder}
-          className={cn(
-            "w-full px-2 py-1.5 text-sm",
-            "border-2 rounded-md",
-            error ? "border-red-500 dark:border-red-500" : "border-border",
-            "bg-input",
-            "text-foreground",
-            "focus:outline-none focus:ring-2",
-            error ? "focus:ring-red-500 focus:border-red-500" : "focus:ring-blue-500 focus:border-blue-500",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            "transition-colors",
-            className
-          )}
-        />
-        {error && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
-        )}
-      </div>
-    );
-  };
 
   // 下拉选择组件 - 用于布尔值和固定选项
   const SelectInput = ({
@@ -571,8 +591,9 @@ export function LoadModelDialog({
         </div>
 
         {/* 表单内容 */}
-        <form onSubmit={handleSubmit} className="p-4 flex-1 overflow-y-auto min-h-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 左列：基础配置 */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-foreground pb-2 border-b border-border">
@@ -766,6 +787,42 @@ export function LoadModelDialog({
                     选择用于模型加载的设备
                   </p>
                 </div>
+
+                {/* 节点选择（仅多节点环境显示） */}
+                {onlineNodes.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      运行节点
+                    </label>
+                    <SelectInput
+                      value={params.nodeId || 'auto'}
+                      onChange={(e) => setParams({ 
+                        ...params, 
+                        nodeId: e.target.value === 'auto' ? undefined : e.target.value 
+                      })}
+                      disabled={isLoading}
+                      className="w-full"
+                    >
+                      <option value="auto">
+                        🎯 自动调度（推荐）- 系统选择最佳节点
+                      </option>
+                      <optgroup label="指定节点">
+                        {onlineNodes.map((node: UnifiedNode) => (
+                          <option key={node.id} value={node.id}>
+                            {node.name} ({node.address}:{node.port})
+                            {node.capabilities?.gpuCount && ` · ${node.capabilities.gpuCount} GPU`}
+                            {node.resources?.gpuInfo?.[0] && 
+                              ` · 显存 ${Math.round((node.resources.gpuInfo[0].totalMemory - node.resources.gpuInfo[0].usedMemory) / 1024 / 1024 / 1024)}GB 可用`
+                            }
+                          </option>
+                        ))}
+                      </optgroup>
+                    </SelectInput>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      自动调度会根据 GPU 显存和负载选择最佳节点
+                    </p>
+                  </div>
+                )}
 
                 {/* 设备状态 */}
                 <div>
@@ -997,10 +1054,10 @@ export function LoadModelDialog({
                       value={params.batchSize}
                       onChange={(v) => setParams({ ...params, batchSize: v })}
                       disabled={isLoading}
-                      min={1}
+                      min={64}
                       max={16384}
                       step={64}
-                      placeholder="512"
+                      placeholder="4096"
                     />
                   </div>
 
@@ -1013,7 +1070,7 @@ export function LoadModelDialog({
                       value={params.uBatchSize}
                       onChange={(v) => setParams({ ...params, uBatchSize: v })}
                       disabled={isLoading}
-                      min={1}
+                      min={64}
                       max={8192}
                       step={64}
                       placeholder="512"
@@ -1199,83 +1256,78 @@ export function LoadModelDialog({
               </div>
             </div>
           </div>
-        </form>
+          </div>
 
-        {/* 按钮区域 - 固定在底部 */}
-        <div className="flex justify-end items-center gap-3 px-4 py-3 border-t border-border bg-card flex-shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="px-4 py-2 text-foreground hover:bg-accent rounded transition-colors disabled:opacity-50"
-          >
-            取消
-          </button>
+          {/* 按钮区域 - 固定在底部 */}
+          <div className="flex justify-end items-center gap-3 px-4 py-3 border-t border-border bg-card flex-shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="px-4 py-2 text-foreground hover:bg-accent rounded transition-colors disabled:opacity-50"
+            >
+              取消
+            </button>
 
-          <button
-            type="button"
-            onClick={async () => {
-              setEstimateResult('计算中...');
+            <button
+              type="button"
+              onClick={async () => {
+                setEstimateResult('计算中...');
 
-              try {
-                const result = await estimateVRAM.mutateAsync({
-                  modelId,
-                  llamaBinPath: params.llamaCppPath || '/home/user/workspace/llama.cpp/build-rocm/bin',
-                  ctxSize: params.ctxSize,
-                  batchSize: params.batchSize,
-                  uBatchSize: params.uBatchSize,
-                  parallel: params.parallelSlots,
-                  flashAttention: params.flashAttention,
-                  kvUnified: params.kvCacheUnified,
-                  cacheTypeK: params.kvCacheTypeK,
-                  cacheTypeV: params.kvCacheTypeV,
-                });
+                try {
+                  const result = await estimateVRAM.mutateAsync({
+                    modelId,
+                    llamaBinPath: params.llamaCppPath || '/home/user/workspace/llama.cpp/build-rocm/bin',
+                    ctxSize: params.ctxSize,
+                    batchSize: params.batchSize,
+                    uBatchSize: params.uBatchSize,
+                    parallel: params.parallelSlots,
+                    flashAttention: params.flashAttention,
+                    kvUnified: params.kvCacheUnified,
+                    cacheTypeK: params.kvCacheTypeK,
+                    cacheTypeV: params.kvCacheTypeV,
+                  });
 
-                if (result.vramGB) {
-                  setEstimateResult(`约需 ${result.vramGB} GB 显存`);
-                } else if (result.error) {
-                  setEstimateResult(`估算失败: ${result.error}`);
-                } else {
-                  setEstimateResult('估算失败');
+                  if (result.vramGB) {
+                    setEstimateResult(`约需 ${result.vramGB} GB 显存`);
+                  } else if (result.error) {
+                    setEstimateResult(`估算失败: ${result.error}`);
+                  } else {
+                    setEstimateResult('估算失败');
+                  }
+                } catch (error) {
+                  setEstimateResult(`估算出错: ${error instanceof Error ? error.message : '未知错误'}`);
                 }
-              } catch (error) {
-                setEstimateResult(`估算出错: ${error instanceof Error ? error.message : '未知错误'}`);
-              }
-            }}
-            disabled={isLoading || estimateVRAM.isPending}
-            className="px-4 py-2 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
-          >
-            {estimateVRAM.isPending ? '计算中...' : '估算显存'}
-          </button>
-          {estimateResult && (
-            <span className="text-sm text-muted-foreground">{estimateResult}</span>
-          )}
+              }}
+              disabled={isLoading || estimateVRAM.isPending}
+              className="px-4 py-2 text-sm border border-border rounded hover:bg-accent disabled:opacity-50"
+            >
+              {estimateVRAM.isPending ? '计算中...' : '估算显存'}
+            </button>
+            {estimateResult && (
+              <span className="text-sm text-muted-foreground">{estimateResult}</span>
+            )}
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              // 需要手动触发表单提交
-              const form = document.querySelector('form') as HTMLFormElement;
-              if (form) form.requestSubmit();
-            }}
-            disabled={isLoading}
-            className={cn(
-              'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors',
-              isLoading && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                加载中...
-              </span>
-            ) : (
-              '开始加载'
-            )}
-          </button>
-        </div>
-      </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={cn(
+                'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors',
+                isLoading && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  加载中...
+                </span>
+              ) : (
+                '开始加载'
+              )}
+            </button>
+          </div>
+      </form>
     </div>
+  </div>
   );
 }

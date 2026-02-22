@@ -15,7 +15,7 @@ backend:
   # 当前使用的后端索引（0 表示第一个）
   currentIndex: 0
   # 连接超时时间（毫秒）
-  timeout: 30000
+  timeout: 3000
   # 连接重试配置
   retry:
     count: 3
@@ -36,7 +36,7 @@ cors:
   # 允许的后端源
   allowedOrigins:
     - "http://localhost:9190"
-    - "http://192.168.1.100:9190"
+    - "http://192.168.10.1:9190"
   # 是否发送凭据
   credentials: false
 

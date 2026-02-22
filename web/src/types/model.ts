@@ -91,6 +91,7 @@ export interface Slot {
 export interface LoadModelParams {
   // 基础参数
   modelId: string;
+  nodeId?: string;              // 指定运行节点 ID，undefined 表示自动调度
   ctxSize?: number;
   batchSize?: number;
   threads?: number;

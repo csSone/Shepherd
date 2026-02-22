@@ -255,3 +255,80 @@ export interface SendCommandResponse {
   message: string;
   command: NodeCommand;
 }
+
+
+/**
+ * llama.cpp 路径信息
+ */
+export interface LlamacppPathInfo {
+  path: string;
+  exists: boolean;
+  version?: string;
+  isDefault?: boolean;
+}
+
+/**
+ * 模型路径信息
+ */
+export interface ModelPathInfo {
+  path: string;
+  exists: boolean;
+  modelCount?: number;
+}
+
+/**
+ * 环境信息
+ */
+export interface EnvironmentInfo {
+  os: string;
+  architecture: string;
+  kernelVersion?: string;
+  goVersion: string;
+  pythonVersion?: string;
+  rocmVersion?: string;
+  cudaVersion?: string;
+}
+
+/**
+ * Conda 配置信息
+ */
+export interface CondaConfigInfo {
+  enabled: boolean;
+  defaultEnv?: string;
+  availableEnvs: string[];
+  condaPath?: string;
+}
+
+/**
+ * 执行器配置信息
+ */
+export interface ExecutorConfigInfo {
+  pythonPath: string;
+  timeout: number;
+  maxRetries: number;
+}
+
+/**
+ * 节点配置信息
+ */
+export interface NodeConfigInfo {
+  llamaCppPaths: LlamacppPathInfo[];
+  modelPaths: ModelPathInfo[];
+  environment: EnvironmentInfo;
+  conda: CondaConfigInfo;
+  executor: ExecutorConfigInfo;
+  collectedAt: string;
+}
+
+/**
+ * llama.cpp 测试结果
+ */
+export interface LlamacppTestResult {
+  success: boolean;
+  path: string;
+  version?: string;
+  error?: string;
+  output?: string;
+  duration: number;
+  testedAt: string;
+}

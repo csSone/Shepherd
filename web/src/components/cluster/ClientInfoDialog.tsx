@@ -15,6 +15,16 @@ import {
   Hash,
   Power,
   Gauge,
+  Settings,
+  FileCode,
+  FolderOpen,
+  Play,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  AlertTriangle,
+  Terminal as TerminalIcon,
+
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,9 +35,10 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { useClient } from '@/features/cluster/hooks';
+import { useClient, useNodeConfig, useTestNodeLlamacpp } from '@/features/cluster/hooks';
 import { cn } from '@/lib/utils';
-import type { Client, GPUInfo } from '@/types';
+import type { Client, GPUInfo, NodeConfigInfo, LlamacppTestResult } from '@/types';
+import { useToast } from '@/hooks/useToast';
 
 interface ClientInfoDialogProps {
   client: Client | null;
@@ -204,7 +215,7 @@ function MetricCard({
 }
 
 /**
- * 头部统计卡片 - 玻璃态效果
+ * 头部统计卡片 - 精致简约风格
  */
 interface HeaderStatCardProps {
   icon: React.ElementType;
@@ -224,13 +235,11 @@ function HeaderStatCard({ icon: Icon, label, value, color }: HeaderStatCardProps
   };
 
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.05] transition-colors">
-      <div className={cn('p-1.5 rounded-md bg-white/5', colorMap[color])}>
-        <Icon className="w-3.5 h-3.5" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</div>
-        <div className="text-sm font-medium text-slate-200">{value}</div>
+    <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] backdrop-blur-sm">
+      <Icon className={cn('w-5 h-5 flex-shrink-0', colorMap[color])} />
+      <div className="flex flex-col justify-center min-w-0">
+        <div className="text-xs text-slate-400 leading-tight">{label}</div>
+        <div className="text-lg font-bold text-white leading-tight mt-0.5">{value}</div>
       </div>
     </div>
   );
@@ -442,6 +451,13 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
                 <Terminal className="w-4 h-4 mr-2" />
                 元数据
               </TabsTrigger>
+              <TabsTrigger
+                value="config"
+                className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 ease-out hover:text-foreground data-[state=active]:hover:text-primary"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                配置
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -640,6 +656,10 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="config" className="p-6 mt-0 flex-1 overflow-y-auto">
+            <NodeConfigPanel clientId={client?.id || ''} />
+          </TabsContent>
         </Tabs>
 
         <div className="flex justify-end gap-2 p-4 border-t border-border bg-slate-50/50 dark:bg-slate-900/20 flex-shrink-0">
@@ -649,5 +669,309 @@ export function ClientInfoDialog({ client, open, onClose }: ClientInfoDialogProp
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+/**
+ * 节点配置面板组件
+ * 显示节点配置信息和 llama.cpp 测试功能
+ */
+function NodeConfigPanel({ clientId }: { clientId: string }) {
+  const { data: config, isLoading } = useNodeConfig(clientId, { enabled: !!clientId });
+  const testLlamacpp = useTestNodeLlamacpp();
+  const toastHelpers = useToast();
+  const [testResult, setTestResult] = useState<LlamacppTestResult | null>(null);
+
+  const handleTest = async () => {
+    try {
+      const result = await testLlamacpp.mutateAsync(clientId);
+      setTestResult(result);
+      if (result.success) {
+        toastHelpers.success('测试成功', `llama.cpp 版本: ${result.version || '未知'}`);
+      } else {
+        toastHelpers.error('测试失败', result.error || '未知错误');
+      }
+    } catch (error) {
+      toastHelpers.error('测试失败', error instanceof Error ? error.message : '请求失败');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <AlertTriangle className="w-12 h-12 mb-4" />
+        <p>无法获取节点配置信息</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* llama.cpp 测试按钮 */}
+      <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-lg">
+            <TerminalIcon className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">llama.cpp 测试</h3>
+            <p className="text-sm text-muted-foreground">测试节点上 llama.cpp 的可用性</p>
+          </div>
+        </div>
+        <Button
+          onClick={handleTest}
+          disabled={testLlamacpp.isPending}
+          className="gap-2"
+        >
+          {testLlamacpp.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4" />
+          )}
+          开始测试
+        </Button>
+      </div>
+
+      {/* 测试结果 */}
+      {testResult && (
+        <div
+          className={cn(
+            'p-4 rounded-xl border',
+            testResult.success
+              ? 'bg-primary/10 dark:bg-primary/20 border-primary/20 dark:border-primary/30'
+              : 'bg-destructive/10 dark:bg-destructive/20 border-destructive/20 dark:border-destructive/30'
+          )}
+        >
+          <div className="flex items-start gap-3">
+            {testResult.success ? (
+              <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
+            ) : (
+              <XCircle className="w-5 h-5 text-destructive mt-0.5" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="font-medium">
+                {testResult.success ? '测试通过' : '测试失败'}
+              </div>
+              {testResult.version && (
+                <div className="text-sm text-muted-foreground mt-1">
+                  版本: {testResult.version}
+                </div>
+              )}
+              {testResult.error && (
+                <div className="text-sm text-destructive mt-1">
+                  错误: {testResult.error}
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground mt-2">
+                测试路径: {testResult.path}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                耗时: {testResult.duration.toFixed(2)}ms · {new Date(testResult.testedAt).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* llama.cpp 路径 */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-border flex items-center gap-2">
+          <FileCode className="w-4 h-4 text-primary" />
+          <span className="font-medium text-sm">llama.cpp 路径</span>
+          <Badge variant="secondary" className="ml-auto">
+            {config.llamaCppPaths.length} 个
+          </Badge>
+        </div>
+        <div className="divide-y divide-border">
+          {config.llamaCppPaths.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-muted-foreground">暂无配置</div>
+          ) : (
+            config.llamaCppPaths.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {item.exists ? (
+                    <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                  )}
+                  <code className="text-xs font-mono truncate">{item.path}</code>
+                  {item.isDefault && (
+                    <Badge variant="outline" className="text-xs flex-shrink-0">默认</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {item.version && (
+                    <span className="text-xs text-muted-foreground">{item.version}</span>
+                  )}
+                  <Badge
+                    variant={item.exists ? 'success' : 'secondary'}
+                    className="text-xs"
+                  >
+                    {item.exists ? '可用' : '不可用'}
+                  </Badge>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 模型路径 */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-border flex items-center gap-2">
+          <FolderOpen className="w-4 h-4 text-primary" />
+          <span className="font-medium text-sm">模型路径</span>
+          <Badge variant="secondary" className="ml-auto">
+            {config.modelPaths.length} 个
+          </Badge>
+        </div>
+        <div className="divide-y divide-border">
+          {config.modelPaths.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-muted-foreground">暂无配置</div>
+          ) : (
+            config.modelPaths.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {item.exists ? (
+                    <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                  )}
+                  <code className="text-xs font-mono truncate">{item.path}</code>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {typeof item.modelCount === 'number' && (
+                    <Badge variant="secondary" className="text-xs">{item.modelCount} 个模型</Badge>
+                  )}
+                  <Badge
+                    variant={item.exists ? 'success' : 'secondary'}
+                    className="text-xs"
+                  >
+                    {item.exists ? '可用' : '不可用'}
+                  </Badge>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 环境信息 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Globe className="w-4 h-4 text-primary" />
+            <span className="font-medium text-sm">系统环境</span>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">操作系统</span>
+              <span className="font-mono">{config.environment.os}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">架构</span>
+              <span className="font-mono">{config.environment.architecture}</span>
+            </div>
+            {config.environment.kernelVersion && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">内核版本</span>
+                <span className="font-mono">{config.environment.kernelVersion}</span>
+              </div>
+            )}
+            {config.environment.rocmVersion && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ROCm 版本</span>
+                <span className="font-mono">{config.environment.rocmVersion}</span>
+              </div>
+            )}
+            {config.environment.cudaVersion && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CUDA 版本</span>
+                <span className="font-mono">{config.environment.cudaVersion}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FileCode className="w-4 h-4 text-primary" />
+            <span className="font-medium text-sm">运行时</span>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Go 版本</span>
+              <span className="font-mono">{config.environment.goVersion}</span>
+            </div>
+            {config.environment.pythonVersion && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Python 版本</span>
+                <span className="font-mono">{config.environment.pythonVersion}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Python 路径</span>
+              <span className="font-mono truncate max-w-[150px]" title={config.executor.pythonPath}>
+                {config.executor.pythonPath}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">超时时间</span>
+              <span>{config.executor.timeout} 秒</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Conda 配置 */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-border flex items-center gap-2">
+          <Layers className="w-4 h-4 text-primary" />
+          <span className="font-medium text-sm">Conda 环境</span>
+          <Badge
+            variant={config.conda.enabled ? 'success' : 'secondary'}
+            className="ml-auto"
+          >
+            {config.conda.enabled ? '已启用' : '未启用'}
+          </Badge>
+        </div>
+        {config.conda.enabled && config.conda.availableEnvs.length > 0 && (
+          <div className="p-4">
+            <div className="flex flex-wrap gap-2">
+              {config.conda.availableEnvs.map((env) => (
+                <Badge
+                  key={env}
+                  variant={env === config.conda.defaultEnv ? 'default' : 'outline'}
+                  className="text-xs"
+                >
+                  {env}
+                  {env === config.conda.defaultEnv && ' (默认)'}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 收集时间 */}
+      <div className="text-xs text-muted-foreground text-right">
+        配置收集时间: {new Date(config.collectedAt).toLocaleString('zh-CN')}
+      </div>
+    </div>
   );
 }

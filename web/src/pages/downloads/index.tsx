@@ -86,30 +86,15 @@ export function DownloadsPage() {
           </p>
         </div>
 
-        {activeTab === 'local' && (
-          <div className="flex items-center gap-2">
-            {stats.completed > 0 && (
-              <Button
-                onClick={handleClearCompleted}
-                variant="ghost"
-                size="sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                清理已完成
-              </Button>
-            )}
-            <Button
-              onClick={() => {
-                setPreFillParams(null);
-                setDialogOpen(true);
-              }}
-              variant="default"
-              size="sm"
-            >
-              <Plus className="w-4 h-4" />
-              新建下载
-            </Button>
-          </div>
+        {activeTab === 'local' && stats.completed > 0 && (
+          <Button
+            onClick={handleClearCompleted}
+            variant="ghost"
+            size="sm"
+          >
+            <Trash2 className="w-4 h-4" />
+            清理已完成
+          </Button>
         )}
       </div>
 

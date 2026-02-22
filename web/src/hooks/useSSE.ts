@@ -101,7 +101,20 @@ export function useSSE(options: UseSSEOptions = {}) {
    */
   const handleError = useCallback(
     (error: Event) => {
-      console.error('SSE connection error:', error);
+      const target = error.target as EventSource;
+
+      // 检查错误类型，减少对正常连接关闭的日志噪音
+      if (target.readyState === EventSource.CLOSED) {
+        console.log('SSE connection closed (normal shutdown)');
+        return;
+      }
+
+      // 对于 ERR_INCOMPLETE_CHUNKED_ENCODING 等网络错误，降低日志级别
+      if (reconnectAttemptsRef.current === 0) {
+        console.warn('SSE connection interrupted, will reconnect...');
+      } else {
+        console.debug(`SSE reconnect attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts}`);
+      }
 
       if (reconnectAttemptsRef.current < maxReconnectAttempts) {
         const delay = Math.min(
@@ -113,9 +126,10 @@ export function useSSE(options: UseSSEOptions = {}) {
           reconnectAttemptsRef.current++;
           connect();
         }, delay);
+      } else {
+        console.error('SSE max reconnection attempts reached');
+        onError?.(error);
       }
-
-      onError?.(error);
     },
     [maxReconnectAttempts, onError, reconnectInterval]
   );
