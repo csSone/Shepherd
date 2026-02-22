@@ -117,6 +117,7 @@ type ScanError struct {
 // LoadRequest contains parameters for loading a model
 type LoadRequest struct {
 	ModelID       string
+	NodeID        string  // 指定运行节点 ID，为空表示自动调度
 	CtxSize       int
 	BatchSize     int
 	Threads       int

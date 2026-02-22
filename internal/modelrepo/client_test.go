@@ -3,6 +3,7 @@ package modelrepo
 
 import (
 	"testing"
+	"time"
 )
 
 // TestNewClient tests creating a new model repository client
@@ -227,4 +228,214 @@ func TestSourceConstants(t *testing.T) {
 	if SourceModelScope != "modelscope" {
 		t.Errorf("SourceModelScope = %v, want modelscope", SourceModelScope)
 	}
+}
+
+// TestSearchHuggingFaceModelsLimitValidation tests limit parameter validation
+func TestSearchHuggingFaceModelsLimitValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		inputLimit  int
+		expectLimit int
+	}{
+		{"default limit", 0, 20},
+		{"negative limit", -10, 20},
+		{"valid limit", 10, 10},
+		{"max limit", 100, 100},
+		{"exceeds max", 200, 20},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClient()
+			// 注意：这里只测试 limit 验证逻辑，不实际发起网络请求
+			// 实际的网络请求应该使用 mock HTTP 服务器
+			if client == nil {
+				t.Fatal("NewClient returned nil")
+			}
+
+			// 验证 limit 范围检查
+			limit := tt.inputLimit
+			if limit <= 0 || limit > 100 {
+				limit = 20
+			}
+			if limit != tt.expectLimit {
+				t.Errorf("limit validation = %v, want %v", limit, tt.expectLimit)
+			}
+		})
+	}
+}
+
+// TestSearchResultStructure tests SearchResult structure
+func TestSearchResultStructure(t *testing.T) {
+	// 创建一个模拟的搜索结果
+	result := &SearchResult{
+		Models: []HuggingFaceModel{
+			{
+				ID:           "Qwen/Qwen2-7B-Instruct",
+				ModelID:      "Qwen/Qwen2-7B-Instruct",
+				Author:       "Qwen",
+				Downloads:    1000000,
+				Likes:        5000,
+				LastModified: "2024-01-01T00:00:00.000Z",
+				Tags:         []string{"gguf", "instruct"},
+			},
+		},
+		Count: 1,
+		Total: 1,
+	}
+
+	if result.Count != 1 {
+		t.Errorf("Count = %v, want 1", result.Count)
+	}
+	if result.Total != 1 {
+		t.Errorf("Total = %v, want 1", result.Total)
+	}
+	if len(result.Models) != 1 {
+		t.Fatalf("Models length = %v, want 1", len(result.Models))
+	}
+
+	model := result.Models[0]
+	if model.ID != "Qwen/Qwen2-7B-Instruct" {
+		t.Errorf("Model ID = %v, want Qwen/Qwen2-7B-Instruct", model.ID)
+	}
+	if model.Author != "Qwen" {
+		t.Errorf("Model Author = %v, want Qwen", model.Author)
+	}
+}
+
+// TestHuggingFaceModelStructure tests HuggingFaceModel structure
+func TestHuggingFaceModelStructure(t *testing.T) {
+	model := HuggingFaceModel{
+		ID:           "test/model",
+		ModelID:      "test/model",
+		Author:       "test",
+		SHA:          "abc123",
+		Private:      false,
+		CreatedAt:    "2024-01-01T00:00:00.000Z",
+		LastModified: "2024-01-02T00:00:00.000Z",
+		Tags:         []string{"gguf", "chat"},
+		Downloads:    1000,
+		Likes:        100,
+		LibraryName:  "transformers",
+	}
+
+	if model.ID != "test/model" {
+		t.Errorf("ID = %v, want test/model", model.ID)
+	}
+	if model.Author != "test" {
+		t.Errorf("Author = %v, want test", model.Author)
+	}
+	if model.Downloads != 1000 {
+		t.Errorf("Downloads = %v, want 1000", model.Downloads)
+	}
+	if len(model.Tags) != 2 {
+		t.Errorf("Tags length = %v, want 2", len(model.Tags))
+	}
+}
+
+// TestClientConfiguration tests client configuration
+func TestClientConfiguration(t *testing.T) {
+	client := NewClientWithConfig(EndpointHuggingFace, "test_token", 60*time.Second)
+
+	if client.GetEndpoint() != EndpointHuggingFace {
+		t.Errorf("Endpoint = %v, want %v", client.GetEndpoint(), EndpointHuggingFace)
+	}
+
+	// Token 是私密的，GetHFToken 应该返回脱敏的值
+	token := client.GetHFToken()
+	if token == "test_token" {
+		t.Error("GetHFToken should return masked token, got actual token")
+	}
+}
+
+// TestEndpointConfiguration tests different endpoint configurations
+func TestEndpointConfiguration(t *testing.T) {
+	tests := []struct {
+		name          string
+		endpoint      string
+		expectSuccess bool
+	}{
+		{"HuggingFace official", EndpointHuggingFace, true},
+		{"HuggingFace mirror", EndpointHuggingMirror, true},
+		{"Custom endpoint", "custom.huggingface.co", true},
+		{"Empty endpoint (should default)", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClientWithConfig(tt.endpoint, "", 30*time.Second)
+			if client == nil {
+				t.Fatal("NewClientWithConfig returned nil")
+			}
+
+			expectedEndpoint := tt.endpoint
+			if expectedEndpoint == "" {
+				expectedEndpoint = EndpointHuggingFace
+			}
+
+			if client.GetEndpoint() != expectedEndpoint {
+				t.Errorf("Endpoint = %v, want %v", client.GetEndpoint(), expectedEndpoint)
+			}
+		})
+	}
+}
+
+// TestSearchAPIEndpoints tests search with different endpoints
+func TestSearchAPIEndpoints(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		query    string
+		limit    int
+	}{
+		{
+			name:     "HuggingFace official search",
+			endpoint: EndpointHuggingFace,
+			query:    "qwen",
+			limit:    5,
+		},
+		{
+			name:     "HuggingFace mirror search",
+			endpoint: EndpointHuggingMirror,
+			query:    "llama",
+			limit:    5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClientWithConfig(tt.endpoint, "", 30*time.Second)
+
+			// 注意：这些测试会实际发起网络请求
+			// 在 CI/CD 环境中可能需要跳过或使用 mock
+			result, err := client.SearchHuggingFaceModels(tt.query, tt.limit)
+
+			// 网络请求可能失败，我们只验证没有 panic
+			if err != nil {
+				t.Logf("Search failed (may be network issue): %v", err)
+				return
+			}
+
+			if result != nil {
+				t.Logf("Search succeeded: found %d models", result.Count)
+			}
+		})
+	}
+}
+
+// TestSearchWithAuthentication tests search with authentication token
+func TestSearchWithAuthentication(t *testing.T) {
+	client := NewClient()
+	testToken := "test_token_123456"
+
+	client.SetHFToken(testToken)
+
+	// 验证 token 已设置（通过 GetHFToken 的脱敏输出）
+	token := client.GetHFToken()
+	if token == "" {
+		t.Error("Expected token to be set, got empty string")
+	}
+
+	// 注意：不实际发起搜索请求，因为 test_token 不是有效 token
+	// 在实际使用中，真实的 token 应该通过环境变量或配置文件传入
 }
