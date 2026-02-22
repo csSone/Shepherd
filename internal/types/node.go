@@ -115,6 +115,8 @@ const (
 	CommandTypeStopTask     CommandType = "stop_task"
 	CommandTypeRestart      CommandType = "restart"
 	CommandTypeShutdown     CommandType = "shutdown"
+	CommandTypeTestLlamacpp CommandType = "test_llamacpp"
+	CommandTypeGetConfig    CommandType = "get_config"
 )
 
 // ==================== 命令 ====================
@@ -146,4 +148,81 @@ type CommandResult struct {
 	CompletedAt time.Time              `json:"completedAt"`
 	Duration    int64                  `json:"duration"` // milliseconds
 	Metadata    map[string]string      `json:"metadata,omitempty"`
+}
+
+
+// ==================== 节点配置信息 ====================
+
+// NodeConfigInfo contains node configuration information reported by client
+// NodeConfigInfo 包含 Client 上报的节点配置信息
+type NodeConfigInfo struct {
+	// LlamaCppPaths llama.cpp 可执行文件路径列表
+	LlamaCppPaths []LlamaCppPathInfo `json:"llamaCppPaths,omitempty"`
+	// ModelPaths 模型存储路径列表
+	ModelPaths []ModelPathInfo `json:"modelPaths,omitempty"`
+	// Environment 环境信息
+	Environment *EnvironmentInfo `json:"environment,omitempty"`
+	// Conda 配置
+	Conda *CondaConfigInfo `json:"conda,omitempty"`
+	// Executor 执行器配置
+	Executor *ExecutorConfigInfo `json:"executor,omitempty"`
+	// 报告时间
+	ReportedAt time.Time `json:"reportedAt"`
+}
+
+// LlamaCppPathInfo represents llama.cpp binary path information
+type LlamaCppPathInfo struct {
+	Path        string `json:"path"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Exists      bool   `json:"exists"`
+	Version     string `json:"version,omitempty"`
+}
+
+// ModelPathInfo represents model directory path information
+type ModelPathInfo struct {
+	Path        string `json:"path"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Exists      bool   `json:"exists"`
+	ModelCount  int    `json:"modelCount,omitempty"`
+}
+
+// EnvironmentInfo contains environment information
+type EnvironmentInfo struct {
+	OS              string `json:"os"`
+	Architecture    string `json:"architecture"`
+	KernelVersion   string `json:"kernelVersion,omitempty"`
+	ROCmVersion     string `json:"rocmVersion,omitempty"`
+	CUDAVersion     string `json:"cudaVersion,omitempty"`
+	PythonVersion   string `json:"pythonVersion,omitempty"`
+	GoVersion       string `json:"goVersion,omitempty"`
+	LlamaCppVersion string `json:"llamaCppVersion,omitempty"`
+}
+
+// CondaConfigInfo contains conda environment configuration
+type CondaConfigInfo struct {
+	Enabled      bool              `json:"enabled"`
+	CondaPath    string            `json:"condaPath,omitempty"`
+	Environments map[string]string `json:"environments,omitempty"` // name -> path
+}
+
+// ExecutorConfigInfo contains executor configuration
+type ExecutorConfigInfo struct {
+	MaxConcurrent   int      `json:"maxConcurrent"`
+	TaskTimeout     int      `json:"taskTimeout"`
+	AllowRemoteStop bool     `json:"allowRemoteStop"`
+	AllowedCommands []string `json:"allowedCommands,omitempty"`
+}
+
+// LlamacppTestResult represents llama.cpp availability test result
+// LlamacppTestResult 表示 llama.cpp 可用性测试结果
+type LlamacppTestResult struct {
+	Success    bool      `json:"success"`
+	BinaryPath string    `json:"binaryPath,omitempty"`
+	Version    string    `json:"version,omitempty"`
+	Output     string    `json:"output,omitempty"`
+	Error      string    `json:"error,omitempty"`
+	TestedAt   time.Time `json:"testedAt"`
+	Duration   int64     `json:"duration"` // milliseconds
 }

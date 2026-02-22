@@ -91,6 +91,10 @@ func (ch *CommandHandler) Handle(command *node.Command) (*node.CommandResult, er
 		err = ch.handleStopProcess(command, result)
 	case node.CommandTypeScanModels:
 		err = ch.handleScanModels(command, result)
+	case node.CommandTypeTestLlamacpp:
+		err = ch.handleTestLlamacpp(command, result)
+	case node.CommandTypeGetConfig:
+		err = ch.handleGetConfig(command, result)
 	default:
 		result.Success = false
 		result.Error = fmt.Sprintf("未知的命令类型: %s", command.Type)
@@ -444,4 +448,47 @@ func (ch *CommandHandler) SetNodeID(nodeID string) {
 // GetNodeID 获取节点 ID
 func (ch *CommandHandler) GetNodeID() string {
 	return ch.nodeID
+}
+
+
+// handleTestLlamacpp 处理测试 llama.cpp 可用性命令
+// Payload 可选包含:
+//   - binary_path: 指定测试的二进制路径 (可选，默认测试所有)
+func (ch *CommandHandler) handleTestLlamacpp(command *node.Command, result *node.CommandResult) error {
+	tester := NewTester(30 * time.Second)
+
+	var testResult *LlamacppTestResult
+	if binaryPath, ok := command.Payload["binary_path"].(string); ok && binaryPath != "" {
+		testResult = tester.TestSpecific(binaryPath)
+	} else {
+		testResult = tester.TestAll()
+	}
+
+	result.Success = testResult.Success
+	result.Result = map[string]interface{}{
+		"success":     testResult.Success,
+		"binary_path": testResult.BinaryPath,
+		"version":     testResult.Version,
+		"output":      testResult.Output,
+		"error":       testResult.Error,
+		"tested_at":   testResult.TestedAt,
+		"duration":    testResult.Duration,
+	}
+
+	if !testResult.Success {
+		result.Error = testResult.Error
+	}
+
+	return nil
+}
+
+// handleGetConfig 处理获取配置信息命令
+func (ch *CommandHandler) handleGetConfig(command *node.Command, result *node.CommandResult) error {
+	// 配置收集器需要在创建 CommandHandler 时传入，这里简化处理
+	// 实际实现时应该通过 config 获取
+	result.Success = true
+	result.Result = map[string]interface{}{
+		"message": "配置信息收集功能需要在初始化时提供 config 对象",
+	}
+	return nil
 }
