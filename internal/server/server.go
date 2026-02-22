@@ -113,6 +113,10 @@ type Config struct {
 	Mode      string // standalone|master|client
 	ServerCfg *config.Config
 	ConfigMgr *config.Manager // 配置管理器
+	// Version information
+	Version   string // 版本号
+	BuildTime string // 构建时间
+	GitCommit string // Git commit hash
 }
 
 // Handlers contains handler instances
@@ -620,9 +624,12 @@ func (s *Server) loggerMiddleware() gin.HandlerFunc {
 // Health check handler
 func (s *Server) handleServerInfo(c *gin.Context) {
 	api.Success(c, gin.H{
-		"version": "1.0.0",
-		"name":    "Shepherd",
-		"status":  "running",
+		"version":   s.config.Version,
+		"buildTime": s.config.BuildTime,
+		"gitCommit": s.config.GitCommit,
+		"name":      "Shepherd",
+		"status":    "running",
+		"mode":      s.config.Mode,
 		"ports": gin.H{
 			"web":       s.config.WebPort,
 			"anthropic": s.config.AnthropicPort,
@@ -1195,6 +1202,44 @@ func (s *Server) handleLoadModel(c *gin.Context) {
 
 	var result *model.LoadResult
 	var err error
+
+	// 如果指定了节点 ID，使用 Scheduler 分发到指定节点
+	if req.NodeID != "" && s.nodeAdapter != nil {
+		scheduler := s.nodeAdapter.GetScheduler()
+		if scheduler == nil {
+			api.ErrorWithDetails(c, types.ErrInternalError, "调度器未初始化", "无法分发到指定节点")
+			return
+		}
+
+		// 构建任务负载
+		payload := map[string]interface{}{
+			"modelId":   req.ModelID,
+			"ctxSize":   req.CtxSize,
+			"batchSize": req.BatchSize,
+			"threads":   req.Threads,
+			"gpuLayers": req.GPULayers,
+		}
+
+		// 提交任务到指定节点
+		task, err := scheduler.SubmitTask("load_model", payload, req.NodeID)
+		if err != nil {
+			api.ErrorWithDetails(c, types.ErrInternalError, "提交模型加载任务失败", err.Error())
+			return
+		}
+
+		logger.Info("模型加载任务已提交到指定节点", "modelId", req.ModelID, "nodeId", req.NodeID, "taskId", task.ID)
+
+		// 返回任务信息，前端可以轮询任务状态
+		api.Success(c, gin.H{
+			"message":  "模型加载任务已提交",
+			"model_id": req.ModelID,
+			"node_id":  req.NodeID,
+			"task_id":  task.ID,
+			"async":    true,
+			"status":   "pending",
+		})
+		return
+	}
 
 	if asyncMode {
 		// 异步加载

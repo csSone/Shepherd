@@ -36,17 +36,20 @@ const (
 
 // NodeCapabilities describes what a node can do
 type NodeCapabilities struct {
-	GPU            bool     `json:"gpu"`
-	GPUCount       int      `json:"gpuCount"`
-	GPUName        string   `json:"gpuName,omitempty"`
-	GPUNames       []string `json:"gpuNames,omitempty"`
-	GPUMemory      int64    `json:"gpuMemory,omitempty"`
-	CPUCount       int      `json:"cpuCount"`
-	Memory         int64    `json:"memory"` // bytes
-	SupportsLlama  bool     `json:"supportsLlama"`
-	SupportsPython bool     `json:"supportsPython"`
-	CondaEnvs      []string `json:"condaEnvs,omitempty"`
-	DockerEnabled  bool     `json:"dockerEnabled,omitempty"`
+	GPU              bool              `json:"gpu"`
+	GPUCount         int               `json:"gpuCount"`
+	GPUName          string            `json:"gpuName,omitempty"`
+	GPUNames         []string          `json:"gpuNames,omitempty"`
+	GPUMemory        int64             `json:"gpuMemory,omitempty"`
+	CPUCount         int               `json:"cpuCount"`
+	Memory           int64             `json:"memory"` // bytes
+	SupportsLlama    bool              `json:"supportsLlama"`
+	SupportsPython   bool              `json:"supportsPython"`
+	PythonVersion    string            `json:"pythonVersion,omitempty"`
+	CondaPath        string            `json:"condaPath,omitempty"`
+	CondaEnvironments map[string]string `json:"condaEnvironments,omitempty"`
+	CondaEnvs        []string          `json:"condaEnvs,omitempty"` // 已废弃，使用 CondaEnvironments
+	DockerEnabled    bool              `json:"dockerEnabled,omitempty"`
 }
 
 // NodeResources represents current resource usage and availability
@@ -190,24 +193,27 @@ type NodeInfo struct {
 
 // NodeConfig contains configuration for a node
 type NodeConfig struct {
-	ID                  string        `json:"id"`
-	Name                string        `json:"name"`
-	Role                NodeRole      `json:"role"`
-	Address             string        `json:"address"`
-	Port                int           `json:"port"`
-	MasterAddress       string        `json:"masterAddress,omitempty"`
-	AdvertiseAddress    string        `json:"advertiseAddress,omitempty"`
-	HeartbeatInterval   time.Duration `json:"heartbeatInterval"`
-	HealthCheckInterval time.Duration `json:"healthCheckInterval"`
-	MaxRetries          int           `json:"maxRetries"`
-	Timeout             time.Duration `json:"timeout"`
-	EnableMetrics       bool          `json:"enableMetrics"`
-	LogLevel            string        `json:"logLevel"`
-	DataDir             string        `json:"dataDir"`
-	TempDir             string        `json:"tempDir"`
-	MaxMemoryUsage      int64         `json:"maxMemoryUsage"` // bytes
-	MaxCPUUsage         float64       `json:"maxCPUUsage"`    // percentage
-	MaxGpuMemory        int64         `json:"maxGpuMemory"`   // bytes
+	ID                  string            `json:"id"`
+	Name                string            `json:"name"`
+	Role                NodeRole          `json:"role"`
+	Address             string            `json:"address"`
+	Port                int               `json:"port"`
+	MasterAddress       string            `json:"masterAddress,omitempty"`
+	AdvertiseAddress    string            `json:"advertiseAddress,omitempty"`
+	HeartbeatInterval   time.Duration     `json:"heartbeatInterval"`
+	HealthCheckInterval time.Duration     `json:"healthCheckInterval"`
+	MaxRetries          int               `json:"maxRetries"`
+	Timeout             time.Duration     `json:"timeout"`
+	EnableMetrics       bool              `json:"enableMetrics"`
+	LogLevel            string            `json:"logLevel"`
+	DataDir             string            `json:"dataDir"`
+	TempDir             string            `json:"tempDir"`
+	MaxMemoryUsage      int64             `json:"maxMemoryUsage"` // bytes
+	MaxCPUUsage         float64           `json:"maxCPUUsage"`    // percentage
+	MaxGpuMemory        int64             `json:"maxGpuMemory"`   // bytes
+	Tags                []string          `json:"tags"`           // 节点标签
+	Metadata            map[string]string `json:"metadata"`       // 节点元数据
+	Capabilities        *NodeCapabilities `json:"capabilities"`   // 节点能力
 }
 
 // NodeConnection represents a connection between nodes

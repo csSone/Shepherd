@@ -51,15 +51,26 @@ type runningTask struct {
 }
 
 // NewExecutor creates a new task executor
-func NewExecutor(cfg *config.ClientConfig, log *logger.Logger) *Executor {
+func NewExecutor(cfg *config.NodeConfig, log *logger.Logger) *Executor {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// 从 NodeConfig 构建 ExecutorConfig
+	taskTimeout := time.Duration(cfg.Executor.TaskTimeout) * time.Second
+	if taskTimeout == 0 {
+		taskTimeout = 5 * time.Minute // 默认 5 分钟
+	}
+
+	maxConcurrent := cfg.Executor.MaxConcurrent
+	if maxConcurrent == 0 {
+		maxConcurrent = 4 // 默认最大并发 4
+	}
+
 	execConfig := &client.ExecutorConfig{
-		CondaPath:     cfg.CondaEnv.CondaPath,
-		CondaEnvs:     cfg.CondaEnv.Environments,
+		CondaPath:     cfg.Capabilities.CondaPath,
+		CondaEnvs:     cfg.Capabilities.CondaEnvironments,
 		LlamacppPaths: []string{}, // llama.cpp 路径由任务执行时动态配置
-		TaskTimeout:   5 * time.Minute,
-		MaxConcurrent: 4,
+		TaskTimeout:   taskTimeout,
+		MaxConcurrent: maxConcurrent,
 	}
 
 	return &Executor{

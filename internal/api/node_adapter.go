@@ -46,6 +46,11 @@ func (a *NodeAdapter) SetEventCallback(callback func(eventType string, data inte
 	a.eventCallback = callback
 }
 
+// GetScheduler 返回调度器实例（供 server 使用模型加载分发）
+func (a *NodeAdapter) GetScheduler() *scheduler.Scheduler {
+	return a.scheduler
+}
+
 // nodeClientManager 将 node.Node 适配为 scheduler.ClientManager 接口
 type nodeClientManager struct {
 	node *node.Node
@@ -553,6 +558,8 @@ func (a *NodeAdapter) RegisterRoutes(router *gin.RouterGroup) {
 		nodes.POST("/:id/command", a.SendCommand)
 		nodes.GET("/:id/commands", a.GetCommands)
 		nodes.POST("/:id/heartbeat", a.HandleHeartbeat)
+		nodes.GET("/:id/config", a.GetNodeConfig)
+		nodes.POST("/:id/test", a.TestNodeLlamacpp)
 	}
 
 	// ========== 全局路由 ==========
@@ -922,5 +929,79 @@ func (a *NodeAdapter) GetClusterOverview(c *gin.Context) {
 				"busy":    busy,
 			},
 		},
+	})
+}
+
+
+// GetNodeConfig 获取节点配置信息
+// GET /api/nodes/:id/config
+func (a *NodeAdapter) GetNodeConfig(c *gin.Context) {
+	nodeID := c.Param("id")
+	if nodeID == "" {
+		BadRequest(c, "节点ID不能为空")
+		return
+	}
+
+	// 向节点发送获取配置命令
+	cmd := node.Command{
+		ID:      fmt.Sprintf("cmd-config-%d", time.Now().UnixNano()),
+		Type:    node.CommandTypeGetConfig,
+		Payload: map[string]interface{}{},
+		CreatedAt: time.Now(),
+	}
+
+	if err := a.node.QueueCommand(nodeID, &cmd); err != nil {
+		a.log.Errorf("发送获取配置命令失败: %v", err)
+		ErrorWithDetails(c, types.ErrInternalError, "发送命令失败", err.Error())
+		return
+	}
+
+	a.log.Infof("获取配置命令已发送: 节点=%s", nodeID)
+	Success(c, gin.H{
+		"message":   "获取配置命令已发送，请通过命令结果接口查询",
+		"nodeID":    nodeID,
+		"commandID": cmd.ID,
+	})
+}
+
+// TestNodeLlamacpp 测试节点 llama.cpp 可用性
+// POST /api/nodes/:id/test
+func (a *NodeAdapter) TestNodeLlamacpp(c *gin.Context) {
+	nodeID := c.Param("id")
+	if nodeID == "" {
+		BadRequest(c, "节点ID不能为空")
+		return
+	}
+
+	var req struct {
+		BinaryPath string `json:"binary_path,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 忽略错误，因为是可选参数
+	}
+
+	// 向节点发送测试命令
+	cmd := node.Command{
+		ID:      fmt.Sprintf("cmd-test-%d", time.Now().UnixNano()),
+		Type:    node.CommandTypeTestLlamacpp,
+		Payload: map[string]interface{}{},
+		CreatedAt: time.Now(),
+	}
+
+	if req.BinaryPath != "" {
+		cmd.Payload["binary_path"] = req.BinaryPath
+	}
+
+	if err := a.node.QueueCommand(nodeID, &cmd); err != nil {
+		a.log.Errorf("发送测试命令失败: %v", err)
+		ErrorWithDetails(c, types.ErrInternalError, "发送命令失败", err.Error())
+		return
+	}
+
+	a.log.Infof("测试 llama.cpp 命令已发送: 节点=%s", nodeID)
+	Success(c, gin.H{
+		"message":   "测试命令已发送，请通过命令结果接口查询",
+		"nodeID":    nodeID,
+		"commandID": cmd.ID,
 	})
 }

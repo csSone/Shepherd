@@ -31,7 +31,7 @@ import (
 
 // Connector manages the connection to the master node
 type Connector struct {
-	config      *config.ClientConfig
+	nodeConfig  *config.NodeConfig
 	clientInfo  *client.ClientInfo
 	httpClient  *http.Client
 	connected   bool
@@ -44,7 +44,7 @@ type Connector struct {
 }
 
 // NewConnector creates a new master connector
-func NewConnector(cfg *config.ClientConfig, log *logger.Logger) (*Connector, error) {
+func NewConnector(cfg *config.NodeConfig, log *logger.Logger) (*Connector, error) {
 	// Generate client info
 	clientInfo, err := generateClientInfo(cfg)
 	if err != nil {
@@ -54,7 +54,7 @@ func NewConnector(cfg *config.ClientConfig, log *logger.Logger) (*Connector, err
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Connector{
-		config:      cfg,
+		nodeConfig:  cfg,
 		clientInfo:  clientInfo,
 		httpClient:  &http.Client{
 			Timeout: 30 * time.Second,
@@ -72,7 +72,7 @@ func (c *Connector) Start() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.config.MasterAddress == "" {
+	if c.nodeConfig.ClientRole.MasterAddress == "" {
 		return fmt.Errorf("master 地址未配置")
 	}
 
@@ -82,7 +82,7 @@ func (c *Connector) Start() error {
 	}
 
 	c.connected = true
-	c.log.Info(fmt.Sprintf("已连接到 Master: %s", c.config.MasterAddress))
+	c.log.Info(fmt.Sprintf("已连接到 Master: %s", c.nodeConfig.ClientRole.MasterAddress))
 
 	// Start heartbeat
 	c.wg.Add(1)
@@ -118,7 +118,7 @@ func (c *Connector) GetClientInfo() *client.ClientInfo {
 
 // register registers this client with the master
 func (c *Connector) register() error {
-	url := fmt.Sprintf("%s/api/master/clients/register", c.config.MasterAddress)
+	url := fmt.Sprintf("%s/api/master/clients/register", c.nodeConfig.ClientRole.MasterAddress)
 
 	body, err := json.Marshal(c.clientInfo)
 	if err != nil {
@@ -141,7 +141,7 @@ func (c *Connector) register() error {
 
 // unregister unregisters this client from the master
 func (c *Connector) unregister() error {
-	url := fmt.Sprintf("%s/api/master/clients/%s", c.config.MasterAddress, c.clientInfo.ID)
+	url := fmt.Sprintf("%s/api/master/clients/%s", c.nodeConfig.ClientRole.MasterAddress, c.clientInfo.ID)
 
 	req, err := http.NewRequestWithContext(context.Background(), "DELETE", url, nil)
 	if err != nil {
@@ -161,7 +161,7 @@ func (c *Connector) unregister() error {
 func (c *Connector) heartbeatLoop() {
 	defer c.wg.Done()
 
-	interval := time.Duration(c.config.Heartbeat.Interval) * time.Second
+	interval := time.Duration(c.nodeConfig.ClientRole.HeartbeatInterval) * time.Second
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -189,7 +189,7 @@ func (c *Connector) sendHeartbeat() error {
 		Resources: resources,
 	}
 
-	url := fmt.Sprintf("%s/api/master/heartbeat", c.config.MasterAddress)
+	url := fmt.Sprintf("%s/api/master/heartbeat", c.nodeConfig.ClientRole.MasterAddress)
 	body, err := json.Marshal(heartbeat)
 	if err != nil {
 		return fmt.Errorf("序列化心跳失败: %w", err)
@@ -401,7 +401,7 @@ func extractVersionNumber(line string) string {
 }
 
 // generateClientInfo generates client information
-func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
+func generateClientInfo(cfg *config.NodeConfig) (*client.ClientInfo, error) {
 	// Get hostname
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -409,8 +409,8 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 	}
 
 	// Generate client ID if not provided
-	clientID := cfg.ClientInfo.ID
-	if clientID == "" {
+	clientID := cfg.ID
+	if clientID == "" || clientID == "auto" {
 		interfaces, _ := net.Interfaces()
 		for _, iface := range interfaces {
 			if iface.HardwareAddr != nil && len(iface.HardwareAddr) > 0 {
@@ -424,7 +424,7 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 	}
 
 	// Get client name
-	clientName := cfg.ClientInfo.Name
+	clientName := cfg.Name
 	if clientName == "" {
 		clientName = hostname
 	}
@@ -435,14 +435,14 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 	// Get system info
 	hostInfo, _ := host.Info()
 	vmStat, _ := mem.VirtualMemory()
-	
+
 	// 检测 GPU 信息
 	gpuDetector := gpu.NewDetector(&gpu.Config{})
 	var gpuCount int
 	var gpuMemory int64
 	var hasGPU bool
 	var gpuList []gpu.Info
-	
+
 	if gpus, err := gpuDetector.DetectAll(context.Background()); err == nil {
 		gpuList = gpus
 		gpuCount = len(gpus)
@@ -457,34 +457,33 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 	} else {
 		fmt.Printf("[DEBUG] GPU detection failed: %v\n", err)
 	}
-	
+
 	// Build capabilities
 	capabilities := &cluster.Capabilities{
 		GPU:            hasGPU,
-		GPUCount:       gpuCount,
 		CPUCount:       runtime.NumCPU(),
 		Memory:         int64(vmStat.Total),
 		GPUMemory:      gpuMemory,
 		SupportsLlama:  true,
-		SupportsPython: cfg.CondaEnv.Enabled,
+		SupportsPython: cfg.Capabilities.PythonEnabled,
 	}
-	
+
 	// 添加 GPU 名称（如果有）
 	if hasGPU && len(gpuList) > 0 {
 		capabilities.GPUName = gpuList[0].Name
 	}
 
-	if cfg.CondaEnv.Enabled {
-		envs := make([]string, 0, len(cfg.CondaEnv.Environments))
-		for name := range cfg.CondaEnv.Environments {
+	if cfg.Capabilities.PythonEnabled {
+		envs := make([]string, 0, len(cfg.Capabilities.CondaEnvironments))
+		for name := range cfg.Capabilities.CondaEnvironments {
 			envs = append(envs, name)
 		}
 		capabilities.CondaEnvs = envs
 	}
 
-	// Build metadata
+	// Build metadata - 合并配置的 metadata 和系统信息
 	metadata := make(map[string]string)
-	for k, v := range cfg.ClientInfo.Metadata {
+	for k, v := range cfg.Metadata {
 		metadata[k] = v
 	}
 	metadata["os"] = hostInfo.OS
@@ -499,7 +498,7 @@ func generateClientInfo(cfg *config.ClientConfig) (*client.ClientInfo, error) {
 		Name:         clientName,
 		Address:      localIP,
 		Port:         9191, // Default client port
-		Tags:         cfg.ClientInfo.Tags,
+		Tags:         cfg.Tags,
 		Capabilities: capabilities,
 		Version:      "0.1.0-alpha",
 		Metadata:     metadata,

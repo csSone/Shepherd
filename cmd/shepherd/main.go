@@ -49,7 +49,7 @@ type App struct {
 
 func main() {
 	// 命令行参数
-	mode := flag.String("mode", "", "运行模式: standalone, master, client")
+	mode := flag.String("mode", "", "运行模式: hybrid (默认), master, client")
 	version := flag.Bool("version", false, "显示版本信息")
 	masterAddr := flag.String("master-address", "", "Master 地址 (client 模式)")
 	configPath := flag.String("config", "", "配置文件路径 (可选)")
@@ -67,10 +67,10 @@ func main() {
 	printBanner()
 
 	// 确定运行模式
-	// 优先使用位置参数，然后是命令行参数，否则默认为 standalone
-	runMode := "standalone"
+	// 优先使用位置参数，然后是命令行参数，否则默认为 hybrid
+	runMode := "hybrid"
 
-	// 检查位置参数 (shepherd standalone, shepherd master, shepherd client)
+	// 检查位置参数 (shepherd hybrid, shepherd master, shepherd client)
 	args := flag.Args()
 	if len(args) > 0 {
 		runMode = args[0]
@@ -78,9 +78,9 @@ func main() {
 		runMode = *mode
 	}
 
-	// 验证运行模式（向后兼容）
-	if runMode != "standalone" && runMode != "master" && runMode != "client" {
-		fmt.Fprintf(os.Stderr, "错误: 无效的运行模式 '%s'，必须是 standalone、master 或 client\n", runMode)
+	// 验证运行模式
+	if runMode != "hybrid" && runMode != "master" && runMode != "client" {
+		fmt.Fprintf(os.Stderr, "错误: 无效的运行模式 '%s'，必须是 hybrid、master 或 client\n", runMode)
 		os.Exit(1)
 	}
 
@@ -189,6 +189,9 @@ func (app *App) Initialize(runMode, masterAddr, configPath string) error {
 		Mode:          cfg.Mode,
 		ServerCfg:     cfg,
 		ConfigMgr:     app.configMgr,
+		Version:       Version,
+		BuildTime:     BuildTime,
+		GitCommit:     GitCommit,
 	}
 
 	app.srv, err = server.NewServer(serverCfg, app.modelMgr)
@@ -215,7 +218,7 @@ func (app *App) Initialize(runMode, masterAddr, configPath string) error {
 // determineRole 根据运行模式和配置确定节点角色
 func (app *App) determineRole(runMode string) string {
 	// 如果配置了 Node.Role，优先使用
-	if app.cfg.Node.Role != "" && app.cfg.Node.Role != "standalone" {
+	if app.cfg.Node.Role != "" && app.cfg.Node.Role != "" {
 		return app.cfg.Node.Role
 	}
 
@@ -231,12 +234,12 @@ func (app *App) determineRole(runMode string) string {
 			return "client"
 		}
 		return "client"
+	case "hybrid":
+		return "hybrid"
 	default:
-		return "standalone"
+		return "hybrid"
 	}
 }
-
-// initDistributedComponents 根据角色初始化分布式组件
 func (app *App) initDistributedComponents() error {
 	logger.Infof("初始化分布式组件，角色: %s", app.role)
 
@@ -423,6 +426,16 @@ func (app *App) buildNodeConfig() *node.NodeConfig {
 		address = netutil.GetBestLocalIP()
 	}
 
+	// 构建节点能力配置
+	capabilities := &node.NodeCapabilities{
+		SupportsPython: cfg.Node.Capabilities.PythonEnabled,
+	}
+	if cfg.Node.Capabilities.PythonEnabled {
+		capabilities.PythonVersion = "3.x"
+		capabilities.CondaPath = cfg.Node.Capabilities.CondaPath
+		capabilities.CondaEnvironments = cfg.Node.Capabilities.CondaEnvironments
+	}
+
 	return &node.NodeConfig{
 		ID:                nodeID,
 		Name:              nodeName,
@@ -433,6 +446,11 @@ func (app *App) buildNodeConfig() *node.NodeConfig {
 		MaxRetries:        cfg.Node.ClientRole.RegisterRetry,
 		LogLevel:          cfg.Log.Level,
 		EnableMetrics:     true,
+		DataDir:           "", // 可从配置添加
+		TempDir:           "", // 可从配置添加
+		Tags:              cfg.Node.Tags,
+		Metadata:          cfg.Node.Metadata,
+		Capabilities:      capabilities,
 	}
 }
 

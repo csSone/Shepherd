@@ -136,6 +136,12 @@ func TestServerRoutes(t *testing.T) {
 		{"Get process", "GET", "/api/processes/test-id", http.StatusNotFound},                   // 进程不存在
 		{"Stop process", "POST", "/api/processes/test-id/stop", http.StatusInternalServerError}, // 进程停止失败（进程不存在是内部错误）
 
+		// Repo routes
+		{"Search repo without query", "GET", "/api/repo/search", http.StatusBadRequest},            // 缺少 q 参数
+		{"Search repo with query", "GET", "/api/repo/search?q=qwen&limit=10", http.StatusInternalServerError}, // 网络请求可能失败
+		{"Get repo config", "GET", "/api/repo/config", http.StatusOK},
+		{"Get repo endpoints", "GET", "/api/repo/endpoints", http.StatusOK},
+
 		// Note: SSE endpoint /api/events is tested separately
 
 		// OpenAI API

@@ -224,6 +224,10 @@ func (m *Manager) HandleWebSocket(c *gin.Context) {
 
 	// Ensure connection is cleaned up
 	defer func() {
+		// Send a final close event before disconnecting
+		c.SSEvent("close", fmt.Sprintf(`{"connectionId":"%s","timestamp":%d}`, connID, time.Now().UnixMilli()))
+		flusher.Flush()
+
 		m.mu.Lock()
 		if _, exists := m.connections[connID]; exists {
 			delete(m.connections, connID)
@@ -253,9 +257,11 @@ func (m *Manager) HandleWebSocket(c *gin.Context) {
 	for {
 		select {
 		case <-notify:
+			// Client disconnected
 			return
 
 		case <-m.ctx.Done():
+			// Server shutting down
 			return
 
 		case event, ok := <-conn.Send:
@@ -264,6 +270,7 @@ func (m *Manager) HandleWebSocket(c *gin.Context) {
 			conn.mu.Unlock()
 
 			if !ok || closed {
+				// Connection closed
 				return
 			}
 
@@ -272,8 +279,12 @@ func (m *Manager) HandleWebSocket(c *gin.Context) {
 			flusher.Flush()
 
 		case <-keepalive.C:
-			// Send keepalive comment
-			c.Writer.Write([]byte(": keepalive\n\n"))
+			// Send keepalive comment to prevent timeout
+			if _, err := c.Writer.Write([]byte(": keepalive\n\n")); err != nil {
+				// Write failed, client probably disconnected
+				logger.Debugf("Keepalive 写入失败，断开连接 %s: %v", connID, err)
+				return
+			}
 			flusher.Flush()
 		}
 	}
@@ -344,7 +355,7 @@ func (m *Manager) BroadcastModelStop(modelID string, success bool, message strin
 }
 
 // BroadcastModelSlots broadcasts a model slots update event
-func (m *Manager) BroadcastModelSlots(modelID string, slots interface{}) {
+func (m *Manager) BroadcastModelSlots(modelID string, slots any) {
 	m.Broadcast(NewModelSlotsEvent(modelID, slots))
 }
 

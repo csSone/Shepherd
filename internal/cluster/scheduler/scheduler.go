@@ -79,13 +79,19 @@ func (s *Scheduler) Stop() {
 }
 
 // SubmitTask submits a new task for scheduling
-func (s *Scheduler) SubmitTask(taskType cluster.TaskType, payload map[string]interface{}) (*cluster.Task, error) {
+// nodeID 参数可选，如果指定则任务将发送到该节点；为空字符串时使用调度策略自动选择
+func (s *Scheduler) SubmitTask(taskType cluster.TaskType, payload map[string]interface{}, nodeID ...string) (*cluster.Task, error) {
 	task := &cluster.Task{
 		ID:        uuid.New().String(),
 		Type:      taskType,
 		Payload:   payload,
 		Status:    cluster.TaskStatusPending,
 		CreatedAt: time.Now(),
+	}
+
+	// 如果指定了节点 ID，设置 AssignedTo
+	if len(nodeID) > 0 && nodeID[0] != "" {
+		task.AssignedTo = nodeID[0]
 	}
 
 	s.mu.Lock()
@@ -195,22 +201,36 @@ func (s *Scheduler) dispatchTask(task *cluster.Task) {
 		return
 	}
 
-	// Select client based on strategy
 	var selectedClient *cluster.Client
 	var err error
 
-	switch s.strategy {
-	case RoundRobinStrategy:
-		selectedClient, err = s.selectRoundRobin(clients)
-	case LeastLoadedStrategy:
-		selectedClient, err = s.selectLeastLoaded(clients)
-	case ResourceAwareStrategy:
-		selectedClient, err = s.selectResourceAware(clients)
-	}
+	// 如果任务已指定节点（通过 AssignedTo），直接使用该节点
+	if task.AssignedTo != "" {
+		client, exists := s.clientMgr.GetClient(task.AssignedTo)
+		if !exists {
+			s.updateTaskStatus(task, cluster.TaskStatusFailed, "", fmt.Sprintf("指定的节点不存在: %s", task.AssignedTo))
+			return
+		}
+		if client.Status != cluster.ClientStatusOnline {
+			s.updateTaskStatus(task, cluster.TaskStatusFailed, "", fmt.Sprintf("指定的节点不在线: %s", task.AssignedTo))
+			return
+		}
+		selectedClient = client
+	} else {
+		// Select client based on strategy
+		switch s.strategy {
+		case RoundRobinStrategy:
+			selectedClient, err = s.selectRoundRobin(clients)
+		case LeastLoadedStrategy:
+			selectedClient, err = s.selectLeastLoaded(clients)
+		case ResourceAwareStrategy:
+			selectedClient, err = s.selectResourceAware(clients)
+		}
 
-	if err != nil {
-		s.updateTaskStatus(task, cluster.TaskStatusPending, "", err.Error())
-		return
+		if err != nil {
+			s.updateTaskStatus(task, cluster.TaskStatusPending, "", err.Error())
+			return
+		}
 	}
 
 	// Send task to client

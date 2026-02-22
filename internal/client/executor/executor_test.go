@@ -28,10 +28,15 @@ func newTestLogger() *logger.Logger {
 
 // TestNewExecutor tests creating a new executor
 func TestNewExecutor(t *testing.T) {
-	cfg := &config.ClientConfig{
-		CondaEnv: config.CondaEnvConfig{
-			CondaPath: "/usr/bin/conda",
-			Environments: map[string]string{
+	cfg := &config.NodeConfig{
+		Executor: config.NodeExecutorConfig{
+			MaxConcurrent: 4,
+			TaskTimeout:   300, // 5 分钟，单位是秒
+		},
+		Capabilities: config.NodeCapabilitiesConfig{
+			PythonEnabled: true,
+			CondaPath:     "/usr/bin/conda",
+			CondaEnvironments: map[string]string{
 				"base": "/opt/conda/envs/base",
 			},
 		},
@@ -50,7 +55,7 @@ func TestNewExecutor(t *testing.T) {
 
 // TestExecuteLoadModelMissingParams tests executeLoadModel with missing parameters
 func TestExecuteLoadModelMissingParams(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -93,7 +98,7 @@ func TestExecuteLoadModelMissingParams(t *testing.T) {
 
 // TestExecuteUnloadModelMissingParams tests executeUnloadModel with missing parameters
 func TestExecuteUnloadModelMissingParams(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -113,7 +118,7 @@ func TestExecuteUnloadModelMissingParams(t *testing.T) {
 
 // TestExecuteUnloadModelNonExistent tests unloading a non-existent model
 func TestExecuteUnloadModelNonExistent(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -135,7 +140,7 @@ func TestExecuteUnloadModelNonExistent(t *testing.T) {
 
 // TestExecuteRunPythonMissingParams tests executeRunPython with missing parameters
 func TestExecuteRunPythonMissingParams(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -155,7 +160,7 @@ func TestExecuteRunPythonMissingParams(t *testing.T) {
 
 // TestExecuteUnknownTaskType tests executing an unknown task type
 func TestExecuteUnknownTaskType(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -175,7 +180,7 @@ func TestExecuteUnknownTaskType(t *testing.T) {
 
 // TestCancelTask tests cancelling a running task
 func TestCancelTask(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -215,7 +220,7 @@ func TestCancelTask(t *testing.T) {
 
 // TestCancelNonExistentTask tests cancelling a non-existent task
 func TestCancelNonExistentTask(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -227,7 +232,7 @@ func TestCancelNonExistentTask(t *testing.T) {
 
 // TestGetRunningTasks tests retrieving running task list
 func TestGetRunningTasks(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -257,7 +262,7 @@ func TestGetRunningTasks(t *testing.T) {
 
 // TestStopTests stopping the executor
 func TestStop(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -285,7 +290,7 @@ func TestStop(t *testing.T) {
 
 // TestFindLlamacppBinary tests finding llama.cpp binary
 func TestFindLlamacppBinary(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -315,7 +320,7 @@ func TestFindLlamacppBinaryWithEnv(t *testing.T) {
 	os.Setenv("LLAMACPP_SERVER_PATH", fakeBinary)
 	defer os.Unsetenv("LLAMACPP_SERVER_PATH")
 
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -328,7 +333,7 @@ func TestFindLlamacppBinaryWithEnv(t *testing.T) {
 
 // TestExecuteRunLlamacppMissingParams tests executeRunLlamacpp with missing parameters
 func TestExecuteRunLlamacppMissingParams(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -348,7 +353,7 @@ func TestExecuteRunLlamacppMissingParams(t *testing.T) {
 
 // TestExecuteTaskWithFullQueue tests task execution when queue is full
 func TestExecuteTaskWithFullQueue(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -403,7 +408,7 @@ func TestRunningProcessStruct(t *testing.T) {
 
 // TestExecuteLoadModelParameterParsing tests parameter parsing in executeLoadModel
 func TestExecuteLoadModelParameterParsing(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -443,7 +448,7 @@ func TestExecuteLoadModelParameterParsing(t *testing.T) {
 
 // BenchmarkExecuteTask benchmarks task execution
 func BenchmarkExecuteTask(b *testing.B) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -461,7 +466,7 @@ func BenchmarkExecuteTask(b *testing.B) {
 
 // BenchmarkGetRunningTasks benchmarks retrieving running tasks
 func BenchmarkGetRunningTasks(b *testing.B) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 
@@ -486,7 +491,7 @@ func BenchmarkGetRunningTasks(b *testing.B) {
 
 // TestExecuteLoadModelWithModelID tests executeLoadModel with and without model_id
 func TestExecuteLoadModelWithModelID(t *testing.T) {
-	cfg := &config.ClientConfig{}
+	cfg := &config.NodeConfig{}
 	log := newTestLogger()
 	executor := NewExecutor(cfg, log)
 

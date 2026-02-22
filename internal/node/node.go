@@ -77,13 +77,21 @@ func NewNode(config *NodeConfig) (*Node, error) {
 		address:   config.Address,
 		port:      config.Port,
 		version:   version.GetVersion(),
-		tags:      make([]string, 0),
-		metadata:  make(map[string]string),
+		tags:      config.Tags,
+		metadata:  config.Metadata,
 		config:    config,
 		createdAt: time.Now(),
 		updatedAt: time.Now(),
 		ctx:       ctx,
 		cancel:    cancel,
+	}
+
+	// 确保 tags 和 metadata 不为 nil
+	if node.tags == nil {
+		node.tags = make([]string, 0)
+	}
+	if node.metadata == nil {
+		node.metadata = make(map[string]string)
 	}
 
 	// 检测系统资源
@@ -93,14 +101,23 @@ func NewNode(config *NodeConfig) (*Node, error) {
 		memoryTotal = int64(vmStat.Total)
 	}
 
-	// Initialize capabilities with detected system resources
-	node.capabilities = &NodeCapabilities{
+	// Initialize capabilities with detected system resources and config
+	capabilities := &NodeCapabilities{
 		SupportsLlama:  true,
-		SupportsPython: true,
+		SupportsPython: config.Capabilities != nil && config.Capabilities.SupportsPython,
 		GPU:            false,
 		CPUCount:       cpuCount,
 		Memory:         memoryTotal,
 	}
+
+	// 如果配置中有 Capabilities，复制其字段
+	if config.Capabilities != nil {
+		capabilities.PythonVersion = config.Capabilities.PythonVersion
+		capabilities.CondaPath = config.Capabilities.CondaPath
+		capabilities.CondaEnvironments = config.Capabilities.CondaEnvironments
+	}
+
+	node.capabilities = capabilities
 
 	// Initialize resources with detected system resources
 	node.resources = &NodeResources{
