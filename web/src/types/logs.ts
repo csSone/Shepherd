@@ -42,3 +42,46 @@ export interface LogStats {
   byLevel: Record<LogLevel, number>;
   bySource: Record<LogSource, number>;
 }
+
+/**
+ * 日志文件信息
+ */
+export interface LogFileInfo {
+  name: string;
+  path: string;
+  size: number;
+  mode: string;
+  date: string;
+  createdAt: string; // ISO 8601
+  isBackup: boolean;
+}
+
+/**
+ * 日志文件内容响应
+ */
+export interface LogFileContent {
+  entries: ParsedLogEntry[];
+  count: number;
+}
+
+/**
+ * 解析后的日志条目（从文件读取）
+ */
+export interface ParsedLogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  caller?: string;
+  fields?: Record<string, unknown>;
+  raw: string;
+}
+
+/**
+ * 日志文件过滤器
+ */
+export interface LogFileFilter {
+  level?: string;
+  search?: string;
+  offset?: number;
+  limit?: number;
+}

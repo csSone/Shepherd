@@ -29,10 +29,6 @@ interface UIState {
   openModal: (modal: string) => void;
   closeModal: () => void;
 
-  // 搜索
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-
   // 过滤器
   modelStatusFilter: string;
   setModelStatusFilter: (status: string) => void;
@@ -91,10 +87,6 @@ export const useUIStore = create<UIState>()(
       activeModal: null,
       openModal: (activeModal) => set({ activeModal }),
       closeModal: () => set({ activeModal: null }),
-
-      // 搜索
-      searchQuery: '',
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
 
       // 过滤器
       modelStatusFilter: 'all',

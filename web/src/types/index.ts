@@ -33,9 +33,9 @@ export type {
   ClientListResponse,
 } from './cluster';
 
-// 向后兼容：导出 ClientStatus 别名
-// Backward compatibility: export ClientStatus alias
-export type { ClientStatus } from './node';
+// 向后兼容：导出 ClientStatus 别名（使用 NodeStatus）
+// Backward compatibility: export ClientStatus alias (using NodeStatus)
+export type { NodeStatus as ClientStatus } from './node';
 
 // 默认导出
 export type { GPUInfo } from './node';

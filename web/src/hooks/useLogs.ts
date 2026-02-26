@@ -18,18 +18,22 @@ interface SSELogEntry {
 interface UseLogsOptions {
   maxLogs?: number;
   autoConnect?: boolean;
+  fromBeginning?: boolean; // 是否从头开始加载历史日志
 }
 
 /**
  * 使用日志流 Hook
- * 
+ *
  * 自动连接 SSE 日志流，实时接收后端日志
- * 
+ *
  * @example
- * const { logs, isConnected, error, reconnect } = useLogs({ maxLogs: 1000 });
+ * const { logs, isConnected, error, reconnect } = useLogs({
+ *   maxLogs: 1000,
+ *   fromBeginning: true  // 页面刷新后加载本次运行的所有历史日志
+ * });
  */
 export function useLogs(options: UseLogsOptions = {}) {
-  const { maxLogs = 1000, autoConnect = true } = options;
+  const { maxLogs = 1000, autoConnect = true, fromBeginning = true } = options;
   
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -133,28 +137,29 @@ export function useLogs(options: UseLogsOptions = {}) {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
-    
+
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
 
     try {
       const baseUrl = apiClient.getBaseUrl();
-      const sseUrl = `${baseUrl}/logs/stream`;
-      
+      // 添加 fromBeginning 参数以加载历史日志
+      const sseUrl = `${baseUrl}/logs/stream?fromBeginning=${fromBeginning ? 'true' : 'false'}`;
+
       console.log('Connecting to log stream:', sseUrl);
-      
+
       const es = new EventSource(sseUrl);
       es.addEventListener('message', handleMessage);
       es.addEventListener('open', handleOpen);
       es.addEventListener('error', handleError);
-      
+
       eventSourceRef.current = es;
     } catch (err) {
       console.error('Failed to create EventSource:', err);
       setError('创建日志流连接失败');
     }
-  }, [handleMessage, handleOpen, handleError]);
+  }, [handleMessage, handleOpen, handleError, fromBeginning]);
 
   /**
    * 断开连接
