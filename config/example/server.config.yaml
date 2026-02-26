@@ -12,20 +12,20 @@ server:
 
 model:
     paths:
-        - /home/user/workspace/Shepherd/models
-        - /home/user/.cache/huggingface/hub
+        - ./models
+        - ~/.cache/huggingface/hub
     path_configs: []
     auto_scan: true
     scan_interval: 0
 
 llamacpp:
     paths:
-        - path: /home/user/workspace/Shepherd/llama.cpp
+        - path: ./llama.cpp
           name: Default
           description: ""
 
 download:
-    directory: /home/user/workspace/Shepherd/downloads
+    directory: ./downloads
     max_concurrent: 4
     chunk_size: 1048576
     retry_count: 3
@@ -55,16 +55,16 @@ log:
     level: info
     format: json
     output: both
-    directory: /home/user/workspace/Shepherd/logs
+    directory: ./logs
     max_size: 100
     max_backups: 3
     max_age: 7
     compress: true
 
 storage:
-    type: memory
+    type: sqlite
     sqlite:
-        path: /home/user/workspace/Shepherd/Shepherd/data/shepherd.db
+        path: ./data/shepherd.db
         pragmas:
             cache_size: "-64000"
             synchronous: NORMAL

@@ -27,7 +27,7 @@ node:
   # Client 角色配置
   client_role:
     enabled: true
-    master_address: http://192.168.1.100:9190  # Master 服务器地址
+    master_address: http://localhost:9190  # Master 服务器地址
     register_retry: 3              # 注册失败重试次数
     heartbeat_interval: 5          # 心跳间隔（秒）
     heartbeat_timeout: 15          # 心跳超时（秒）
