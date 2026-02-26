@@ -109,12 +109,24 @@ func (s *SQLiteStore) initSchema(config *SQLiteConfig) error {
 		created_at INTEGER NOT NULL
 	);
 
+	CREATE TABLE IF NOT EXISTS model_load_configs (
+		id TEXT PRIMARY KEY,
+		node_id TEXT NOT NULL,
+		model_id TEXT NOT NULL,
+		model_name TEXT NOT NULL,
+		config TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL,
+		UNIQUE(node_id, model_id)
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at);
 	CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_benchmarks_model_id ON benchmarks(model_id);
 	CREATE INDEX IF NOT EXISTS idx_benchmarks_status ON benchmarks(status);
 	CREATE INDEX IF NOT EXISTS idx_benchmarks_created ON benchmarks(created_at);
+	CREATE INDEX IF NOT EXISTS idx_model_load_configs_node_model ON model_load_configs(node_id, model_id);
 	`
 
 	if _, err := s.db.Exec(schema); err != nil {
@@ -768,6 +780,121 @@ func (s *SQLiteStore) DeleteBenchmarkConfig(ctx context.Context, name string) er
 
 	_, err := s.db.ExecContext(ctx, "DELETE FROM benchmark_configs WHERE name = ?", name)
 	return err
+}
+
+// ModelLoadConfig operations
+
+// SaveModelLoadConfig saves or updates a model load configuration
+func (s *SQLiteStore) SaveModelLoadConfig(ctx context.Context, config *ModelLoadConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Generate ID if not provided
+	if config.ID == "" {
+		config.ID = generateID("mlcfg")
+	}
+
+	// Set timestamps
+	now := timeNow()
+	if config.CreatedAt.IsZero() {
+		config.CreatedAt = now
+	}
+	config.UpdatedAt = now
+
+	// Marshal config to JSON
+	configJSON, err := json.Marshal(config.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal model load config: %w", err)
+	}
+
+	// Use UPSERT (INSERT OR REPLACE)
+	query := `
+		INSERT INTO model_load_configs (id, node_id, model_id, model_name, config, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(node_id, model_id) DO UPDATE SET
+			config = excluded.config,
+			model_name = excluded.model_name,
+			updated_at = excluded.updated_at
+	`
+
+	_, err = s.db.ExecContext(ctx, query,
+		config.ID,
+		config.NodeID,
+		config.ModelID,
+		config.ModelName,
+		string(configJSON),
+		config.CreatedAt.Unix(),
+		config.UpdatedAt.Unix(),
+	)
+
+	return err
+}
+
+// GetModelLoadConfig retrieves a model load configuration by node ID and model ID
+func (s *SQLiteStore) GetModelLoadConfig(ctx context.Context, nodeID, modelID string) (*ModelLoadConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var c ModelLoadConfig
+	var configJSON []byte
+	var createdUnix, updatedUnix int64
+
+	query := `
+		SELECT id, node_id, model_id, model_name, config, created_at, updated_at
+		FROM model_load_configs
+		WHERE node_id = ? AND model_id = ?
+	`
+
+	err := s.db.QueryRowContext(ctx, query, nodeID, modelID).Scan(
+		&c.ID,
+		&c.NodeID,
+		&c.ModelID,
+		&c.ModelName,
+		&configJSON,
+		&createdUnix,
+		&updatedUnix,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrModelLoadConfigNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model load config: %w", err)
+	}
+
+	// Parse config JSON
+	if len(configJSON) > 0 {
+		if err := json.Unmarshal(configJSON, &c.Config); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal model load config: %w", err)
+		}
+	}
+
+	// Convert Unix timestamps
+	c.CreatedAt = time.Unix(createdUnix, 0).UTC()
+	c.UpdatedAt = time.Unix(updatedUnix, 0).UTC()
+
+	return &c, nil
+}
+
+// DeleteModelLoadConfig deletes a model load configuration by node ID and model ID
+func (s *SQLiteStore) DeleteModelLoadConfig(ctx context.Context, nodeID, modelID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result, err := s.db.ExecContext(ctx,
+		"DELETE FROM model_load_configs WHERE node_id = ? AND model_id = ?",
+		nodeID, modelID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete model load config: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrModelLoadConfigNotFound
+	}
+
+	return nil
 }
 
 // Close closes the database connection

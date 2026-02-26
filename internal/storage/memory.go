@@ -10,12 +10,13 @@ import (
 
 // MemoryStore implements Store interface with in-memory storage
 type MemoryStore struct {
-	mu               sync.RWMutex
-	conversations    map[string]*Conversation
-	messages         map[string][]*Message // conversation_id -> messages
-	messagesByID     map[string]*Message
-	benchmarks       map[string]*Benchmark
-	benchmarkConfigs map[string]*BenchmarkConfig
+	mu                sync.RWMutex
+	conversations     map[string]*Conversation
+	messages          map[string][]*Message // conversation_id -> messages
+	messagesByID      map[string]*Message
+	benchmarks        map[string]*Benchmark
+	benchmarkConfigs  map[string]*BenchmarkConfig
+	modelLoadConfigs  map[string]*ModelLoadConfig // key: "nodeID:modelID"
 }
 
 // NewMemoryStore creates a new in-memory store
@@ -26,6 +27,7 @@ func NewMemoryStore() (*MemoryStore, error) {
 		messagesByID:     make(map[string]*Message),
 		benchmarks:       make(map[string]*Benchmark),
 		benchmarkConfigs: make(map[string]*BenchmarkConfig),
+		modelLoadConfigs: make(map[string]*ModelLoadConfig),
 	}, nil
 }
 
@@ -352,6 +354,60 @@ func (s *MemoryStore) DeleteBenchmarkConfig(ctx context.Context, name string) er
 	return nil
 }
 
+// ModelLoadConfig operations
+
+// SaveModelLoadConfig saves or updates a model load configuration
+func (s *MemoryStore) SaveModelLoadConfig(ctx context.Context, config *ModelLoadConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Generate ID if not provided
+	if config.ID == "" {
+		config.ID = generateID("mlcfg")
+	}
+
+	// Set timestamps
+	now := time.Now()
+	if config.CreatedAt.IsZero() {
+		config.CreatedAt = now
+	}
+	config.UpdatedAt = now
+
+	// Use composite key: nodeID:modelID
+	key := config.NodeID + ":" + config.ModelID
+	s.modelLoadConfigs[key] = config
+
+	return nil
+}
+
+// GetModelLoadConfig retrieves a model load configuration by node ID and model ID
+func (s *MemoryStore) GetModelLoadConfig(ctx context.Context, nodeID, modelID string) (*ModelLoadConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	key := nodeID + ":" + modelID
+	config, exists := s.modelLoadConfigs[key]
+	if !exists {
+		return nil, ErrModelLoadConfigNotFound
+	}
+
+	return config, nil
+}
+
+// DeleteModelLoadConfig deletes a model load configuration by node ID and model ID
+func (s *MemoryStore) DeleteModelLoadConfig(ctx context.Context, nodeID, modelID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := nodeID + ":" + modelID
+	if _, exists := s.modelLoadConfigs[key]; !exists {
+		return ErrModelLoadConfigNotFound
+	}
+
+	delete(s.modelLoadConfigs, key)
+	return nil
+}
+
 // Close closes the store (no-op for memory store)
 func (s *MemoryStore) Close() error {
 	s.mu.Lock()
@@ -360,6 +416,9 @@ func (s *MemoryStore) Close() error {
 	s.conversations = make(map[string]*Conversation)
 	s.messages = make(map[string][]*Message)
 	s.messagesByID = make(map[string]*Message)
+	s.benchmarks = make(map[string]*Benchmark)
+	s.benchmarkConfigs = make(map[string]*BenchmarkConfig)
+	s.modelLoadConfigs = make(map[string]*ModelLoadConfig)
 
 	return nil
 }

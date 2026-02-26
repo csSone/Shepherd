@@ -89,6 +89,17 @@ type BenchmarkConfig struct {
 	CreatedAt   time.Time              `json:"createdAt" db:"created_at"`
 }
 
+// ModelLoadConfig represents a saved model loading configuration
+type ModelLoadConfig struct {
+	ID         string                 `json:"id" db:"id"`
+	NodeID     string                 `json:"nodeId" db:"node_id"`       // Machine/Node ID
+	ModelID    string                 `json:"modelId" db:"model_id"`    // Model ID
+	ModelName  string                 `json:"modelName" db:"model_name"` // Model name (for reference)
+	Config     map[string]interface{} `json:"config" db:"config"`      // LoadModelParams as JSON
+	CreatedAt  time.Time              `json:"createdAt" db:"created_at"`
+	UpdatedAt  time.Time              `json:"updatedAt" db:"updated_at"`
+}
+
 // Store defines the storage interface
 type Store interface {
 	// Conversation operations
@@ -116,6 +127,11 @@ type Store interface {
 	ListBenchmarkConfigs(ctx context.Context, limit, offset int) ([]*BenchmarkConfig, error)
 	UpdateBenchmarkConfig(ctx context.Context, config *BenchmarkConfig) error
 	DeleteBenchmarkConfig(ctx context.Context, name string) error
+
+	// ModelLoadConfig operations
+	SaveModelLoadConfig(ctx context.Context, config *ModelLoadConfig) error
+	GetModelLoadConfig(ctx context.Context, nodeID, modelID string) (*ModelLoadConfig, error)
+	DeleteModelLoadConfig(ctx context.Context, nodeID, modelID string) error
 
 	// Cleanup
 	Close() error
@@ -180,6 +196,7 @@ var (
 	ErrMessageNotFound       = &StorageError{Code: "NOT_FOUND", Message: "Message not found"}
 	ErrBenchmarkNotFound     = &StorageError{Code: "NOT_FOUND", Message: "Benchmark not found"}
 	ErrBenchmarkConfigNotFound = &StorageError{Code: "NOT_FOUND", Message: "Benchmark config not found"}
+	ErrModelLoadConfigNotFound = &StorageError{Code: "NOT_FOUND", Message: "Model load config not found"}
 )
 
 // StorageError represents a storage error
