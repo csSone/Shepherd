@@ -24,7 +24,7 @@ import (
 
 // 版本信息（编译时注入）
 var (
-	Version   = "v0.3.1"
+	Version   = "v0.3.2"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
 )
@@ -110,12 +110,12 @@ func main() {
 func printBanner() {
 	fmt.Print(`
 ╔═════════════════════════════════════════════════════╗
-║                                                       ║
-║   Shepherd - llama.cpp 模型管理系统                  ║
-║   (C) 2026 Shepherd Project                             ║
-║                                                       ║
-║   Go 语言重构版本 - 更快、更轻、更简单               ║
-║                                                       ║
+║                                                    ║ 
+║   Shepherd - llama.cpp 模型管理系统                   ║
+║   (C) 2026 Shepherd Project                         ║
+║                                                      ║
+║   分布式管理 - 更快、更轻、更简单              		║
+║                                                      ║
 ╚═════════════════════════════════════════════════════╝
 `)
 	fmt.Printf("版本: %s\n", Version)

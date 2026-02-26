@@ -5,6 +5,49 @@ All notable changes to Shepherd will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.2] - 2026-02-27
+
+### Added
+- **模型加载配置持久化**: 支持保存和加载模型配置
+  - 新增 `ModelLoadConfig` 存储模型，使用 `(nodeID, modelID)` 作为复合主键
+  - 新增 API 端点:
+    - `GET /api/models/:id/load-config` - 获取模型加载配置
+    - `PUT /api/models/:id/load-config` - 保存模型加载配置
+    - `DELETE /api/models/:id/load-config` - 删除模型加载配置
+  - SQLite 存储使用 UPSERT 模式，自动更新已存在的配置
+  - 内存存储使用复合键 `"nodeID:modelID"` 存储配置
+  - NodeAdapter 新增 `GetNodeID()` 方法获取节点 ID
+- **前端 Hooks**: 新增模型配置管理 hooks
+  - `useModelLoadConfig()` - 查询模型配置
+  - `useSaveModelLoadConfig()` - 保存模型配置
+  - `useDeleteModelLoadConfig()` - 删除模型配置
+- **LoadModelDialog 增强**:
+  - 自动加载上次保存的配置
+  - 加载模型时自动保存配置
+  - 新增"重置"按钮，清除保存的配置并恢复默认值
+
+### Changed
+- **默认存储类型**: 示例配置文件 `server.config.yaml` 存储类型从 `memory` 改为 `sqlite`
+  - 数据库路径: `./data/shepherd.db`
+
+### Fixed
+- **路径配置错误提示**:
+  - PathEditDialog 现在显示友好的错误提示
+  - 解析后端错误消息，区分"路径不存在"、"不是目录"等错误
+  - 保存失败时不关闭对话框，允许用户修改后重试
+- **路径验证改进**:
+  - 调用后端 API 进行真实验证（llama.cpp 路径）
+  - 验证状态：null（未验证）/ true（有效）/ false（无效）
+  - 500ms 防抖，避免频繁请求
+  - 显示"验证路径中..."加载状态
+- **版本显示更新**: Sidebar 版本号从 v0.1.2 更新到 v0.4.1
+- **日志查看器修复**:
+  - 修复日志内容重叠问题
+  - 使用动态行高计算，根据消息长度调整高度
+  - 更新到 react-window v2 API
+
+---
+
 ## [v0.3.1] - 2026-02-26
 
 ### Added
