@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, HelpCircle, Loader2, ChevronDown, Info } from 'lucide-react';
+import { X, HelpCircle, Loader2, ChevronDown, Info, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LoadModelParams, ModelCapabilities } from '@/types';
-import { useGPUs, useModelCapabilities, useSetModelCapabilities, useLlamacppBackends, useEstimateVRAM, type SystemGPUInfo, type LlamacppBackend } from '@/features/models/hooks';
+import { useGPUs, useModelCapabilities, useSetModelCapabilities, useLlamacppBackends, useEstimateVRAM, useModelLoadConfig, useSaveModelLoadConfig, useDeleteModelLoadConfig, type SystemGPUInfo, type LlamacppBackend } from '@/features/models/hooks';
 import { useOnlineNodes } from '@/features/cluster/hooks';
 import type { UnifiedNode } from '@/types';
 
@@ -223,26 +223,18 @@ export function LoadModelDialog({
   modelPath,
   isLoading = false,
 }: LoadModelDialogProps) {
-  // 获取 GPU 列表
-  const { data: gpuData } = useGPUs();
-  const gpus = gpuData?.gpus || [];
-  const gpuDevices = gpuData?.devices || [];
-
   // 获取在线节点列表（用于节点选择）
   const { data: onlineNodes = [] } = useOnlineNodes();
 
   // 获取 llama.cpp 后端列表
   const { data: llamacppBackends = [] } = useLlamacppBackends();
 
-  // 获取模型能力配置
-  const { data: savedCapabilities } = useModelCapabilities(isOpen ? modelId : '');
+  // 模型加载配置相关 hooks
+  const { data: loadConfigData, isLoading: isLoadingConfig } = useModelLoadConfig(isOpen ? modelId : '');
+  const saveModelLoadConfig = useSaveModelLoadConfig();
+  const deleteModelLoadConfig = useDeleteModelLoadConfig();
 
-  // 设置模型能力的 mutation
-  const setModelCapabilities = useSetModelCapabilities();
-
-  // 显存估算 mutation
-  const estimateVRAM = useEstimateVRAM();
-
+  // 初始化参数状态
   const [params, setParams] = useState<LoadModelParams>({
     modelId,
     ctxSize: 8192,
@@ -290,6 +282,20 @@ export function LoadModelDialog({
   // Tooltip 状态
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
+  // 获取 GPU 列表（依赖 params.llamaCppPath）
+  const { data: gpuData } = useGPUs(params.llamaCppPath);
+  const gpus = gpuData?.gpus || [];
+  const gpuDevices = gpuData?.devices || [];
+
+  // 获取模型能力配置
+  const { data: savedCapabilities } = useModelCapabilities(isOpen ? modelId : '');
+
+  // 设置模型能力的 mutation
+  const setModelCapabilities = useSetModelCapabilities();
+
+  // 显存估算 mutation
+  const estimateVRAM = useEstimateVRAM();
+
   // 当对话框打开时，加载已保存的能力配置
   useEffect(() => {
     if (isOpen && savedCapabilities) {
@@ -305,6 +311,21 @@ export function LoadModelDialog({
       }));
     }
   }, [isOpen, savedCapabilities]);
+
+  // 当对话框打开时，加载已保存的模型加载配置
+  useEffect(() => {
+    if (isOpen && loadConfigData && !isLoadingConfig) {
+      if (loadConfigData.exists && loadConfigData.config) {
+        // 从保存的配置中恢复参数
+        const savedConfig = loadConfigData.config.config;
+        setParams(prev => ({
+          ...prev,
+          ...(savedConfig as Partial<LoadModelParams>),
+        }));
+      }
+      // 如果不存在保存的配置，使用默认值（不改变当前状态）
+    }
+  }, [isOpen, loadConfigData, isLoadingConfig]);
 
   // 处理能力变化，应用约束规则并保存
   const handleCapabilityChange = (key: string, value: boolean) => {
@@ -355,14 +376,78 @@ export function LoadModelDialog({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingStatus('加载中...');
+
+    // 保存当前配置
+    try {
+      await saveModelLoadConfig.mutateAsync({
+        modelId,
+        config: params,
+      });
+    } catch (error) {
+      console.error('保存模型加载配置失败:', error);
+      // 保存失败不影响加载操作
+    }
+
     onConfirm(params);
   };
 
   const applyPreset = (presetParams: Partial<LoadModelParams>) => {
     setParams(prev => ({ ...prev, ...presetParams }));
+  };
+
+  // 重置为默认配置
+  const handleResetConfig = async () => {
+    // 删除保存的配置
+    try {
+      await deleteModelLoadConfig.mutateAsync(modelId);
+    } catch (error) {
+      console.error('删除模型加载配置失败:', error);
+    }
+
+    // 重置为默认参数
+    setParams({
+      modelId,
+      ctxSize: 8192,
+      batchSize: 4096,
+      threads: 4,
+      gpuLayers: 99,
+      temperature: 0.7,
+      topP: 0.95,
+      topK: 40,
+      repeatPenalty: 1.1,
+      seed: -1,
+      nPredict: -1,
+      llamaCppPath: '/usr/local/bin',
+      mainGpu: 'default',
+      capabilities: {
+        thinking: false,
+        tools: false,
+        translation: false,
+        embedding: false,
+      },
+      flashAttention: true,
+      noMmap: false,
+      lockMemory: false,
+      logitsAll: false,
+      reranking: false,
+      minP: 0.05,
+      presencePenalty: 0.0,
+      frequencyPenalty: 0.0,
+      uBatchSize: 512,
+      parallelSlots: 4,
+      kvCacheSize: 8192,
+      kvCacheUnified: true,
+      kvCacheTypeK: 'f16',
+      kvCacheTypeV: 'f16',
+      directIo: 'default',
+      disableJinja: false,
+      chatTemplate: '',
+      contextShift: false,
+      extraArgs: '',
+    });
   };
 
   // Tooltip 交互
@@ -441,8 +526,8 @@ export function LoadModelDialog({
             }
             handleTooltipLeave();
           }}
-          className="ml-1.5 w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600
-                     text-muted-foreground text-xs font-medium flex items-center justify-center
+          className="ml-1 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600
+                     text-muted-foreground text-[10px] font-medium flex items-center justify-center
                      hover:from-blue-50 hover:to-blue-100 dark:hover:from-blue-900/40 dark:hover:to-blue-800/40
                      hover:text-blue-600 dark:hover:text-blue-400
                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
@@ -562,31 +647,52 @@ export function LoadModelDialog({
 
         {/* 预设配置按钮 */}
         <div className="px-4 py-3 border-b border-border bg-muted/50 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-foreground mr-2">预设配置:</span>
-            {Object.entries(PRESETS).map(([key, preset]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => applyPreset(preset.params)}
-                disabled={isLoading}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                  "border shadow-sm",
-                  "hover:shadow-md hover:-translate-y-px active:translate-y-0",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  // 根据预设类型使用不同的样式
-                  key === 'fast' && "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80",
-                  key === 'balanced' && "bg-primary/10 text-primary border-primary/30 hover:bg-primary/15",
-                  key === 'performance' && "bg-accent text-accent-foreground border-border hover:bg-accent/80",
-                  key === 'max' && "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/15",
-                  "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm"
-                )}
-                title={preset.description}
-              >
-                {preset.name}
-              </button>
-            ))}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-foreground mr-2">预设配置:</span>
+              {Object.entries(PRESETS).map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyPreset(preset.params)}
+                  disabled={isLoading}
+                  className={cn(
+                    "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                    "border shadow-sm",
+                    "hover:shadow-md hover:-translate-y-px active:translate-y-0",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    // 根据预设类型使用不同的样式
+                    key === 'fast' && "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80",
+                    key === 'balanced' && "bg-primary/10 text-primary border-primary/30 hover:bg-primary/15",
+                    key === 'performance' && "bg-accent text-accent-foreground border-border hover:bg-accent/80",
+                    key === 'max' && "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/15",
+                    "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+                  )}
+                  title={preset.description}
+                >
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+
+            {/* 重置配置按钮 */}
+            <button
+              type="button"
+              onClick={handleResetConfig}
+              disabled={isLoading}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                "border shadow-sm",
+                "hover:shadow-md hover:-translate-y-px active:translate-y-0",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "bg-muted text-muted-foreground border-border hover:bg-muted/80",
+                "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+              )}
+              title="重置为默认配置"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              重置
+            </button>
           </div>
         </div>
 
@@ -732,30 +838,12 @@ export function LoadModelDialog({
                     设备
                   </label>
                   <div className="border border-border rounded-lg p-3 bg-card">
-                    {gpuDevices.length > 0 ? (
-                      <div className="space-y-1">
-                        {gpuDevices.map((device: string, index: number) => (
-                          <label
-                            key={index}
-                            className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              disabled={true}
-                              className="rounded border-border text-blue-600 focus:ring-blue-500 w-4 h-4"
-                            />
-                            <span>{device}</span>
-                            <span className="ml-auto text-xs text-green-600 dark:text-green-400">就绪</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : gpus.length > 0 ? (
+                    {gpus.length > 0 ? (
                       <div className="space-y-1">
                         {gpus.map((gpu: SystemGPUInfo) => (
                           <label
                             key={gpu.id}
-                            className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded hover:bg-accent"
+                            className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-accent p-1 rounded"
                           >
                             <input
                               type="checkbox"
@@ -763,16 +851,25 @@ export function LoadModelDialog({
                               disabled={true}
                               className="rounded border-border text-blue-600 focus:ring-blue-500 w-4 h-4"
                             />
-                            <span>
-                              {gpu.name}
-                              {gpu.totalMemory && ` (${gpu.totalMemory}`}
-                              {gpu.freeMemory && gpu.totalMemory && `, ${gpu.freeMemory} free`}
-                              {gpu.totalMemory && ')'}
+                            <span className="flex-1">
+                              <span className="font-medium">{gpu.id}</span>
+                              <span className="text-muted-foreground mx-1">·</span>
+                              <span className="text-muted-foreground">{gpu.name}</span>
+                              {gpu.totalMemory && (
+                                <span className="ml-2 text-muted-foreground">
+                                  总计 {gpu.totalMemory}
+                                </span>
+                              )}
+                              {gpu.freeMemory && (
+                                <span className="ml-2 text-green-600 dark:text-green-400">
+                                  可用 {gpu.freeMemory}
+                                </span>
+                              )}
                             </span>
                             {gpu.available ? (
-                              <span className="ml-auto text-xs text-green-600 dark:text-green-400">就绪</span>
+                              <span className="text-xs text-green-600 dark:text-green-400">就绪</span>
                             ) : (
-                              <span className="ml-auto text-xs text-red-600 dark:text-red-400">不可用</span>
+                              <span className="text-xs text-red-600 dark:text-red-400">不可用</span>
                             )}
                           </label>
                         ))}

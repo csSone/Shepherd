@@ -273,12 +273,14 @@ export interface SystemGPUListResponse {
 
 /**
  * 获取系统 GPU 列表 Hook
+ * @param llamaCppPath - 可选的 llama.cpp 路径，用于获取该路径下的 GPU 信息
  */
-export function useGPUs() {
+export function useGPUs(llamaCppPath?: string) {
   return useQuery<SystemGPUListResponse>({
-    queryKey: ['system', 'gpus'],
+    queryKey: ['system', 'gpus', llamaCppPath],
     queryFn: async () => {
-      const response = await apiClient.get<{ success: boolean; data: SystemGPUListResponse }>('/system/gpus');
+      const params = llamaCppPath ? `?llamacppPath=${encodeURIComponent(llamaCppPath)}` : '';
+      const response = await apiClient.get<{ success: boolean; data: SystemGPUListResponse }>(`/system/gpus${params}`);
       return response.data;
     },
     staleTime: 60 * 1000, // GPU 信息缓存 1 分钟
@@ -652,6 +654,77 @@ export function useDeleteBenchmarkConfig() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['benchmark', 'configs'] });
+    },
+  });
+}
+
+// ========== 模型加载配置 Hooks ==========
+
+/**
+ * 模型加载配置响应类型
+ */
+export interface ModelLoadConfigResponse {
+  exists: boolean;
+  config?: {
+    id: string;
+    nodeId: string;
+    modelId: string;
+    modelName: string;
+    config: Record<string, any>;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+}
+
+/**
+ * 获取模型加载配置 Hook
+ */
+export function useModelLoadConfig(modelId: string) {
+  return useQuery<ModelLoadConfigResponse>({
+    queryKey: ['models', modelId, 'load-config'],
+    queryFn: async () => {
+      const response = await apiClient.get<{ success: boolean; data: ModelLoadConfigResponse }>(
+        `/models/${modelId}/load-config`
+      );
+      return response.data;
+    },
+    enabled: !!modelId,
+    staleTime: 10 * 60 * 1000, // 10 分钟缓存
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * 保存模型加载配置 Hook
+ */
+export function useSaveModelLoadConfig() {
+  return useMutation({
+    mutationFn: async ({ modelId, config }: { modelId: string; config: Record<string, any> }) => {
+      const response = await apiClient.put<{ success: boolean }>(
+        `/models/${modelId}/load-config`,
+        { config }
+      );
+      return response;
+    },
+  });
+}
+
+/**
+ * 删除模型加载配置 Hook
+ */
+export function useDeleteModelLoadConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (modelId: string) => {
+      const response = await apiClient.delete<{ success: boolean }>(
+        `/models/${modelId}/load-config`
+      );
+      return response;
+    },
+    onSuccess: (_, modelId) => {
+      // 使配置查询失效
+      queryClient.invalidateQueries({ queryKey: ['models', modelId, 'load-config'] });
     },
   });
 }
