@@ -136,11 +136,12 @@ func NewServer(config *Config, modelMgr *model.Manager) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	s := &Server{
-		config:   config,
-		ctx:      ctx,
-		cancel:   cancel,
-		handlers: &Handlers{},
-		modelMgr: modelMgr,
+		config:       config,
+		ctx:          ctx,
+		cancel:       cancel,
+		handlers:     &Handlers{},
+		modelMgr:     modelMgr,
+		capabilities: make(map[string]*ModelCapabilities), // 初始化 capabilities map
 	}
 
 	// Initialize storage manager
@@ -311,6 +312,11 @@ func (s *Server) setupRoutes() {
 			models.POST("/:id/unload", s.handleUnloadModel)
 			models.PUT("/:id/alias", s.handleSetAlias)
 			models.PUT("/:id/favourite", s.handleSetFavourite)
+
+			// 模型加载配置管理
+			models.GET("/:id/load-config", s.handleGetModelLoadConfig)
+			models.PUT("/:id/load-config", s.handleSaveModelLoadConfig)
+			models.DELETE("/:id/load-config", s.handleDeleteModelLoadConfig)
 		}
 
 		// Model scan routes
@@ -365,6 +371,10 @@ func (s *Server) setupRoutes() {
 		{
 			logs.GET("/stream", s.handleLogStream)
 			logs.GET("/entries", s.handleLogEntries)
+			logs.GET("/files", s.handleLogFiles)
+			logs.GET("/files/:filename", s.handleLogFileContent)
+			logs.GET("/files/:filename/stats", s.handleLogFileStats)
+			logs.DELETE("/files/:filename", s.handleDeleteLogFile)
 		}
 
 		// System routes
@@ -642,31 +652,56 @@ func (s *Server) handleServerInfo(c *gin.Context) {
 
 // handleGetGPUs 返回系统可用的 GPU 列表
 // 返回格式兼容 LlamacppServer 的设备列表格式
+// 支持通过查询参数 llamacppPath 指定 llama.cpp 路径
 func (s *Server) handleGetGPUs(c *gin.Context) {
-	// 首先尝试使用 llama-bench 获取设备列表（与 LlamacppServer 一致）
-	llamacppBinPath := ""
+	// 获取查询参数中的 llama.cpp 路径
+	requestedPath := c.Query("llamacppPath")
+
+	// 收集可能的 llama-bench 路径
+	benchPaths := []string{}
+
+	// 1. 优先使用请求指定的路径
+	if requestedPath != "" {
+		// 尝试多个可能的子目录
+		benchPaths = append(benchPaths,
+			requestedPath+"/llama-bench",
+			requestedPath+"/build/bin/llama-bench",
+			requestedPath+"/bin/llama-bench",
+		)
+	}
+
+	// 2. 从配置路径收集
 	if s.config != nil && s.config.ServerCfg != nil && len(s.config.ServerCfg.Llamacpp.Paths) > 0 {
-		// 使用第一个可用的 llama.cpp 路径
 		for _, p := range s.config.ServerCfg.Llamacpp.Paths {
 			if fileInfo, err := os.Stat(p.Path); err == nil && fileInfo.IsDir() {
-				llamacppBinPath = p.Path
-				break
+				benchPaths = append(benchPaths,
+					p.Path+"/llama-bench",
+					p.Path+"/build/bin/llama-bench",
+					p.Path+"/bin/llama-bench",
+				)
 			}
 		}
 	}
 
+	// 3. 添加系统路径
+	benchPaths = append(benchPaths,
+		"/usr/local/bin/llama-bench",
+		"/usr/bin/llama-bench",
+		"llama-bench", // 使用系统 PATH
+	)
+
 	deviceStrings := []string{} // 简单设备描述字符串（兼容 LlamacppServer）
 	gpus := []gin.H{}           // 详细 GPU 信息（Shepherd 扩展）
 
-	if llamacppBinPath != "" {
-		// 尝试使用 llama-bench 获取设备列表
-		benchPath := llamacppBinPath + "/llama-bench"
+	// 尝试每个可能的路径
+	for _, benchPath := range benchPaths {
 		cmd := exec.Command(benchPath, "--list-devices")
 		output, err := cmd.CombinedOutput()
 		if err == nil {
 			// 解析 llama-bench 输出
 			lines := strings.Split(string(output), "\n")
 			inDeviceList := false
+			foundDevices := false
 			for _, line := range lines {
 				line = strings.TrimSpace(line)
 				if line == "" {
@@ -679,27 +714,38 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 				if inDeviceList {
 					// 解析设备行，例如: "ROCm0: AMD Radeon Graphics (122880 MiB, 115050 MiB free)"
 					deviceStrings = append(deviceStrings, line)
+					foundDevices = true
 
 					// 同时提取详细信息
 					parts := strings.SplitN(line, ":", 2)
 					if len(parts) == 2 {
 						deviceID := strings.TrimSpace(parts[0])
-						description := strings.TrimSpace(parts[1])
+						rest := strings.TrimSpace(parts[1])
 
-						// 提取内存信息
+						// 提取 GPU 名称（去掉括号中的内存信息）
+						gpuName := rest
 						var totalMemory, freeMemory string
-						// 使用正则表达式提取内存信息
-						memRe := regexp.MustCompile(`\((\d+) MiB(?:, (\d+) MiB free)?\)`)
-						if memMatches := memRe.FindStringSubmatch(description); len(memMatches) > 0 {
-							totalMemory = memMatches[1] + " MiB"
-							if len(memMatches) > 2 && memMatches[2] != "" {
-								freeMemory = memMatches[2] + " MiB"
+
+						// 使用正则表达式提取内存信息和分离名称
+						memRe := regexp.MustCompile(`^(.+?)\s*\((\d+)\s+MiB(?:,\s*(\d+)\s+MiB\s+free)?\)`)
+						if memMatches := memRe.FindStringSubmatch(rest); len(memMatches) > 0 {
+							gpuName = strings.TrimSpace(memMatches[1])
+							if totalMiB, err := strconv.ParseInt(memMatches[2], 10, 64); err == nil {
+								// 转换为 GB（保留两位小数）
+								totalGB := float64(totalMiB) / 1024
+								totalMemory = fmt.Sprintf("%.2f GB", totalGB)
+							}
+							if len(memMatches) > 3 && memMatches[3] != "" {
+								if freeMiB, err := strconv.ParseInt(memMatches[3], 10, 64); err == nil {
+									freeGB := float64(freeMiB) / 1024
+									freeMemory = fmt.Sprintf("%.2f GB", freeGB)
+								}
 							}
 						}
 
 						gpus = append(gpus, gin.H{
 							"id":          deviceID,
-							"name":        description,
+							"name":        gpuName,
 							"totalMemory": totalMemory,
 							"freeMemory":  freeMemory,
 							"available":   true,
@@ -707,89 +753,116 @@ func (s *Server) handleGetGPUs(c *gin.Context) {
 					}
 				}
 			}
+			// 如果成功找到设备，停止尝试其他路径
+			if foundDevices {
+				break
+			}
 		}
 	}
 
-	// 如果 llama-bench 失败，尝试使用 rocm-smi 作为后备方案
+	// 如果 llama-bench 失败，尝试使用 rocminfo 获取 GPU 信息
+	// rocminfo 对于 APU 能提供更准确的内存池大小（共享系统内存）
 	if len(deviceStrings) == 0 {
-		cmd := exec.Command("rocm-smi", "--showmeminfo", "vram")
+		cmd := exec.Command("rocminfo")
 		output, err := cmd.Output()
 		if err == nil {
-			// 解析 rocm-smi 文本输出
-			// 输出格式:
-			// ============================= ROCm System Management Interface ============================
-			// ==================================== Memory Info ===================================
-			// GPU[0]  : VRAM Total                   : 122880 MiB
-			// GPU[0]  : VRAM Total Free              : 113684 MiB
 			lines := strings.Split(string(output), "\n")
-			gpuIndex := -1
-			var totalMemory, freeMemory string
+			type GPUMemoryInfo struct {
+				deviceIndex   int
+				name          string
+				marketingName string
+				totalKB       int64 // 总内存（KB）
+			}
+			gpuMemories := []GPUMemoryInfo{}
+
+			currentAgentType := ""
+			var currentGPU GPUMemoryInfo
+			inPoolInfo := false
+			poolIndex := 0
 
 			for _, line := range lines {
 				line = strings.TrimSpace(line)
-				// 检测新的 GPU
-				if strings.HasPrefix(line, "GPU[") {
-					// 保存前一个 GPU 的信息（如果有）
-					if gpuIndex >= 0 {
-						deviceID := fmt.Sprintf("ROCm%d", gpuIndex)
-						deviceString := fmt.Sprintf("%s: AMD Radeon Graphics", deviceID)
-						if totalMemory != "" {
-							deviceString += fmt.Sprintf(" (%s", totalMemory)
-							if freeMemory != "" {
-								deviceString += fmt.Sprintf(", %s free", freeMemory)
-							}
-							deviceString += ")"
-						}
-						deviceStrings = append(deviceStrings, deviceString)
 
-						gpus = append(gpus, gin.H{
-							"id":          deviceID,
-							"name":        "AMD Radeon Graphics",
-							"totalMemory": totalMemory,
-							"freeMemory":  freeMemory,
-							"available":   true,
-						})
+				// 检测新的 Agent
+				if regexp.MustCompile(`^Agent\s+\d+\s*$`).MatchString(line) {
+					// 保存前一个 GPU 的信息（如果是 GPU）
+					if currentAgentType == "GPU" && currentGPU.totalKB > 0 {
+						gpuMemories = append(gpuMemories, currentGPU)
 					}
-					// 提取 GPU 索引
-					if matches := regexp.MustCompile(`GPU\[(\d+)\]`).FindStringSubmatch(line); len(matches) > 1 {
+					// 重置状态
+					currentAgentType = ""
+					currentGPU = GPUMemoryInfo{}
+					inPoolInfo = false
+					poolIndex = 0
+				}
+
+				// 检测 Device Type（在 Marketing Name 之后，但需要先收集信息）
+				if regexp.MustCompile(`^\s*Device Type:\s+GPU`).MatchString(line) {
+					currentAgentType = "GPU"
+				}
+
+				// 解析 Agent 基本信息
+				if matches := regexp.MustCompile(`^\s*Name:\s+(\S+)`).FindStringSubmatch(line); len(matches) > 1 {
+					currentGPU.name = matches[1]
+				}
+				// Marketing Name
+				if strings.Contains(line, "Marketing Name:") {
+					marketingName := strings.ReplaceAll(line, "Marketing Name:", "")
+					currentGPU.marketingName = strings.TrimSpace(marketingName)
+				}
+
+				// 检测 Pool Info 开始
+				if regexp.MustCompile(`^\s*Pool Info:\s*$`).MatchString(line) {
+					inPoolInfo = true
+					poolIndex = 0
+				}
+
+				// 检测 Pool 开始
+				if inPoolInfo && regexp.MustCompile(`^\s*Pool\s+(\d+)\s*$`).MatchString(line) {
+					if matches := regexp.MustCompile(`Pool\s+(\d+)`).FindStringSubmatch(line); len(matches) > 1 {
 						if idx, err := strconv.Atoi(matches[1]); err == nil {
-							gpuIndex = idx
-							totalMemory = ""
-							freeMemory = ""
+							poolIndex = idx
 						}
 					}
-				} else if gpuIndex >= 0 {
-					// 解析 VRAM 信息
-					if strings.Contains(line, "VRAM Total") && !strings.Contains(line, "Free") {
-						if matches := regexp.MustCompile(`(\d+)\s*MiB`).FindStringSubmatch(line); len(matches) > 1 {
-							totalMemory = matches[1] + " MiB"
-						}
-					} else if strings.Contains(line, "VRAM Total Free") {
-						if matches := regexp.MustCompile(`(\d+)\s*MiB`).FindStringSubmatch(line); len(matches) > 1 {
-							freeMemory = matches[1] + " MiB"
+				}
+
+				// 解析 Pool Size（只在 Pool 1 解析）
+				if inPoolInfo && poolIndex == 1 {
+					if matches := regexp.MustCompile(`^\s*Size:\s+(\d+)\s*\(0x[0-9a-fA-F]+\)\s*KB`).FindStringSubmatch(line); len(matches) > 1 {
+						if kb, err := strconv.ParseInt(matches[1], 10, 64); err == nil {
+							currentGPU.totalKB = kb
 						}
 					}
 				}
 			}
 
 			// 保存最后一个 GPU 的信息
-			if gpuIndex >= 0 {
-				deviceID := fmt.Sprintf("ROCm%d", gpuIndex)
-				deviceString := fmt.Sprintf("%s: AMD Radeon Graphics", deviceID)
-				if totalMemory != "" {
-					deviceString += fmt.Sprintf(" (%s", totalMemory)
-					if freeMemory != "" {
-						deviceString += fmt.Sprintf(", %s free", freeMemory)
-					}
-					deviceString += ")"
+			if currentAgentType == "GPU" && currentGPU.totalKB > 0 {
+				gpuMemories = append(gpuMemories, currentGPU)
+			}
+
+			// 生成 GPU 列表
+			for i, gpuInfo := range gpuMemories {
+				// 转换为 GB（保留两位小数）
+				totalGB := float64(gpuInfo.totalKB) / 1024 / 1024
+				totalMemory := fmt.Sprintf("%.2f GB", totalGB)
+
+				deviceID := fmt.Sprintf("ROCm%d", i)
+				gpuName := gpuInfo.marketingName
+				if gpuName == "" {
+					gpuName = "AMD GPU"
 				}
+
+				deviceString := fmt.Sprintf("%s: %s", deviceID, gpuName)
+				deviceString += fmt.Sprintf(" (%s)", totalMemory)
+
 				deviceStrings = append(deviceStrings, deviceString)
 
 				gpus = append(gpus, gin.H{
 					"id":          deviceID,
-					"name":        "AMD Radeon Graphics",
+					"name":        gpuName,
 					"totalMemory": totalMemory,
-					"freeMemory":  freeMemory,
+					"freeMemory":  totalMemory,
 					"available":   true,
 				})
 			}
@@ -1896,11 +1969,43 @@ func (s *Server) handleLogStream(c *gin.Context) {
 
 	// Send existing entries if requested
 	if fromBeginning {
-		entries := logStream.GetEntries(limit)
-		if len(entries) > 0 {
+		// Try to read from log file first
+		logEntries := []logger.StreamLogEntry{}
+
+		// Get log file path from configuration
+		if s.config != nil && s.config.ServerCfg != nil {
+			logDir := s.config.ServerCfg.Log.Directory
+			mode := s.config.Mode
+
+			// Get latest log file path
+			logPath, err := logger.GetLatestLogFile(logDir, mode)
+			if err == nil {
+				// Read log file with empty filter to get all entries
+				parsedEntries, err := logger.ReadLogFile(logPath, logger.LogFileFilter{})
+				if err == nil && len(parsedEntries) > 0 {
+					// Convert ParsedLogEntry to StreamLogEntry
+					for _, entry := range parsedEntries {
+						logEntries = append(logEntries, logger.StreamLogEntry{
+							Timestamp: entry.Timestamp,
+							Level:     entry.Level,
+							Message:   entry.Message,
+							Fields:    entry.Fields,
+						})
+					}
+				}
+			}
+		}
+
+		// If no file entries, use memory cache as fallback
+		if len(logEntries) == 0 {
+			logEntries = logStream.GetEntries(limit)
+		}
+
+		// Send historical logs
+		if len(logEntries) > 0 {
 			// Batch send historical logs to reduce network I/O
 			var buf strings.Builder
-			for _, entry := range entries {
+			for _, entry := range logEntries {
 				data := fmt.Sprintf("data: {\"timestamp\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n\n",
 					entry.Timestamp.Format(time.RFC3339),
 					entry.Level,
@@ -1959,6 +2064,253 @@ func (s *Server) handleLogEntries(c *gin.Context) {
 		"entries": entries,
 		"count":   len(entries),
 	})
+}
+
+// handleLogFiles lists all available log files
+func (s *Server) handleLogFiles(c *gin.Context) {
+	cfg := s.config.ConfigMgr.Get()
+	logDir := cfg.Log.Directory
+	serverMode := s.config.Mode
+
+	files, err := logger.ListLogFiles(logDir, serverMode)
+	if err != nil {
+		api.ErrorWithDetails(c, types.ErrInternalError, "获取日志文件列表失败", err.Error())
+		return
+	}
+
+	api.Success(c, gin.H{
+		"files": files,
+		"count": len(files),
+	})
+}
+
+// handleLogFileContent returns the content of a specific log file
+func (s *Server) handleLogFileContent(c *gin.Context) {
+	filename := c.Param("filename")
+
+	// Security: ensure filename is safe
+	if !isSafeFilename(filename) {
+		api.BadRequest(c, "无效的文件名")
+		return
+	}
+
+	cfg := s.config.ConfigMgr.Get()
+	logDir := cfg.Log.Directory
+	logPath := filepath.Join(logDir, filename)
+
+	// Parse filters
+	filter := logger.LogFileFilter{
+		Level:  c.Query("level"),
+		Search: c.Query("search"),
+	}
+
+	if offset := c.Query("offset"); offset != "" {
+		fmt.Sscanf(offset, "%d", &filter.Offset)
+	}
+	if limit := c.Query("limit"); limit != "" {
+		fmt.Sscanf(limit, "%d", &filter.Limit)
+	}
+
+	// Read log file
+	entries, err := logger.ReadLogFile(logPath, filter)
+	if err != nil {
+		api.ErrorWithDetails(c, types.ErrInternalError, "读取日志文件失败", err.Error())
+		return
+	}
+
+	api.Success(c, gin.H{
+		"entries": entries,
+		"count":   len(entries),
+	})
+}
+
+// handleLogFileStats returns statistics about a log file
+func (s *Server) handleLogFileStats(c *gin.Context) {
+	filename := c.Param("filename")
+
+	// Security: ensure filename is safe
+	if !isSafeFilename(filename) {
+		api.BadRequest(c, "无效的文件名")
+		return
+	}
+
+	cfg := s.config.ConfigMgr.Get()
+	logDir := cfg.Log.Directory
+	logPath := filepath.Join(logDir, filename)
+
+	stats, err := logger.GetLogFileStats(logPath)
+	if err != nil {
+		api.ErrorWithDetails(c, types.ErrInternalError, "获取日志统计失败", err.Error())
+		return
+	}
+
+	api.Success(c, stats)
+}
+
+// handleDeleteLogFile deletes a specific log file
+func (s *Server) handleDeleteLogFile(c *gin.Context) {
+	filename := c.Param("filename")
+
+	// Security: ensure filename is safe
+	if !isSafeFilename(filename) {
+		api.BadRequest(c, "无效的文件名")
+		return
+	}
+
+	// Prevent deleting the current day's log file
+	cfg := s.config.ConfigMgr.Get()
+	serverMode := s.config.Mode
+	currentDate := time.Now().Format("2006-01-02")
+	currentLogName := fmt.Sprintf("shepherd-%s-%s.log", serverMode, currentDate)
+
+	if filename == currentLogName {
+		api.Forbidden(c, "不能删除当前日志文件")
+		return
+	}
+
+	logDir := cfg.Log.Directory
+	logPath := filepath.Join(logDir, filename)
+
+	// Delete file
+	if err := os.Remove(logPath); err != nil {
+		api.ErrorWithDetails(c, types.ErrInternalError, "删除日志文件失败", err.Error())
+		return
+	}
+
+	logger.Info("日志文件已删除", "filename", filename)
+
+	api.Success(c, gin.H{
+		"message": "日志文件已删除",
+	})
+}
+
+// handleGetModelLoadConfig 获取模型加载配置
+func (s *Server) handleGetModelLoadConfig(c *gin.Context) {
+	modelID := c.Param("id")
+
+	// 获取节点ID
+	nodeID := "local"
+	if s.nodeAdapter != nil {
+		nodeID = s.nodeAdapter.GetNodeID()
+	}
+
+	// 从存储中获取配置
+	store := s.storageMgr.GetStore()
+	ctx := c.Request.Context()
+	config, err := store.GetModelLoadConfig(ctx, nodeID, modelID)
+	if err != nil {
+		if err == storage.ErrModelLoadConfigNotFound {
+			// 返回空配置，表示使用默认配置
+			api.Success(c, gin.H{
+				"exists": false,
+				"config": nil,
+			})
+			return
+		}
+		api.ErrorWithDetails(c, types.ErrInternalError, "获取模型加载配置失败", err.Error())
+		return
+	}
+
+	api.Success(c, gin.H{
+		"exists": true,
+		"config": config,
+	})
+}
+
+// handleSaveModelLoadConfig 保存模型加载配置
+func (s *Server) handleSaveModelLoadConfig(c *gin.Context) {
+	modelID := c.Param("id")
+
+	// 获取节点ID
+	nodeID := "local"
+	if s.nodeAdapter != nil {
+		nodeID = s.nodeAdapter.GetNodeID()
+	}
+
+	// 解析请求参数
+	var req struct {
+		Config map[string]interface{} `json:"config"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.ErrorWithDetails(c, types.ErrInvalidRequest, "无效的请求参数", err.Error())
+		return
+	}
+
+	// 获取模型名称（从模型管理器）
+	modelName := modelID
+	if model, ok := s.modelMgr.GetModel(modelID); ok {
+		modelName = model.Name
+	}
+
+	// 创建配置对象
+	config := &storage.ModelLoadConfig{
+		NodeID:    nodeID,
+		ModelID:   modelID,
+		ModelName: modelName,
+		Config:    req.Config,
+	}
+
+	// 保存到存储
+	store := s.storageMgr.GetStore()
+	ctx := c.Request.Context()
+	if err := store.SaveModelLoadConfig(ctx, config); err != nil {
+		api.ErrorWithDetails(c, types.ErrInternalError, "保存模型加载配置失败", err.Error())
+		return
+	}
+
+	logger.Info("模型加载配置已保存", "nodeId", nodeID, "modelId", modelID)
+
+	api.Success(c, gin.H{
+		"message": "配置已保存",
+	})
+}
+
+// handleDeleteModelLoadConfig 删除模型加载配置
+func (s *Server) handleDeleteModelLoadConfig(c *gin.Context) {
+	modelID := c.Param("id")
+
+	// 获取节点ID
+	nodeID := "local"
+	if s.nodeAdapter != nil {
+		nodeID = s.nodeAdapter.GetNodeID()
+	}
+
+	// 从存储中删除配置
+	store := s.storageMgr.GetStore()
+	ctx := c.Request.Context()
+	if err := store.DeleteModelLoadConfig(ctx, nodeID, modelID); err != nil {
+		if err == storage.ErrModelLoadConfigNotFound {
+			api.ErrorWithDetails(c, types.ErrInvalidRequest, "配置不存在", "模型加载配置不存在")
+			return
+		}
+		api.ErrorWithDetails(c, types.ErrInternalError, "删除模型加载配置失败", err.Error())
+		return
+	}
+
+	logger.Info("模型加载配置已删除", "nodeId", nodeID, "modelId", modelID)
+
+	api.Success(c, gin.H{
+		"message": "配置已删除",
+	})
+}
+
+// isSafeFilename checks if a filename is safe (prevents directory traversal)
+func isSafeFilename(filename string) bool {
+	// Check for path traversal attempts
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		return false
+	}
+
+	// Check file extension
+	if !strings.HasSuffix(filename, ".log") {
+		return false
+	}
+
+	// Check filename format (basic pattern match)
+	// Format: shepherd-{mode}-{date} {time}.log or shepherd-{mode}-{date} {time}-{timestamp}-{reason}.log
+	// Supports filenames with spaces and timestamps: shepherd-hybrid-2026-02-26 21-46-59.log
+	pattern := regexp.MustCompile(`^shepherd-[a-z]+-\d{4}-\d{2}-\d{2}(?:\s\d{2}-\d{2}-\d{2})?(?:-\d{8}-\d{6}-[a-z]+)?\.log$`)
+	return pattern.MatchString(filename)
 }
 
 func (s *Server) handleEvents(c *gin.Context) {

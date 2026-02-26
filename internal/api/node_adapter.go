@@ -51,6 +51,14 @@ func (a *NodeAdapter) GetScheduler() *scheduler.Scheduler {
 	return a.scheduler
 }
 
+// GetNodeID 返回当前节点 ID
+func (a *NodeAdapter) GetNodeID() string {
+	if a.node == nil {
+		return "local"
+	}
+	return a.node.GetID()
+}
+
 // nodeClientManager 将 node.Node 适配为 scheduler.ClientManager 接口
 type nodeClientManager struct {
 	node *node.Node
