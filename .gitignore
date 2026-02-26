@@ -96,3 +96,6 @@ config/server.config.yaml
 
 # Example AGENTS.md (may contain sensitive instructions)
 AGENTS.md
+
+# AI assistant documentation (local only)
+CLAUDE.md
