@@ -667,6 +667,14 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 		}, err
 	}
 
+	// 设置输出处理器转发日志
+	proc.SetOutputHandler(func(line string) {
+		// 过滤掉过于频繁的日志
+		if !strings.Contains(line, "update_slots") && !strings.Contains(line, "log_server_r") {
+			logger.Debug(fmt.Sprintf("[%s] %s", req.ModelID, line))
+		}
+	})
+
 	// Update status
 	m.mu.Lock()
 	status.State = StateLoaded
@@ -798,8 +806,16 @@ func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
 	loadCompleted := make(chan bool, 1)
 	loadError := make(chan error, 1)
 
-	// 设置输出处理器检测加载完成
+	// 设置输出处理器检测加载完成并转发日志
 	proc.SetOutputHandler(func(line string) {
+		// 将 llama.cpp 输出转发到日志系统
+		// 过滤掉过于频繁的日志
+		if !strings.Contains(line, "update_slots") && !strings.Contains(line, "log_server_r") {
+			// 使用 debug 级别记录 llama.cpp 输出，避免日志过多
+			logger.Debug(fmt.Sprintf("[%s] %s", req.ModelID, line))
+		}
+
+		// 检测加载完成
 		if strings.Contains(line, "all slots are idle") {
 			select {
 			case loadCompleted <- true:

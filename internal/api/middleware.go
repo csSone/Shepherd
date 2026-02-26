@@ -4,6 +4,7 @@ package api
 
 import (
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -61,7 +62,13 @@ func RecoveryMiddleware(log *logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Errorf("Panic recovered: %v", r)
+				// 获取调用栈信息
+				buf := make([]byte, 4096)
+				n := runtime.Stack(buf, false)
+				stack := string(buf[:n])
+
+				log.Errorf("Panic recovered: %v\nPath: %s\nMethod: %s\nStack:\n%s",
+					r, c.Request.URL.Path, c.Request.Method, stack)
 				ErrorWithDetails(c, types.ErrInternalError, "Internal server error", "A panic occurred")
 				c.Abort()
 			}
