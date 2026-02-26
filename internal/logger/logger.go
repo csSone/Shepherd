@@ -394,6 +394,13 @@ func (l *Logger) log(level LogLevel, msg string, fields []Field) {
 	}
 }
 
+// LogEntry represents a log entry with fields
+type LogEntry struct {
+	logger  *Logger
+	fields  []Field
+	context string
+}
+
 // WithField creates a log entry with a single field
 func (l *Logger) WithField(key string, value interface{}) *LogEntry {
 	return &LogEntry{
@@ -423,13 +430,6 @@ func (l *Logger) WithError(err error) *LogEntry {
 		fields:  []Field{{Key: "error", Value: err.Error()}},
 		context: "",
 	}
-}
-
-// LogEntry represents a log entry with fields
-type LogEntry struct {
-	logger  *Logger
-	fields  []Field
-	context string
 }
 
 // WithField adds a field to the log entry
