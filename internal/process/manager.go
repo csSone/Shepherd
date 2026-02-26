@@ -324,3 +324,251 @@ func escapeQuotes(s string) string {
 	}
 	return result.String()
 }
+
+
+// LoadRequest contains parameters for building a llama-server command
+// This is a local definition to avoid import cycle; the canonical version is in internal/model
+type LoadRequest struct {
+	ModelPath        string
+	Port             int
+	CtxSize          int
+	BatchSize        int
+	Threads          int
+	GPULayers        int
+	Temperature      float64
+	TopP             float64
+	TopK             int
+	RepeatPenalty    float64
+	Seed             int
+	NPredict         int
+	Devices          []string // GPU device selection (e.g., ["cuda:0", "cuda:1"])
+	MainGPU          int      // Main GPU index for single-GPU mode
+	CustomCmd        string   // Custom command string appended verbatim
+	ExtraParams      string   // Extra parameters appended verbatim
+	MmprojPath       string   // Path to mmproj.gguf for vision models
+	EnableVision     bool     // Enable vision/multimodal capabilities
+	FlashAttention   bool     // Enable Flash Attention (-fa)
+	NoMmap           bool     // Disable memory mapping (--no-mmap)
+	LockMemory       bool     // Lock model in RAM (--mlock)
+	NoWebUI          bool     // Disable web UI (--no-webui)
+	EnableMetrics    bool     // Enable /metrics endpoint (--metrics)
+	SlotSavePath     string   // Slot cache directory (--slot-save-path)
+	CacheRAM         int      // RAM cache limit in MB (--cache-ram, -1 = unlimited)
+	ChatTemplateFile string   // Custom chat template file (--chat-template-file)
+	Timeout          int      // Read/write timeout in seconds (--timeout)
+	Alias            string   // Model alias for REST API (--alias)
+	UBatchSize       int      // Micro-batch size (--ubatch-size)
+	ParallelSlots    int      // Number of parallel slots (--parallel)
+	KVCacheTypeK     string   // KV cache type for K (--kv-cache-type-k)
+	KVCacheTypeV     string   // KV cache type for V (--kv-cache-type-v)
+	KVCacheUnified   bool     // Use unified KV cache (--kv-unified)
+	KVCacheSize      int      // KV cache size (--kv-cache-size)
+
+	// Additional sampling parameters
+	LogitsAll       bool    // --logits-all (input vector mode)
+	Reranking       bool    // --reranking (reranking mode)
+	MinP            float64 // --min-p (Min-P sampling)
+	PresencePenalty float64 // --presence-penalty
+	FrequencyPenalty float64 // --frequency-penalty
+
+	// Template and processing
+	DirectIo     string // --dio (direct I/O mode)
+	DisableJinja bool   // --no-jinja (disable Jinja template)
+	ChatTemplate string // --chat-template (built-in chat template)
+	ContextShift bool   // --context-shift (enable context shift)
+}
+
+// BuildCommandFromRequest builds the llama-server command line from a LoadRequest struct
+// This is the new, comprehensive command builder that supports all llama.cpp flags
+func BuildCommandFromRequest(req *LoadRequest, binPath string) (string, error) {
+	// Validate required fields
+	if req == nil {
+		return "", fmt.Errorf("request cannot be nil")
+	}
+	if binPath == "" {
+		return "", fmt.Errorf("binary path cannot be empty")
+	}
+	if req.ModelPath == "" {
+		return "", fmt.Errorf("model path cannot be empty")
+	}
+	if req.Port <= 0 {
+		return "", fmt.Errorf("port must be positive")
+	}
+
+	// Find the llama-server executable
+	serverBin := filepath.Join(binPath, "llama-server")
+
+	// Build command arguments
+	args := []string{
+		serverBin,
+		"-m", req.ModelPath,
+		"--port", strconv.Itoa(req.Port),
+		"--host", "0.0.0.0",
+	}
+
+	// Context and batch size
+	if req.CtxSize > 0 {
+		args = append(args, "-c", strconv.Itoa(req.CtxSize))
+	}
+	if req.BatchSize > 0 {
+		args = append(args, "-b", strconv.Itoa(req.BatchSize))
+	}
+	if req.Threads > 0 {
+		args = append(args, "-t", strconv.Itoa(req.Threads))
+	}
+
+	// GPU configuration
+	if req.GPULayers > 0 {
+		args = append(args, "-ngl", strconv.Itoa(req.GPULayers))
+	}
+
+	// GPU device selection
+	// Single GPU: -sm none -dev cuda:0 -mg 0
+	// Multi-GPU: -dev cuda:0,cuda:1
+	if len(req.Devices) > 0 {
+		if len(req.Devices) == 1 {
+			// Single GPU mode: disable split mode
+			args = append(args, "-sm", "none")
+			args = append(args, "-dev", req.Devices[0])
+			args = append(args, "-mg", strconv.Itoa(req.MainGPU))
+		} else {
+			// Multi-GPU mode: comma-separated devices
+			args = append(args, "-dev", strings.Join(req.Devices, ","))
+		}
+	}
+
+	// Vision/Multimodal support
+	if req.MmprojPath != "" {
+		args = append(args, "--mmproj", req.MmprojPath)
+	}
+
+	// Performance feature flags
+	if req.FlashAttention {
+		args = append(args, "-fa")
+	}
+	if req.NoMmap {
+		args = append(args, "--no-mmap")
+	}
+	if req.LockMemory {
+		args = append(args, "--mlock")
+	}
+
+	// Server feature flags
+	if req.NoWebUI {
+		args = append(args, "--no-webui")
+	}
+	if req.EnableMetrics {
+		args = append(args, "--metrics")
+	}
+	if req.SlotSavePath != "" {
+		args = append(args, "--slot-save-path", req.SlotSavePath)
+	}
+	if req.CacheRAM != 0 {
+		args = append(args, "--cache-ram", strconv.Itoa(req.CacheRAM))
+	}
+
+	// Chat template
+	if req.ChatTemplateFile != "" {
+		args = append(args, "--chat-template-file", req.ChatTemplateFile)
+	}
+
+	// Batch processing
+	if req.UBatchSize > 0 {
+		args = append(args, "--ubatch-size", strconv.Itoa(req.UBatchSize))
+	}
+	if req.ParallelSlots > 0 {
+		args = append(args, "--parallel", strconv.Itoa(req.ParallelSlots))
+	}
+
+	// KV cache configuration
+	if req.KVCacheTypeK != "" {
+		args = append(args, "--kv-cache-type-k", req.KVCacheTypeK)
+	}
+	if req.KVCacheTypeV != "" {
+		args = append(args, "--kv-cache-type-v", req.KVCacheTypeV)
+	}
+	if req.KVCacheUnified {
+		args = append(args, "--kv-unified")
+	}
+	if req.KVCacheSize > 0 {
+		args = append(args, "--kv-cache-size", strconv.Itoa(req.KVCacheSize))
+	}
+
+	// Runtime configuration
+	if req.Timeout > 0 {
+		args = append(args, "--timeout", strconv.Itoa(req.Timeout))
+	}
+	if req.Alias != "" {
+		args = append(args, "--alias", req.Alias)
+	}
+
+	// Sampling parameters (for server defaults)
+	if req.Temperature != 0 {
+		args = append(args, "--temp", fmt.Sprintf("%.2f", req.Temperature))
+	}
+	if req.TopP != 0 {
+		args = append(args, "--top-p", fmt.Sprintf("%.2f", req.TopP))
+	}
+	if req.TopK > 0 {
+		args = append(args, "--top-k", strconv.Itoa(req.TopK))
+	}
+	if req.RepeatPenalty != 0 {
+		args = append(args, "--repeat-penalty", fmt.Sprintf("%.2f", req.RepeatPenalty))
+	}
+	if req.Seed != 0 {
+		args = append(args, "--seed", strconv.Itoa(req.Seed))
+	}
+	if req.NPredict > 0 {
+		args = append(args, "-n", strconv.Itoa(req.NPredict))
+	}
+
+	// Additional sampling parameters
+	// Note: --logits-all is not supported by llama-server, only by llama-cli
+	// if req.LogitsAll {
+	// 	args = append(args, "--logits-all")
+	// }
+	if req.Reranking {
+		args = append(args, "--reranking")
+	}
+	if req.MinP > 0 {
+		args = append(args, "--min-p", fmt.Sprintf("%.2f", req.MinP))
+	}
+	if req.PresencePenalty != 0 {
+		args = append(args, "--presence-penalty", fmt.Sprintf("%.2f", req.PresencePenalty))
+	}
+	if req.FrequencyPenalty != 0 {
+		args = append(args, "--frequency-penalty", fmt.Sprintf("%.2f", req.FrequencyPenalty))
+	}
+
+	// Template and processing
+	// DirectIo is a boolean flag (--dio)
+	// NOTE: --dio requires specific filesystem support and may not work in all environments
+	// Temporarily disabled for testing - uncomment if your environment supports DirectIO
+	// if req.DirectIo != "" {
+	// 	args = append(args, "--dio")
+	// }
+	if req.DisableJinja {
+		args = append(args, "--no-jinja")
+	}
+	if req.ChatTemplate != "" {
+		args = append(args, "--chat-template", req.ChatTemplate)
+	}
+	if req.ContextShift {
+		args = append(args, "--context-shift")
+	}
+
+	// Build the base command string
+	cmd := quoteAndJoin(args)
+
+	// Append custom command if provided
+	if req.CustomCmd != "" {
+		cmd += " " + strings.TrimSpace(req.CustomCmd)
+	}
+
+	// Append extra params if provided
+	if req.ExtraParams != "" {
+		cmd += " " + strings.TrimSpace(req.ExtraParams)
+	}
+
+	return cmd, nil
+}

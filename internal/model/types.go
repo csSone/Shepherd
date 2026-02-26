@@ -116,18 +116,70 @@ type ScanError struct {
 
 // LoadRequest contains parameters for loading a model
 type LoadRequest struct {
-	ModelID       string
-	NodeID        string  // 指定运行节点 ID，为空表示自动调度
-	CtxSize       int
-	BatchSize     int
-	Threads       int
-	GPULayers     int
-	Temperature   float64
-	TopP          float64
-	TopK          int
-	RepeatPenalty float64
-	Seed          int
-	NPredict      int
+	ModelID       string `json:"modelId"`
+	NodeID        string `json:"nodeId"` // 指定运行节点 ID，为空表示自动调度
+	CtxSize       int    `json:"ctxSize"`
+	BatchSize     int    `json:"batchSize"`
+	Threads       int    `json:"threads"`
+	GPULayers     int    `json:"gpuLayers"`
+	Temperature   float64 `json:"temperature"`
+	TopP          float64 `json:"topP"`
+	TopK          int    `json:"topK"`
+	RepeatPenalty float64 `json:"repeatPenalty"`
+	Seed          int    `json:"seed"`
+	NPredict      int    `json:"nPredict"`
+	// GPU device selection
+	Devices []string `json:"devices"` // -dev flags (e.g., ["cuda:0", "cuda:1"])
+	MainGPU int      `json:"mainGpu"` // -mg flag (main GPU index)
+
+	// Custom command configuration
+	CustomCmd   string `json:"llamaCppPath"` // Custom llama.cpp binary path override (frontend uses llamaCppPath)
+	ExtraParams string `json:"extraArgs"`    // Extra CLI arguments appended to command (frontend uses extraArgs)
+
+	// Vision/Multimodal support
+	MmprojPath   string `json:"mmprojPath"`   // Path to mmproj.gguf for vision models
+	EnableVision bool   `json:"enableVision"` // Enable vision/multimodal capabilities
+
+	// Performance feature flags
+	FlashAttention bool `json:"flashAttention"` // -fa flag
+	NoMmap         bool `json:"noMmap"`         // --no-mmap flag
+	LockMemory     bool `json:"lockMemory"`     // --mlock flag
+
+	// Server feature flags
+	NoWebUI       bool   `json:"noWebUI"`       // --no-webui flag
+	EnableMetrics bool   `json:"enableMetrics"` // --metrics flag
+	SlotSavePath  string `json:"slotSavePath"`  // --slot-save-path
+	CacheRAM      int    `json:"cacheRam"`      // --cache-ram size in MB
+
+	// Chat template configuration
+	ChatTemplateFile string `json:"chatTemplateFile"` // --chat-template-file path
+
+	// Runtime configuration
+	Timeout int    `json:"timeout"` // --timeout in seconds
+	Alias   string `json:"alias"`   // --alias for model identification
+
+	// Batch processing
+	UBatchSize   int `json:"uBatchSize"`   // --ubatch-size
+	ParallelSlots int `json:"parallelSlots"` // --parallel
+
+	// KV cache configuration
+	KVCacheTypeK   string `json:"kvCacheTypeK"`   // --kv-cache-type-k
+	KVCacheTypeV   string `json:"kvCacheTypeV"`   // --kv-cache-type-v
+	KVCacheUnified bool   `json:"kvCacheUnified"` // --kv-unified
+	KVCacheSize    int    `json:"kvCacheSize"`    // --kv-cache-size
+
+	// Additional sampling parameters
+	LogitsAll       bool    `json:"logitsAll"`       // --logits-all
+	Reranking       bool    `json:"reranking"`       // --reranking
+	MinP            float64 `json:"minP"`            // --min-p
+	PresencePenalty float64 `json:"presencePenalty"` // --presence-penalty
+	FrequencyPenalty float64 `json:"frequencyPenalty"` // --frequency-penalty
+
+	// Template and processing
+	DirectIo      string `json:"directIo"`      // --dio
+	DisableJinja  bool   `json:"disableJinja"`  // --jinja (false to disable)
+	ChatTemplate  string `json:"chatTemplate"`  // --chat-template
+	ContextShift  bool   `json:"contextShift"`  // --context-shift
 }
 
 // LoadResult represents the result of a load operation

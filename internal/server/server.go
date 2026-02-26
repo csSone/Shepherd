@@ -282,6 +282,7 @@ func (s *Server) setupRoutes() {
 		models := api.Group("/models")
 		{
 			models.GET("", s.handleListModels)
+			models.GET("/loaded", s.handleListLoadedModels)
 
 			// 模型能力管理（必须在 :id 路由之前）
 			models.GET("/capabilities/get", s.handleGetModelCapabilities)
@@ -1140,6 +1141,64 @@ func (s *Server) handleListModels(c *gin.Context) {
 	}
 
 	api.Success(c, gin.H{"models": dtos, "total": len(dtos)})
+}
+
+// handleListLoadedModels 返回已加载的模型列表
+func (s *Server) handleListLoadedModels(c *gin.Context) {
+	models := s.modelMgr.ListModels()
+	statuses := s.modelMgr.ListStatus()
+
+	var loadedModels []ModelDTO
+	for _, m := range models {
+		// 只返回已加载的模型
+		if status, ok := statuses[m.ID]; ok && status.State == model.StateLoaded {
+			dto := ModelDTO{
+				ID:          m.ID,
+				Name:        m.Name,
+				DisplayName: m.DisplayName,
+				Alias:       m.Alias,
+				Path:        m.Path,
+				PathPrefix:  m.PathPrefix,
+				Size:        m.Size,
+				Favourite:   m.Favourite,
+				Status:      "loaded",
+				IsLoaded:    true,
+			}
+
+			// 添加分卷信息
+			if m.ShardCount > 0 {
+				dto.ShardCount = m.ShardCount
+				dto.TotalSize = m.TotalSize
+				dto.ShardFiles = m.ShardFiles
+			}
+
+			// 添加 mmproj 路径
+			if m.MmprojPath != "" {
+				dto.MmprojPath = m.MmprojPath
+			}
+
+			// 添加扫描时间
+			if !m.ScannedAt.IsZero() {
+				dto.ScannedAt = m.ScannedAt.Format(time.RFC3339)
+			}
+
+			// 添加元数据
+			if m.Metadata != nil {
+				metadata := map[string]interface{}{
+					"name":            m.Metadata.Name,
+					"architecture":    m.Metadata.Architecture,
+					"quantization":    m.Metadata.Quantization,
+					"contextLength":   m.Metadata.ContextLength,
+					"embeddingLength": m.Metadata.EmbeddingLength,
+				}
+				dto.Metadata = metadata
+			}
+
+			loadedModels = append(loadedModels, dto)
+		}
+	}
+
+	api.Success(c, gin.H{"success": true, "models": loadedModels, "total": len(loadedModels)})
 }
 
 func (s *Server) handleGetModel(c *gin.Context) {

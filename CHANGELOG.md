@@ -5,6 +5,46 @@ All notable changes to Shepherd will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.1] - 2026-02-26
+
+### Added
+- **扩展模型加载参数**: 新增 11 个 llama.cpp 服务器参数支持
+  - **采样参数**: `reranking`, `minP`, `presencePenalty`, `frequencyPenalty`
+  - **模板和处理**: `disableJinja` (--no-jinja), `chatTemplate` (--chat-template), `contextShift` (--context-shift)
+  - **KV 缓存配置**: `kvCacheTypeK` (--kv-cache-type-k), `kvCacheTypeV` (--kv-cache-type-v), `kvCacheUnified` (--kv-unified), `kvCacheSize` (--kv-cache-size)
+  - 前端 LoadModelDialog 完整支持所有新参数配置
+  - 后端 BuildCommandFromRequest 支持所有新参数
+- **日志系统增强**:
+  - 所有日志自动包含调用位置（文件名:行号）
+  - 日志格式调整: `[时间] [文件:行号] 级别 消息` (文本格式) / `{"time":"...","caller":"...","level":"...","msg":"..."}` (JSON 格式)
+  - 模型加载/卸载过程添加详细日志记录
+- **开发体验改进**:
+  - 更新 .gitignore，排除 AI 编辑器配置文件（.claude/, .sisyphus, .cursor/ 等）
+  - CLAUDE.md 文档添加到版本控制
+
+### Fixed
+- **参数兼容性**: 禁用 llama-server 不支持的参数
+  - `--logits-all` 仅适用于 llama-cli，不适用于 llama-server
+  - `--dio` 需要特定文件系统支持，默认禁用
+- **类型同步**: 更新 `toProcessLoadRequest` 转换函数，确保所有新字段正确传递
+- **测试更新**: 更新测试用例以反映禁用的参数
+
+### Technical Details
+- **支持的参数映射**:
+  - `reranking: boolean` → `--reranking`
+  - `minP: float64` → `--min-p <value>`
+  - `presencePenalty: float64` → `--presence-penalty <value>`
+  - `frequencyPenalty: float64` → `--frequency-penalty <value>`
+  - `disableJinja: boolean` → `--no-jinja`
+  - `chatTemplate: string` → `--chat-template <value>`
+  - `contextShift: boolean` → `--context-shift`
+  - `kvCacheTypeK: string` → `--kv-cache-type-k <value>`
+  - `kvCacheTypeV: string` → `--kv-cache-type-v <value>`
+  - `kvCacheUnified: boolean` → `--kv-unified`
+  - `kvCacheSize: int` → `--kv-cache-size <value>`
+
+---
+
 ## [v0.3.0] - 2026-02-22
 
 ### Added

@@ -15,6 +15,7 @@ import (
 
 	"github.com/shepherd-project/shepherd/Shepherd/internal/config"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/gguf"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/logger"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/process"
 )
 
@@ -61,14 +62,14 @@ func NewManager(cfg *config.Config, cfgMgr *config.Manager, procMgr *process.Man
 	// Log initialization info
 	paths := m.getScanPaths()
 	if len(paths) == 0 {
-		fmt.Printf("[WARN] ModelManager: 未配置模型扫描路径\n")
+		logger.Warn("ModelManager: 未配置模型扫描路径")
 	} else {
-		fmt.Printf("[INFO] ModelManager: 初始化完成，配置路径: %v\n", paths)
+		logger.Info("ModelManager: 初始化完成", "paths", paths)
 	}
 
 	// Load saved models
 	m.loadModels()
-	fmt.Printf("[INFO] ModelManager: 从配置加载了 %d 个模型\n", len(m.models))
+	logger.Info("ModelManager: 从配置加载模型完成", "modelCount", len(m.models))
 
 	return m
 }
@@ -98,14 +99,13 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	}
 
 	scanPaths := m.getScanPaths()
-	fmt.Printf("[INFO] ModelManager: 开始扫描 %d 个路径\n", len(scanPaths))
+	logger.Info("开始扫描模型", "pathCount", len(scanPaths))
 
 	// Scan each configured path
 	for _, scanPath := range scanPaths {
-		fmt.Printf("[INFO] ModelManager: 正在扫描路径: %s\n", scanPath)
+		logger.Info("正在扫描路径", "path", scanPath)
 		pathModels, pathErrors := m.scanPath(ctx, scanPath)
-		fmt.Printf("[INFO] ModelManager: 路径 %s 扫描完成: 找到 %d 个模型, %d 个错误\n",
-			scanPath, len(pathModels), len(pathErrors))
+		logger.Info("路径扫描完成", "path", scanPath, "modelCount", len(pathModels), "errorCount", len(pathErrors))
 		result.Models = append(result.Models, pathModels...)
 		result.Errors = append(result.Errors, pathErrors...)
 		result.TotalFiles += len(pathModels) + len(pathErrors)
@@ -113,8 +113,7 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	}
 
 	result.Duration = time.Since(result.ScannedAt)
-	fmt.Printf("[INFO] ModelManager: 扫描完成，总共找到 %d 个模型，耗时 %v\n",
-		len(result.Models), result.Duration)
+	logger.Info("模型扫描完成", "totalModels", len(result.Models), "duration", result.Duration.String(), "totalErrors", len(result.Errors))
 
 	// Update models map（先清空，再添加）
 	m.mu.Lock()
@@ -126,16 +125,16 @@ func (m *Manager) Scan(ctx context.Context) (*ScanResult, error) {
 	// ========== 新增：合并分卷文件 ==========
 	mergedCount := m.mergeSplitModels()
 	if mergedCount > 0 {
-		fmt.Printf("[INFO] ModelManager: 已合并 %d 组分卷文件\n", mergedCount)
+		logger.Info("已合并分卷文件", "mergedCount", mergedCount)
 	}
 
 	modelCount := len(m.models)
 	m.mu.Unlock()
-	fmt.Printf("[INFO] ModelManager: 模型缓存已更新，当前共 %d 个模型\n", modelCount)
+	logger.Info("模型缓存已更新", "modelCount", modelCount)
 
 	// Save to config
 	m.saveModels()
-	fmt.Printf("[INFO] ModelManager: 已保存 %d 个模型到配置\n", len(m.models))
+	logger.Info("已保存模型到配置", "savedCount", len(m.models))
 
 	// 更新 result.Models 为合并后的模型列表
 	// 这样 Scan API 返回的是合并后的结果
@@ -166,16 +165,15 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 	// Check if path exists
 	info, err := os.Stat(scanPath)
 	if err != nil {
-		fmt.Printf("[ERROR] ModelManager: 路径访问失败: %s - %v\n", scanPath, err)
+		logger.Error("路径访问失败", "path", scanPath, "error", err)
 		return nil, []ScanError{{Path: scanPath, Error: fmt.Sprintf("路径访问失败: %v", err)}}
 	}
 
-	fmt.Printf("[DEBUG] ModelManager: 开始扫描路径: %s (类型: %s)\n", scanPath, func() string {
-		if info.IsDir() {
-			return "目录"
-		}
-		return "文件"
-	}())
+	pathType := "文件"
+	if info.IsDir() {
+		pathType = "目录"
+	}
+	logger.Debug("开始扫描路径", "path", scanPath, "type", pathType)
 
 	// Check if path is readable
 	if info.IsDir() {
@@ -218,7 +216,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 			// 检查是否为模型文件
 			if m.isModelFile(path) {
 				matchedCount++
-				fmt.Printf("[INFO] ModelManager: 找到模型文件: %s\n", path)
+				logger.Debug("找到模型文件", "path", path)
 
 				wg.Add(1)
 				semaphore <- struct{}{}
@@ -229,7 +227,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 
 					model, err := m.loadModelWithValidation(filePath)
 					if err != nil {
-						fmt.Printf("[WARN] ModelManager: 加载模型失败: %s - %v\n", filePath, err)
+						logger.Warn("加载模型失败", "path", filePath, "error", err)
 						mu.Lock()
 						errors = append(errors, ScanError{
 							Path:  filePath,
@@ -237,7 +235,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 						})
 						mu.Unlock()
 					} else {
-						fmt.Printf("[INFO] ModelManager: 成功加载模型: %s (ID: %s)\n", model.Name, model.ID)
+						logger.Info("成功加载模型", "name", model.Name, "id", model.ID, "path", filePath)
 						mu.Lock()
 						models = append(models, model)
 						mu.Unlock()
@@ -250,8 +248,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 
 		wg.Wait()
 
-		fmt.Printf("[DEBUG] ModelManager: 路径 %s 扫描完成: 共检查 %d 个文件，匹配 %d 个模型文件\n",
-			scanPath, fileCount, matchedCount)
+		logger.Debug("路径扫描完成", "path", scanPath, "fileCount", fileCount, "matchedCount", matchedCount)
 
 		if err != nil && err != ctx.Err() {
 			errors = append(errors, ScanError{
@@ -260,7 +257,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 			})
 		}
 	} else if m.isModelFile(scanPath) {
-		fmt.Printf("[INFO] ModelManager: 单文件模型: %s\n", scanPath)
+		logger.Info("单文件模型", "path", scanPath)
 		model, err := m.loadModelWithValidation(scanPath)
 		if err != nil {
 			errors = append(errors, ScanError{
@@ -271,7 +268,7 @@ func (m *Manager) scanPath(ctx context.Context, scanPath string) ([]*Model, []Sc
 			models = append(models, model)
 		}
 	} else {
-		fmt.Printf("[WARN] ModelManager: 路径不是模型文件: %s\n", scanPath)
+		logger.Warn("路径不是模型文件", "path", scanPath)
 	}
 
 	return models, errors
@@ -314,7 +311,7 @@ func (m *Manager) isModelFile(path string) bool {
 		if strings.HasSuffix(base, ".safetensors") ||
 			strings.HasSuffix(base, ".bin") ||
 			strings.HasSuffix(base, ".safetensors") {
-			fmt.Printf("[DEBUG] 找到 HuggingFace 格式模型: %s\n", path)
+			logger.Debug("找到 HuggingFace 格式模型", "path", path)
 			return true
 		}
 	}
@@ -591,13 +588,17 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 	// Get model
 	model, exists := m.GetModel(req.ModelID)
 	if !exists {
+		logger.Warn("模型加载失败: 模型不存在", "modelId", req.ModelID)
 		return nil, fmt.Errorf("model not found: %s", req.ModelID)
 	}
+
+	logger.Info("开始加载模型", "modelId", req.ModelID, "modelName", model.Name, "ctxSize", req.CtxSize, "gpuLayers", req.GPULayers)
 
 	// Check if already loading
 	m.mu.Lock()
 	if status, exists := m.statuses[req.ModelID]; exists && status.State == StateLoading {
 		m.mu.Unlock()
+		logger.Warn("模型加载失败: 模型正在加载中", "modelId", req.ModelID)
 		return nil, fmt.Errorf("model already loading: %s", req.ModelID)
 	}
 
@@ -619,6 +620,7 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 		status.State = StateError
 		status.Error = fmt.Errorf("llama.cpp binary not found")
 		m.mu.Unlock()
+		logger.Error("模型加载失败: llama.cpp 二进制文件未找到", "modelId", req.ModelID)
 		return &LoadResult{
 			Success: false,
 			ModelID: req.ModelID,
@@ -626,30 +628,18 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 		}, status.Error
 	}
 
-	// Build command
-	opts := map[string]interface{}{
-		"ctx_size":       req.CtxSize,
-		"batch_size":     req.BatchSize,
-		"threads":        req.Threads,
-		"gpu_layers":     req.GPULayers,
-		"temperature":    req.Temperature,
-		"top_p":          req.TopP,
-		"top_k":          req.TopK,
-		"repeat_penalty": req.RepeatPenalty,
-		"n_predict":      req.NPredict,
-	}
-
+	// Build command using BuildCommandFromRequest
 	// Find available port
 	port := m.findAvailablePort()
-
-	// 使用主分卷文件路径（第一卷）
 	modelPath := model.Path
 	if len(model.ShardFiles) > 0 {
 		modelPath = model.ShardFiles[0]
 		fmt.Printf("[INFO] 使用分卷模型主文件: %s (共 %d 个分卷)\n", modelPath, len(model.ShardFiles))
 	}
 
-	cmd, err := process.BuildCommand(binPath, modelPath, port, opts)
+	// Convert to process.LoadRequest and build command
+	procReq := toProcessLoadRequest(req, modelPath, port)
+	cmd, err := process.BuildCommandFromRequest(procReq, binPath)
 	if err != nil {
 		m.mu.Lock()
 		status.State = StateError
@@ -669,6 +659,7 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 		status.State = StateError
 		status.Error = err
 		m.mu.Unlock()
+		logger.Error("模型加载失败: 启动进程失败", "modelId", req.ModelID, "error", err)
 		return &LoadResult{
 			Success: false,
 			ModelID: req.ModelID,
@@ -685,6 +676,8 @@ func (m *Manager) Load(req *LoadRequest) (*LoadResult, error) {
 	m.mu.Unlock()
 
 	duration := time.Since(startTime)
+
+	logger.Info("模型加载成功", "modelId", req.ModelID, "port", port, "duration", duration.String(), "pid", proc.GetPID())
 
 	return &LoadResult{
 		Success:  true,
@@ -753,6 +746,8 @@ func (m *Manager) LoadAsync(req *LoadRequest) (*LoadResult, error) {
 func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
 	startTime := time.Now()
 
+	logger.Info("开始异步加载模型", "modelId", req.ModelID)
+
 	// Find llama.cpp binary
 	binPath := m.findLlamaCppBinary()
 	if binPath == "" {
@@ -760,43 +755,29 @@ func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
 		status.State = StateError
 		status.Error = fmt.Errorf("llama.cpp binary not found")
 		m.mu.Unlock()
-		fmt.Printf("[ERROR] ModelManager: %s - llama.cpp binary not found\n", req.ModelID)
+		logger.Error("异步模型加载失败: llama.cpp 二进制文件未找到", "modelId", req.ModelID)
 		return
 	}
 
-	// Build command
-	opts := map[string]interface{}{
-		"ctx_size":       req.CtxSize,
-		"batch_size":     req.BatchSize,
-		"threads":        req.Threads,
-		"gpu_layers":     req.GPULayers,
-		"temperature":    req.Temperature,
-		"top_p":          req.TopP,
-		"top_k":          req.TopK,
-		"repeat_penalty": req.RepeatPenalty,
-		"n_predict":      req.NPredict,
-	}
-
+	// Build command using BuildCommandFromRequest
 	// Find available port
 	port := m.findAvailablePort()
-
-	// Get model
 	model, _ := m.GetModel(req.ModelID)
-
-	// 使用主分卷文件路径（第一卷）
 	modelPath := model.Path
 	if len(model.ShardFiles) > 0 {
 		modelPath = model.ShardFiles[0]
-		fmt.Printf("[INFO] ModelManager: 使用分卷模型主文件: %s (共 %d 个分卷)\n", modelPath, len(model.ShardFiles))
+		logger.Info("使用分卷模型主文件", "modelId", req.ModelID, "mainFile", modelPath, "shardCount", len(model.ShardFiles))
 	}
 
-	cmd, err := process.BuildCommand(binPath, modelPath, port, opts)
+	// Convert to process.LoadRequest and build command
+	procReq := toProcessLoadRequest(req, modelPath, port)
+	cmd, err := process.BuildCommandFromRequest(procReq, binPath)
 	if err != nil {
 		m.mu.Lock()
 		status.State = StateError
 		status.Error = err
 		m.mu.Unlock()
-		fmt.Printf("[ERROR] ModelManager: %s - 构建命令失败: %v\n", req.ModelID, err)
+		logger.Error("异步模型加载失败: 构建命令失败", "modelId", req.ModelID, "error", err)
 		return
 	}
 
@@ -807,11 +788,11 @@ func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
 		status.State = StateError
 		status.Error = err
 		m.mu.Unlock()
-		fmt.Printf("[ERROR] ModelManager: %s - 启动进程失败: %v\n", req.ModelID, err)
+		logger.Error("异步模型加载失败: 启动进程失败", "modelId", req.ModelID, "error", err)
 		return
 	}
 
-	fmt.Printf("[INFO] ModelManager: %s - 进程已启动 (PID: %d, Port: %d)\n", req.ModelID, proc.GetPID(), port)
+	logger.Info("异步模型加载: 进程已启动", "modelId", req.ModelID, "pid", proc.GetPID(), "port", port)
 
 	// 等待加载完成（监控进程输出）
 	loadCompleted := make(chan bool, 1)
@@ -837,14 +818,14 @@ func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
 		status.LoadedAt = time.Now()
 		m.mu.Unlock()
 		duration := time.Since(startTime)
-		fmt.Printf("[INFO] ModelManager: %s - 加载完成 (用时: %.2f秒)\n", req.ModelID, duration.Seconds())
+		logger.Info("异步模型加载成功", "modelId", req.ModelID, "port", port, "duration", duration.String())
 
 	case err := <-loadError:
 		m.mu.Lock()
 		status.State = StateError
 		status.Error = err
 		m.mu.Unlock()
-		fmt.Printf("[ERROR] ModelManager: %s - 加载失败: %v\n", req.ModelID, err)
+		logger.Error("异步模型加载失败", "modelId", req.ModelID, "error", err)
 		// 清理进程
 		m.processMgr.Stop(req.ModelID)
 
@@ -853,7 +834,7 @@ func (m *Manager) loadModelAsync(req *LoadRequest, status *ModelStatus) {
 		status.State = StateError
 		status.Error = fmt.Errorf("模型加载超时 (10分钟)")
 		m.mu.Unlock()
-		fmt.Printf("[ERROR] ModelManager: %s - 加载超时\n", req.ModelID)
+		logger.Error("异步模型加载超时", "modelId", req.ModelID, "timeout", "10m")
 		// 清理进程
 		m.processMgr.Stop(req.ModelID)
 	}
@@ -877,15 +858,20 @@ func (m *Manager) Unload(modelID string) error {
 
 	status, exists := m.statuses[modelID]
 	if !exists {
+		logger.Warn("模型卸载失败: 模型未加载", "modelId", modelID)
 		return fmt.Errorf("model not loaded: %s", modelID)
 	}
 
 	if status.State != StateLoaded {
+		logger.Warn("模型卸载失败: 模型未处于已加载状态", "modelId", modelID, "state", status.State)
 		return fmt.Errorf("model not in loaded state: %s", modelID)
 	}
 
+	logger.Info("开始卸载模型", "modelId", modelID, "modelName", status.Name, "port", status.Port)
+
 	// Stop process
 	if err := m.processMgr.Stop(modelID); err != nil {
+		logger.Error("模型卸载失败: 停止进程失败", "modelId", modelID, "error", err)
 		return err
 	}
 
@@ -893,6 +879,8 @@ func (m *Manager) Unload(modelID string) error {
 	status.State = StateUnloaded
 	status.ProcessID = ""
 	status.Port = 0
+
+	logger.Info("模型卸载成功", "modelId", modelID, "modelName", status.Name)
 
 	return nil
 }
@@ -1681,4 +1669,57 @@ func (m *Manager) mergeSplitModels() int {
 	}
 
 	return mergedCount
+}
+
+
+// toProcessLoadRequest converts model.LoadRequest to process.LoadRequest for command building
+// This bridges the canonical LoadRequest (with ModelID/NodeID) to the command-building LoadRequest (with ModelPath/Port)
+func toProcessLoadRequest(req *LoadRequest, modelPath string, port int) *process.LoadRequest {
+	return &process.LoadRequest{
+		ModelPath:        modelPath,
+		Port:             port,
+		CtxSize:          req.CtxSize,
+		BatchSize:        req.BatchSize,
+		Threads:          req.Threads,
+		GPULayers:        req.GPULayers,
+		Temperature:      req.Temperature,
+		TopP:             req.TopP,
+		TopK:             req.TopK,
+		RepeatPenalty:    req.RepeatPenalty,
+		Seed:             req.Seed,
+		NPredict:         req.NPredict,
+		Devices:          req.Devices,
+		MainGPU:          req.MainGPU,
+		CustomCmd:        req.CustomCmd,
+		ExtraParams:      req.ExtraParams,
+		MmprojPath:       req.MmprojPath,
+		EnableVision:     req.EnableVision,
+		FlashAttention:   req.FlashAttention,
+		NoMmap:           req.NoMmap,
+		LockMemory:       req.LockMemory,
+		NoWebUI:          req.NoWebUI,
+		EnableMetrics:    req.EnableMetrics,
+		SlotSavePath:     req.SlotSavePath,
+		CacheRAM:         req.CacheRAM,
+		ChatTemplateFile: req.ChatTemplateFile,
+		Timeout:          req.Timeout,
+		Alias:            req.Alias,
+		UBatchSize:       req.UBatchSize,
+		ParallelSlots:    req.ParallelSlots,
+		KVCacheTypeK:     req.KVCacheTypeK,
+		KVCacheTypeV:     req.KVCacheTypeV,
+		KVCacheUnified:   req.KVCacheUnified,
+		KVCacheSize:      req.KVCacheSize,
+		// Additional sampling parameters
+		LogitsAll:        req.LogitsAll,
+		Reranking:        req.Reranking,
+		MinP:             req.MinP,
+		PresencePenalty:  req.PresencePenalty,
+		FrequencyPenalty: req.FrequencyPenalty,
+		// Template and processing
+		DirectIo:         req.DirectIo,
+		DisableJinja:     req.DisableJinja,
+		ChatTemplate:     req.ChatTemplate,
+		ContextShift:     req.ContextShift,
+	}
 }

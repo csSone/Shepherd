@@ -15,6 +15,10 @@
 - [安全策略](security.md) - 安全报告和最佳实践
 - [AI 代理指南](../AGENTS.md) - AI 编码代理使用指南
 
+### API 文档
+
+- [模型加载 API](api/model-loading.md) - 模型加载参数详解
+
 ### Web 前端
 
 - [前端总览](web/README.md) - Web 前端概述和开发

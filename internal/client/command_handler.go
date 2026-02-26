@@ -12,6 +12,8 @@ import (
 	"github.com/shepherd-project/shepherd/Shepherd/internal/model"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/node"
 	"github.com/shepherd-project/shepherd/Shepherd/internal/process"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/client/tester"
+	"github.com/shepherd-project/shepherd/Shepherd/internal/types"
 )
 
 // CommandHandler 处理从 Master 接收到的命令
@@ -138,9 +140,16 @@ func (ch *CommandHandler) handleLoadModel(command *node.Command, result *node.Co
 		return fmt.Errorf("缺少必需的参数: model_id")
 	}
 
+	if ch.logger != nil {
+		ch.logger.Info(fmt.Sprintf("开始加载模型: %s", modelID))
+	}
+
 	if ch.modelManager == nil {
 		result.Success = false
 		result.Error = "模型管理器未初始化"
+		if ch.logger != nil {
+			ch.logger.Error("模型管理器未初始化")
+		}
 		return fmt.Errorf("模型管理器未初始化")
 	}
 
@@ -149,41 +158,87 @@ func (ch *CommandHandler) handleLoadModel(command *node.Command, result *node.Co
 		ModelID: modelID,
 	}
 
-	// 解析可选参数
+	// 解析可选参数并记录
 	if ctxSize, ok := command.Payload["ctx_size"].(float64); ok {
 		req.CtxSize = int(ctxSize)
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("上下文大小: %d", req.CtxSize))
+		}
 	}
 	if gpuLayers, ok := command.Payload["gpu_layers"].(float64); ok {
 		req.GPULayers = int(gpuLayers)
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("GPU 层数: %d", req.GPULayers))
+		}
 	}
 	if threads, ok := command.Payload["threads"].(float64); ok {
 		req.Threads = int(threads)
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("线程数: %d", req.Threads))
+		}
 	}
 	if batchSize, ok := command.Payload["batch_size"].(float64); ok {
 		req.BatchSize = int(batchSize)
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("批次大小: %d", req.BatchSize))
+		}
 	}
 	if temperature, ok := command.Payload["temperature"].(float64); ok {
 		req.Temperature = temperature
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("温度: %.2f", req.Temperature))
+		}
 	}
 	if topP, ok := command.Payload["top_p"].(float64); ok {
 		req.TopP = topP
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("Top-P: %.2f", req.TopP))
+		}
 	}
 	if topK, ok := command.Payload["top_k"].(float64); ok {
 		req.TopK = int(topK)
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("Top-K: %d", req.TopK))
+		}
 	}
 	if repeatPenalty, ok := command.Payload["repeat_penalty"].(float64); ok {
 		req.RepeatPenalty = repeatPenalty
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("重复惩罚: %.2f", req.RepeatPenalty))
+		}
 	}
 	if nPredict, ok := command.Payload["n_predict"].(float64); ok {
 		req.NPredict = int(nPredict)
+		if ch.logger != nil {
+			ch.logger.Debug(fmt.Sprintf("预测令牌数: %d", req.NPredict))
+		}
+	}
+
+	if ch.logger != nil {
+		ch.logger.Info(fmt.Sprintf("模型参数解析完成，准备执行加载: %s", modelID))
 	}
 
 	// 执行加载
+	if ch.logger != nil {
+		ch.logger.Debug(fmt.Sprintf("调用 ModelManager.Load() 加载模型: %s", modelID))
+	}
 	loadResult, err := ch.modelManager.Load(req)
 	if err != nil {
 		result.Success = false
 		result.Error = fmt.Sprintf("加载模型失败: %v", err)
+		if ch.logger != nil {
+			ch.logger.Error(fmt.Sprintf("加载模型 %s 失败: %v", modelID, err))
+		}
 		return err
+	}
+
+	if ch.logger != nil {
+		if loadResult.Success {
+			ch.logger.Info(fmt.Sprintf("模型 %s 加载成功 (端口: %d, 耗时: %dms, 上下文大小: %d)",
+				loadResult.ModelID, loadResult.Port, loadResult.Duration.Milliseconds(), loadResult.CtxSize))
+		} else {
+			ch.logger.Error(fmt.Sprintf("模型 %s 加载失败: %s", modelID, loadResult.Error.Error()))
+		}
 	}
 
 	result.Success = loadResult.Success
@@ -209,20 +264,36 @@ func (ch *CommandHandler) handleUnloadModel(command *node.Command, result *node.
 	if !ok || modelID == "" {
 		result.Success = false
 		result.Error = "缺少必需的参数: model_id"
+		if ch.logger != nil {
+			ch.logger.Error("卸载模型失败: 缺少必需的参数 model_id")
+		}
 		return fmt.Errorf("缺少必需的参数: model_id")
+	}
+
+	if ch.logger != nil {
+		ch.logger.Info(fmt.Sprintf("开始卸载模型: %s", modelID))
 	}
 
 	if ch.modelManager == nil {
 		result.Success = false
 		result.Error = "模型管理器未初始化"
+		if ch.logger != nil {
+			ch.logger.Error("卸载模型失败: 模型管理器未初始化")
+		}
 		return fmt.Errorf("模型管理器未初始化")
 	}
 
 	// 执行卸载
+	if ch.logger != nil {
+		ch.logger.Debug(fmt.Sprintf("调用 ModelManager.Unload() 卸载模型: %s", modelID))
+	}
 	err := ch.modelManager.Unload(modelID)
 	if err != nil {
 		result.Success = false
 		result.Error = fmt.Sprintf("卸载模型失败: %v", err)
+		if ch.logger != nil {
+			ch.logger.Error(fmt.Sprintf("卸载模型 %s 失败: %v", modelID, err))
+		}
 		return err
 	}
 
@@ -230,6 +301,10 @@ func (ch *CommandHandler) handleUnloadModel(command *node.Command, result *node.
 	result.Result = map[string]interface{}{
 		"model_id": modelID,
 		"unloaded": true,
+	}
+
+	if ch.logger != nil {
+		ch.logger.Info(fmt.Sprintf("模型 %s 卸载成功", modelID))
 	}
 
 	return nil
@@ -450,18 +525,17 @@ func (ch *CommandHandler) GetNodeID() string {
 	return ch.nodeID
 }
 
-
 // handleTestLlamacpp 处理测试 llama.cpp 可用性命令
 // Payload 可选包含:
 //   - binary_path: 指定测试的二进制路径 (可选，默认测试所有)
 func (ch *CommandHandler) handleTestLlamacpp(command *node.Command, result *node.CommandResult) error {
-	tester := NewTester(30 * time.Second)
+	llamacppTester := tester.NewTester(30 * time.Second)
 
-	var testResult *LlamacppTestResult
+	var testResult *types.LlamacppTestResult
 	if binaryPath, ok := command.Payload["binary_path"].(string); ok && binaryPath != "" {
-		testResult = tester.TestSpecific(binaryPath)
+		testResult = llamacppTester.TestSpecific(binaryPath)
 	} else {
-		testResult = tester.TestAll()
+		testResult = llamacppTester.TestAll()
 	}
 
 	result.Success = testResult.Success

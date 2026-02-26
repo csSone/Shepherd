@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -304,11 +305,20 @@ func (l *Logger) log(level LogLevel, msg string, fields []Field) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// 获取调用者信息 (文件名和行号)
+	// skip=2 跳过当前函数和调用 log 的函数 (如 Info/Debug 等)
+	_, file, line, ok := runtime.Caller(2)
+	caller := ""
+	if ok {
+		// 只保留文件名，不包含完整路径
+		caller = fmt.Sprintf("%s:%d", filepath.Base(file), line)
+	}
+
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	var logLine string
 
 	if l.formatJSON {
-		// JSON format
+		// JSON format - 顺序: time, caller, level, msg, fields
 		fieldStr := ""
 		if len(fields) > 0 {
 			fieldPairs := make([]string, 0, len(fields)*2)
@@ -317,9 +327,13 @@ func (l *Logger) log(level LogLevel, msg string, fields []Field) {
 			}
 			fieldStr = "," + strings.Join(fieldPairs, ":")
 		}
-		logLine = fmt.Sprintf(`{"time":"%s","level":"%s","msg":"%s"%s}`+"\n", timestamp, level, msg, fieldStr)
+		callerStr := ""
+		if caller != "" {
+			callerStr = fmt.Sprintf(`,"caller":"%s"`, caller)
+		}
+		logLine = fmt.Sprintf(`{"time":"%s"%s,"level":"%s","msg":"%s"%s}`+"\n", timestamp, callerStr, level, msg, fieldStr)
 	} else {
-		// Text format
+		// Text format - 顺序: [时间] [文件:行号] 级别 消息 字段...
 		fieldStr := ""
 		if len(fields) > 0 {
 			fieldPairs := make([]string, 0, len(fields))
@@ -328,7 +342,11 @@ func (l *Logger) log(level LogLevel, msg string, fields []Field) {
 			}
 			fieldStr = " " + strings.Join(fieldPairs, " ")
 		}
-		logLine = fmt.Sprintf("[%s] %s %s%s\n", timestamp, level, msg, fieldStr)
+		callerStr := ""
+		if caller != "" {
+			callerStr = fmt.Sprintf(" [%s]", caller)
+		}
+		logLine = fmt.Sprintf("[%s]%s %s %s%s\n", timestamp, callerStr, level, msg, fieldStr)
 	}
 
 	// Write to all outputs

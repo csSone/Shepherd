@@ -119,6 +119,8 @@ const (
 	CommandTypeStopTask     CommandType = "stop_task"
 	CommandTypeRestart      CommandType = "restart"
 	CommandTypeShutdown     CommandType = "shutdown"
+	CommandTypeTestLlamacpp CommandType = "test_llamacpp"
+	CommandTypeGetConfig    CommandType = "get_config"
 )
 
 // Command represents a command sent between nodes

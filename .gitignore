@@ -26,6 +26,8 @@ go.work.sum
 
 # env file
 .env
+.env.local
+.env.*.local
 
 # Editor/IDE
 .idea/
@@ -43,7 +45,6 @@ bin/
 # Logs
 logs/
 *.log
-
 
 # OS
 .DS_Store
@@ -63,6 +64,7 @@ profile.cov
 # Web frontend
 web/node_modules/
 web/package-lock.json
+web/dist/
 
 # Data directories
 data/
@@ -72,12 +74,25 @@ data/
 *.db-shm
 *.db-wal
 
-AGENTS.md
+# AI Editor and Code Assistant configurations (local only)
+.claude/
+.sisyphus
+.cursor/
+.cursorrules
+.aider*
+.github/copilot-instructions.md
+.copilot-instructions.md
+*.local.md
+*.local.yaml
+*.local.yml
 
 # Local configuration files and directories
 config/node
 config.local
-/internal/model/config 
+config/*.local.yaml
+config/*.local.yml
+config/server.config.yaml
+/internal/model/config
 
-
-CLAUDE.md
+# Example AGENTS.md (may contain sensitive instructions)
+AGENTS.md
