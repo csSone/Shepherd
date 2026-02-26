@@ -93,6 +93,7 @@ config/*.local.yaml
 config/*.local.yml
 config/server.config.yaml
 /internal/model/config
+/internal/**/config/
 
 # Example AGENTS.md (may contain sensitive instructions)
 AGENTS.md
